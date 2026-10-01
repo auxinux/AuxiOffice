@@ -353,6 +353,8 @@ def package(args):
     if "msi" in formats:
         build_msi(p, stage)
     dist = DIST_DIR / "windows"
+    from . import update_info
+    update_info.write("windows", [f for f in dist.iterdir() if f.is_file()])
     lines = []
     for f in sorted(dist.glob("*")):
         if f.is_file() and f.name != "SHA256SUMS":

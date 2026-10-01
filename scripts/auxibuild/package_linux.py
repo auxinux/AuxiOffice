@@ -371,6 +371,8 @@ def package(args):
         produced.append(build_deb(p))
     if "appimage" in formats:
         produced.append(build_appimage(p))
+    from . import update_info
+    update_info.write("linux", [f for f in (DIST_DIR / "linux").iterdir() if f.is_file()])
     sums = DIST_DIR / "linux" / "SHA256SUMS"
     lines = []
     for f in sorted((DIST_DIR / "linux").glob("*")):
