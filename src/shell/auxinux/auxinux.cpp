@@ -10,6 +10,7 @@
 
 #include "applicationmanager.h"        // CAscApplicationSettings (desktop-sdk)
 #include "cascapplicationmanagerwrapper.h"
+#include "clangater.h"
 #include "components/asctabwidget.h"   // COpenOptions, etLocalFile...
 #include "components/cfiledialog.h"
 #include "defines.h"
@@ -19,10 +20,14 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QHash>
 #include <QJsonArray>
 #include <QProcess>
 #include <QUrl>
 #include <QStandardPaths>
+#include <QTimer>
+#include <QTranslator>
+#include <csignal>
 #include <cstdio>
 
 #ifdef _WIN32
@@ -152,6 +157,57 @@ bool routeToTextEditor(const COpenOptions& opts)
         return false;
 
     return launchTextEditor(QStringList{path});
+}
+
+namespace {
+// Messages ajoutés par AuxiNux au shell (absents des traductions upstream de desktop-apps).
+class Translator : public QTranslator
+{
+public:
+    QString translate(const char *, const char *source, const char *, int) const override
+    {
+        if ( !CLangater::getCurrentLangCode().startsWith(QStringLiteral("fr")) )
+            return QString();
+        static const QHash<QByteArray, QString> fr = {
+            {"AuxiText cannot be started.", QString::fromUtf8("AuxiText ne peut pas être lancé.")},
+            {"PDF documents", QStringLiteral("Documents PDF")},
+            {"All files (*.*)", QStringLiteral("Tous les fichiers (*.*)")},
+        };
+        return fr.value(QByteArray(source));
+    }
+    bool isEmpty() const override { return false; }
+};
+}
+
+#ifdef __linux
+namespace {
+// Le moteur (desktop-sdk, CLinuxData::Check) installe au démarrage de la boucle d'événements un
+// gestionnaire SIGTERM qui ferme l'application depuis le gestionnaire de signal (opérations non
+// réentrantes) : il se termine par une erreur de segmentation, donc un core dump à chaque
+// fermeture de session. Dès qu'il est en place, on rétablit l'action par défaut d'Unix
+// (terminaison immédiate, sans core dump ; les processus du moteur web s'arrêtent avec le shell).
+void restoreSigterm(int attempts)
+{
+    struct sigaction current;
+    if ( sigaction(SIGTERM, nullptr, &current) == 0 && current.sa_handler != SIG_DFL ) {
+        std::signal(SIGTERM, SIG_DFL);
+        return;
+    }
+    if ( attempts > 0 )
+        QTimer::singleShot(500, [attempts] { restoreSigterm(attempts - 1); });
+}
+}
+
+void restoreDefaultSignals()
+{
+    QTimer::singleShot(0, [] { restoreSigterm(20); });
+}
+#endif
+
+void installTranslator()
+{
+    static Translator translator;
+    QCoreApplication::installTranslator(&translator);
 }
 
 QString selectPdfFile(int parentViewId)

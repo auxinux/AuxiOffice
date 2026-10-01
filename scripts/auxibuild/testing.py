@@ -5,8 +5,10 @@
 Linux : versions, AuxiText unit tests, static branding/privacy/legal checks,
         GUI smoke tests (Xvfb + xdotool, offline) with a network audit (strace),
         engine conversion tests (x2t: DOCX/XLSX/PPTX -> PDF/ODF and back).
-Windows (cross-built from Linux): static checks only (PE imports, version
-        resources, subsystem); the functional tests are manual (docs/TESTING-WINDOWS.md).
+Windows (cross-built from Linux): static checks (PE imports, version resources,
+        subsystem) and, when AUXI_WINE points to a Wine launcher, a smoke test under
+        Wine (versions, shell start-up through the launcher). Wine is not Windows: the
+        functional tests remain manual (docs/TESTING-WINDOWS.md).
 
 A Markdown + JSON report is written to build/test-reports/<target>/. Any failure
 makes the stage fail: untested artefacts are never reported as validated."""
@@ -215,11 +217,15 @@ def test_engine(r, stage, py):
 def test_windows_static(r, stage):
     from .toolchain import ensure_venv
     py = ensure_venv()
-    eng = stage
-    for exe in ("auxioffice-editors.exe", "auxitext.exe", "auxioffice.exe"):
-        res = subprocess.run([py, ROOT / "scripts" / "tools" / "check_pe_imports.py", stage / exe, eng, eng / "converter"],
+    # Dossiers de recherche des DLL à l'exécution : le dossier de l'application ; le shell
+    # reçoit en plus converter\ dans son PATH (lanceur auxioffice.exe, comme upstream).
+    search = {"auxioffice.exe": [stage], "auxitext.exe": [stage],
+              "auxioffice-editors.exe": [stage, stage / "converter"]}
+    for exe, dirs in search.items():
+        res = subprocess.run([py, ROOT / "scripts" / "tools" / "check_pe_imports.py", stage / exe, *dirs],
                              capture_output=True, text=True)
-        r.add(f"{exe} : imports résolus par les DLL livrées", res.returncode == 0, res.stdout.strip().splitlines()[-1][:160])
+        out = (res.stdout.strip().splitlines() or [res.stderr.strip()])[-1]
+        r.add(f"{exe} : imports résolus par les DLL livrées", res.returncode == 0, out[:160])
     script = (
         "import pefile,sys\n"
         "pe=pefile.PE(sys.argv[1])\n"
@@ -235,6 +241,50 @@ def test_windows_static(r, stage):
         r.add(f"{exe} : sous-système GUI et métadonnées", res.returncode == 0 and parts[0] == "2"
               and "AuxiNux Office" in res.stdout, res.stdout.strip()[:120])
     r.add("tests fonctionnels Windows", False, "à exécuter sur Windows 10/11 (docs/TESTING-WINDOWS.md)", skipped=True)
+
+
+def test_windows_wine(r, stage):
+    """Facultatif : AUXI_WINE = lanceur Wine (avec son WINEPREFIX). Vérifie les versions et que le
+    shell démarre via le lanceur, avec toutes ses DLL (moteur dans converter\\) et ses processus CEF."""
+    wine = os.environ.get("AUXI_WINE")
+    if not wine:
+        r.add("tests sous Wine", False, "AUXI_WINE non défini (facultatif, voir docs/TESTING-WINDOWS.md)",
+              skipped=True)
+        return
+    env = dict(os.environ, WINEDEBUG="err+module")
+    expected = f"{product()['product']['name']} {version()}"
+    res = subprocess.run([wine, stage / "auxioffice.exe", "--version"], capture_output=True, text=True,
+                         env=env, timeout=120)
+    r.add("Wine : auxioffice.exe --version", res.stdout.strip() == expected, res.stdout.strip()[:80])
+    res = subprocess.run([wine, stage / "auxitext.exe", "--version"], capture_output=True, text=True,
+                         env=env, timeout=120)
+    r.add("Wine : auxitext.exe --version", res.stdout.startswith(f"AuxiText {version()}"), res.stdout.strip()[:80])
+
+    log = REPORTS / "windows" / "wine-shell.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with open(log, "w", encoding="utf-8", errors="replace") as fh:
+        proc = subprocess.Popen([wine, stage / "auxioffice.exe"], stdout=fh, stderr=subprocess.STDOUT, env=env)
+        running = False
+        for _ in range(60):
+            time.sleep(2)
+            ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True).stdout
+            if "auxioffice-editors.exe" in ps and "editors_helper.exe" in ps:
+                running = True
+                time.sleep(10)
+                break
+        subprocess.run([wine, "wineboot", "--end-session"], capture_output=True, env=env, timeout=120)
+        server = os.environ.get("AUXI_WINESERVER") or shutil.which("wineserver")
+        if server:
+            subprocess.run([server, "-k"], capture_output=True, timeout=60)
+        try:
+            proc.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    text = log.read_text(encoding="utf-8", errors="replace")
+    missing = sorted({l.split("Library ")[1].split(" ")[0] for l in text.splitlines()
+                      if "import_dll" in l and "Library " in l})
+    r.add("Wine : shell lancé via auxioffice.exe (DLL du moteur et processus CEF)", running and not missing,
+          ("DLL introuvables : " + ", ".join(missing)) if missing else ("démarré" if running else "non démarré"))
 
 
 def run_all(args):
@@ -255,6 +305,7 @@ def run_all(args):
             test_engine(r, stage, py)
     else:
         test_windows_static(r, stage)
+        test_windows_wine(r, stage)
     r.write()
     if r.failures:
         fail(f"{len(r.failures)} test(s) en échec — voir {REPORTS / args.target / 'report.md'}")

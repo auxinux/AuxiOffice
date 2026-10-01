@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Projet AuxiNux <repo@auxinux.ca>
+Date: Thu, 1 Oct 2026 21:09:00 +0000
+Subject: [PATCH] shell: French translations of AuxiNux messages
+
+Install the AuxiNux translator (messages added by the AuxiNux patches, such as 'AuxiText cannot be started.' and the 'Open PDF' file filter), which follows the interface language of the shell.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ win-linux/src/main.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/win-linux/src/main.cpp b/win-linux/src/main.cpp
+index dd4c339..c9a03e3 100644
+--- a/win-linux/src/main.cpp
++++ b/win-linux/src/main.cpp
+@@ -190,6 +190,7 @@ int main( int argc, char *argv[] )
+     setup_paths(&AscAppManager::getInstance());
+ #ifdef AUXI_PRODUCT_NAME
+     AuxiNux::applyPrivacyDefaults();
++    AuxiNux::installTranslator();
+ #endif
+     application_cef->Init_CEF(&AscAppManager::getInstance(), argc, argv);
+     /* ********************** */

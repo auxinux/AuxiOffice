@@ -40,6 +40,16 @@ void adjustSettings(CAscApplicationSettings& settings);
 // du moteur (assistants IA désactivés tant que l'utilisateur ne les active pas).
 void applyPrivacyDefaults();
 
+// Traductions des messages propres à AuxiNux dans le shell (français, anglais), selon la
+// langue de l'interface ; à appeler une fois l'application Qt créée.
+void installTranslator();
+
+#ifdef __linux
+// À appeler avant la boucle d'événements : arrêt standard sur SIGTERM (le gestionnaire du
+// moteur ferme l'application depuis le signal et se termine par une erreur de segmentation).
+void restoreDefaultSignals();
+#endif
+
 // Fichiers texte brut gérés par AuxiText (extensions de branding/product.json, sauf CSV).
 bool isTextDocument(const QString& path);
 

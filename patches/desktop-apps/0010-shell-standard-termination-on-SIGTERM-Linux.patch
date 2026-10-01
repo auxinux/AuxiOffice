@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Projet AuxiNux <repo@auxinux.ca>
+Date: Thu, 1 Oct 2026 21:14:26 +0000
+Subject: [PATCH] shell: standard termination on SIGTERM (Linux)
+
+When the event loop starts, the engine (desktop-sdk) installs a SIGTERM handler that closes the application from inside the signal handler; it ends in a segmentation fault, so every session logout produced a crash and a core dump. Once that handler is in place, restore the default action of SIGTERM (immediate termination, no core dump).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ win-linux/src/main.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/win-linux/src/main.cpp b/win-linux/src/main.cpp
+index c9a03e3..4690ec4 100644
+--- a/win-linux/src/main.cpp
++++ b/win-linux/src/main.cpp
+@@ -193,6 +193,9 @@ int main( int argc, char *argv[] )
+     AuxiNux::installTranslator();
+ #endif
+     application_cef->Init_CEF(&AscAppManager::getInstance(), argc, argv);
++#if defined(AUXI_PRODUCT_NAME) && defined(__linux)
++    AuxiNux::restoreDefaultSignals();
++#endif
+     /* ********************** */
+ 
+ //    GET_REGISTRY_SYSTEM(reg_system)

@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -102,7 +103,9 @@ class Session:
         root = d.screen().root
         g = root.get_geometry()
         raw = root.get_image(0, 0, g.width, g.height, X.ZPixmap, 0xffffffff)
-        Image.frombytes("RGB", (g.width, g.height), raw.data, "raw", "BGRX").save(self.out / f"{name}.png")
+        image = Image.frombytes("RGB", (g.width, g.height), raw.data, "raw", "BGRX")
+        image.save(self.out / f"{name}.png")
+        return image
 
     def wait_stable(self, timeout=60, quiet=3.0):
         """Attend que l'écran ne change plus pendant « quiet » secondes (chargement terminé)."""
@@ -255,18 +258,30 @@ class Session:
                     f"{len(prs.slides)} diapositives, titre « {title} »")
 
     def test_pdf(self):
-        self.launch(self.docs / "document.pdf")
+        pdf = self.docs / "document.pdf"
+        self.launch(pdf)
         time.sleep(4)
         self.wait_stable(90)
+        # ouvert dans AuxiPDF : le shell l'inscrit dans les documents récents (type 513 = PDF)
+        recents = self.home / ".local" / "share" / "auxioffice" / "recents.xml"
+        text = recents.read_text(encoding="utf-8-sig", errors="replace") if recents.exists() else ""
+        opened = f'path="{pdf}" type="513"' in text
         ox, oy = self.main_origin()
         self.click(ox + 600, oy + 470)
+        before = self.shot("05-pdf")
         self.xdo("key", "ctrl+f")
         time.sleep(1)
         self.xdo("type", "--delay", "60", "Page 3")
         self.xdo("key", "Return")
         time.sleep(2)
-        self.shot("05-pdf-recherche")
-        self.record("PDF ouvrir/rechercher", True, "vérification visuelle : 05-pdf-recherche.png")
+        after = self.shot("05-pdf-recherche")
+        # la recherche fait défiler la vue jusqu'à la page 3 : une part importante de l'écran change
+        from PIL import ImageChops
+        diff = ImageChops.difference(before, after).convert("L").point(lambda v: 255 if v > 24 else 0)
+        changed = sum(diff.histogram()[255:]) / (diff.width * diff.height)
+        self.record("PDF ouvrir/rechercher", opened and changed > 0.05,
+                    f"documents récents : {'oui' if opened else 'non'}, vue modifiée par la recherche : "
+                    f"{changed:.0%} de l'écran (captures 05-pdf*.png)")
 
     def test_text(self):
         doc = self.docs / "notes-crlf.txt"
@@ -312,6 +327,28 @@ class Session:
         time.sleep(10)
         self.stop_app()
 
+    def test_sigterm(self):
+        """Arrêt par SIGTERM (fermeture de session) : terminaison normale, sans erreur de
+        segmentation ni processus du moteur restant (patch desktop-apps 0010)."""
+        self.stop_app()
+        prefix = ["unshare", "-Un"] if self.offline else []
+        # unshare (sans --fork) puis le lanceur remplacent leur image : le processus suivi est le shell.
+        proc = subprocess.Popen(prefix + [str(Path(self.args.app) / "auxioffice")], env=self.env,
+                                stdout=open(self.out / "app.log", "a"), stderr=subprocess.STDOUT, cwd=str(self.home))
+        started = self.main_window(120) is not None
+        time.sleep(10)
+        proc.send_signal(signal.SIGTERM)
+        try:
+            code = proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            code = "aucune (toujours actif après 30 s)"
+        time.sleep(3)
+        helpers = subprocess.run(["pgrep", "-x", "editors_helper"], capture_output=True, text=True).stdout.split()
+        self.record("arrêt par SIGTERM sans plantage", started and code == -signal.SIGTERM and not helpers,
+                    f"fenêtre {'ouverte' if started else 'absente'}, sortie {code}, "
+                    f"{len(helpers)} processus du moteur restant(s)")
+
     def stop_app(self):
         for name in ("auxioffice-edit", "editors_helper", "auxitext", "strace"):
             subprocess.run(["pkill", "-x", name], capture_output=True)
@@ -333,7 +370,8 @@ class Session:
     def run(self):
         self.start_x()
         try:
-            for t in (self.test_startpage, self.test_docx, self.test_xlsx, self.test_pptx, self.test_pdf, self.test_text):
+            for t in (self.test_startpage, self.test_docx, self.test_xlsx, self.test_pptx, self.test_pdf, self.test_text,
+                      self.test_sigterm):
                 try:
                     t()
                 except Exception as e:   # un scénario en échec n'arrête pas les autres
