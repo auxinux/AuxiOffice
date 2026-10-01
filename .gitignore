@@ -16,3 +16,7 @@ __pycache__/
 *.swp
 .DS_Store
 aqtinstall.log
+
+# Vidages mémoire de processus
+core
+core.[0-9]*

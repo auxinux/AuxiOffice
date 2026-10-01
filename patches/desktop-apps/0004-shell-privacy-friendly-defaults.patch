@@ -3,16 +3,16 @@ From: Projet AuxiNux <repo@auxinux.ca>
 Date: Thu, 1 Oct 2026 17:51:40 +0000
 Subject: [PATCH] shell: privacy-friendly defaults
 
-No online template gallery unless --templates-url is given; AI assistants disabled until the user enables them; no sign-up page when none is configured.
+No online template gallery unless --templates-url is given; no sign-up page when none is configured.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- win-linux/src/cascapplicationmanagerwrapper.cpp | 13 +++++++++++++
- win-linux/src/windows/cmainwindow.cpp           |  5 +++++
- 2 files changed, 18 insertions(+)
+ win-linux/src/cascapplicationmanagerwrapper.cpp | 7 +++++++
+ win-linux/src/windows/cmainwindow.cpp           | 5 +++++
+ 2 files changed, 12 insertions(+)
 
 diff --git a/win-linux/src/cascapplicationmanagerwrapper.cpp b/win-linux/src/cascapplicationmanagerwrapper.cpp
-index ce5a55a..1b23c93 100644
+index ce5a55a..388ad99 100644
 --- a/win-linux/src/cascapplicationmanagerwrapper.cpp
 +++ b/win-linux/src/cascapplicationmanagerwrapper.cpp
 @@ -32,6 +32,9 @@
@@ -37,19 +37,6 @@ index ce5a55a..1b23c93 100644
  
                      QJsonObject _json_obj{
                          {"portal", _templates_url},
-@@ -1327,6 +1334,12 @@ void CAscApplicationManagerWrapper::initializeApp()
-         AscAppManager::setUserSettings(L"system-scale", L"1");
-     }
- 
-+#ifdef AUXI_DEFAULT_DISABLE_AI
-+    // AuxiNux: AI assistants (which send content to a third-party provider) are opt-in
-+    if ( AscAppManager::userSettings(L"disable-ai").empty() )
-+        AscAppManager::setUserSettings(L"disable-ai", L"1");
-+#endif
-+
-     SingleApplication * app = static_cast<SingleApplication *>(QCoreApplication::instance());
-     connect(app, &SingleApplication::receivedMessage, [](const QString &args) {
-         std::vector<std::wstring> vec_inargs;
 diff --git a/win-linux/src/windows/cmainwindow.cpp b/win-linux/src/windows/cmainwindow.cpp
 index 346ea57..e74d9dc 100644
 --- a/win-linux/src/windows/cmainwindow.cpp

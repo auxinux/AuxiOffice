@@ -13,7 +13,7 @@ THIRD_PARTY_DIR = BUILD_DIR / "third_party"
 
 # Which upstream repositories each build feature needs.
 FEATURE_REPOS = {
-    "legal": ["DesktopEditors"],
+    "legal": ["DesktopEditors", "sdkjs"],
     "shell": ["desktop-apps", "desktop-sdk", "core"],
     "startpage": ["desktop-apps"],
     "webapps": ["web-apps"],
@@ -30,18 +30,25 @@ def head_commit(repo_dir):
     return _git(repo_dir, "rev-parse", "HEAD", capture=True).stdout.strip()
 
 
-def fetch_repo(name, spec):
+def fetch_repo(name, spec, full=False):
     """Shallow-fetch exactly the pinned commit. Sparse repositories only check out
-    the listed paths (partial clone), which keeps e.g. 'core' small."""
+    the listed paths (partial clone), which keeps e.g. 'core' small. 'full'
+    disables the sparse set used when a repository is only needed for its legal files."""
     dest = UPSTREAM_SRC / name
     commit = spec["commit"]
-    sparse = spec.get("sparse")
+    sparse = spec.get("sparse") or (None if full else spec.get("sparse_when_not_built"))
+    wanted_sparse = "\n".join(sparse) + "\n" if sparse else ""
+    sparse_file = dest / ".git" / "info" / "sparse-checkout"
     if (dest / ".git").exists():
         current = head_commit(dest)
-        if current == commit:
+        current_sparse = sparse_file.read_text() if sparse_file.exists() and _git(
+            dest, "config", "core.sparseCheckout", check=False, capture=True).stdout.strip() == "true" else ""
+        if current == commit and current_sparse == wanted_sparse:
             ok(f"{name} déjà à {commit[:12]}")
             return dest
         info(f"{name} : {current[:12]} -> {commit[:12]}")
+        if not sparse:
+            _git(dest, "config", "core.sparseCheckout", "false")
     else:
         dest.mkdir(parents=True, exist_ok=True)
         _git(dest, "init", "-q")
@@ -55,6 +62,8 @@ def fetch_repo(name, spec):
     else:
         _git(dest, "fetch", "-q", "--depth", "1", "origin", commit)
     _git(dest, "checkout", "-q", "--force", commit)
+    if not sparse:
+        _git(dest, "read-tree", "-mu", "HEAD")   # repeuple un checkout auparavant partiel
     got = head_commit(dest)
     if got != commit:
         fail(f"{name} : commit obtenu {got} différent du verrou {commit}")
@@ -75,7 +84,7 @@ def fetch_sources(features):
     step("Récupération des sources upstream épinglées")
     spec = lock()["repositories"]
     for name in repos_for(features):
-        fetch_repo(name, spec[name])
+        fetch_repo(name, spec[name], full=(name == "sdkjs" and "sdkjs-source" in features))
 
 
 def reset_repo(name, clean_ignored=False):

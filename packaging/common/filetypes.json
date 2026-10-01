@@ -1,0 +1,119 @@
+{
+  "_comment": "Types de fichiers gérés par chaque application d'AuxiNux Office (Linux : MimeType des fichiers .desktop ; Windows : associations proposées par l'installateur). Les extensions sans type MIME dédié (.ini, .conf) sont couvertes par text/plain. icon_resource_id : identifiant de ressource d'icône dans auxioffice.exe (DefaultIcon = auxioffice.exe,-<id>).",
+  "writer": {
+    "mime": [
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+      "application/vnd.ms-word.document.macroEnabled.12",
+      "application/msword",
+      "application/vnd.oasis.opendocument.text",
+      "application/vnd.oasis.opendocument.text-template",
+      "application/rtf",
+      "text/rtf",
+      "application/epub+zip",
+      "application/x-fictionbook+xml"
+    ],
+    "windows": {
+      "extensions": [
+        "docx",
+        "doc",
+        "odt",
+        "rtf",
+        "dotx",
+        "ott",
+        "docm"
+      ],
+      "icon_resource_id": 2
+    }
+  },
+  "sheet": {
+    "mime": [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+      "application/vnd.ms-excel.sheet.macroEnabled.12",
+      "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+      "application/vnd.ms-excel",
+      "application/vnd.oasis.opendocument.spreadsheet",
+      "application/vnd.oasis.opendocument.spreadsheet-template",
+      "text/csv"
+    ],
+    "windows": {
+      "extensions": [
+        "xlsx",
+        "xls",
+        "ods",
+        "csv",
+        "xltx",
+        "ots",
+        "xlsm"
+      ],
+      "icon_resource_id": 3
+    }
+  },
+  "present": {
+    "mime": [
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+      "application/vnd.openxmlformats-officedocument.presentationml.template",
+      "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.oasis.opendocument.presentation",
+      "application/vnd.oasis.opendocument.presentation-template"
+    ],
+    "windows": {
+      "extensions": [
+        "pptx",
+        "ppt",
+        "odp",
+        "ppsx",
+        "potx",
+        "otp",
+        "pptm"
+      ],
+      "icon_resource_id": 4
+    }
+  },
+  "pdf": {
+    "mime": [
+      "application/pdf",
+      "image/vnd.djvu",
+      "application/vnd.ms-xpsdocument",
+      "application/oxps"
+    ],
+    "windows": {
+      "extensions": [
+        "pdf",
+        "djvu",
+        "xps",
+        "oxps"
+      ],
+      "icon_resource_id": 5
+    }
+  },
+  "text": {
+    "mime": [
+      "text/plain",
+      "text/x-log",
+      "text/markdown",
+      "application/json",
+      "application/xml",
+      "text/xml",
+      "application/yaml",
+      "application/x-yaml",
+      "text/x-yaml"
+    ],
+    "windows": {
+      "extensions": [
+        "txt",
+        "log",
+        "md",
+        "json",
+        "xml",
+        "yaml",
+        "yml",
+        "ini"
+      ],
+      "icon_resource_id": 6
+    }
+  }
+}

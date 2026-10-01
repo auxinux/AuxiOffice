@@ -1,0 +1,18 @@
+AuxiNux Office — auteurs
+=======================
+
+Projet AuxiNux (https://auxinux.ca)
+  Mainteneur des paquets : AuxiNux <repo@auxinux.ca>
+
+Contributions
+  Les contributions sont listées par l'historique Git du dépôt (git shortlog -sne).
+  Toute personne contribuant du code ou des ressources est ajoutée ici sur demande.
+
+Programme d'origine
+  ONLYOFFICE Desktop Editors — Ascensio System SIA et contributeurs
+  https://github.com/ONLYOFFICE/DesktopEditors
+  (core, desktop-sdk, desktop-apps, web-apps, sdkjs, build_tools)
+
+Ressources tierces utilisées par AuxiNux
+  Police Carlito (contours des lettres de l'identité visuelle) —
+  tyPoland Łukasz Dziedzic, The Carlito Project Authors (SIL OFL 1.1)

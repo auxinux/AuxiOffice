@@ -1,0 +1,62 @@
+AuxiNux Office
+Copyright (C) 2026 Projet AuxiNux
+
+AuxiNux Office est un logiciel libre développé dans le cadre du projet AuxiNux
+(https://auxinux.ca).
+
+AuxiNux Office utilise et modifie des composants provenant de ONLYOFFICE Desktop
+Editors 9.4.0 (build 129), développé à l'origine par Ascensio System SIA
+(https://github.com/ONLYOFFICE/DesktopEditors), distribué sous la licence GNU
+Affero General Public License version 3 accompagnée de conditions additionnelles
+(voir LICENSING.md et, dans les paquets, licenses/ONLYOFFICE-LICENSE.txt).
+
+AuxiNux Office est un projet indépendant et n'est pas un produit officiel de
+ONLYOFFICE ou d'Ascensio System SIA.
+
+ONLYOFFICE est une marque d'Ascensio System SIA (« ONLYOFFICE is a trademark of
+Ascensio System SIA »). Aucun droit de marque n'est accordé ni revendiqué. Le
+nom ONLYOFFICE n'est utilisé que pour indiquer l'origine du code.
+
+VERSION MODIFIÉE
+----------------
+AuxiNux Office est une version modifiée du programme d'origine. Les
+modifications sont apportées par le projet AuxiNux depuis le 2026-10-01 :
+
+  - patches/<dépôt upstream>/*.patch : modifications du code upstream (chaque
+    fichier modifié porte en outre une mention datée « Modified by Projet AuxiNux ») ;
+  - src/ : composants propres à AuxiNux (AuxiText, lanceur auxioffice, extensions
+    du shell et de la page d'accueil) ;
+  - branding/ : identité visuelle AuxiNux, qui remplace celle du programme d'origine.
+
+La liste détaillée des modifications d'une version est générée dans le fichier
+NOTICE.txt installé avec AuxiNux Office.
+
+COMPOSANTS ET LICENCES
+----------------------
+  - Code AuxiNux (src/, scripts/, patches/) : GNU AGPL v3 ou ultérieure
+    (AGPL-3.0-or-later) ; l'ensemble distribué est soumis à l'AGPL v3 (AGPL-3.0-only)
+    et aux conditions additionnelles du programme d'origine.
+  - Code ONLYOFFICE (core, desktop-sdk, desktop-apps, web-apps, sdkjs) :
+    Copyright (C) 2009-2026 Ascensio System SIA — AGPL-3.0-only + conditions
+    additionnelles.
+  - Éléments non logiciels d'origine ONLYOFFICE (illustrations, jeux d'icônes,
+    rédaction technique) : Creative Commons Attribution-ShareAlike 4.0
+    International (https://creativecommons.org/licenses/by-sa/4.0/legalcode).
+  - Identité visuelle AuxiNux (branding/) : Copyright (C) 2026 Projet AuxiNux,
+    CC BY-SA 4.0 ; les contours des lettres proviennent de la police Carlito
+    (SIL Open Font License 1.1, branding/fonts/OFL-1.1.txt). Les noms et logos
+    AuxiNux restent des signes distinctifs du projet AuxiNux.
+  - Composants tiers (Chromium Embedded Framework, Qt, ICU, V8, bibliothèques
+    JavaScript, polices, dictionnaires…) : voir LICENSING.md et le répertoire
+    licenses/ installé avec l'application.
+
+-------------------------------------------------------------------------------
+English summary
+
+AuxiNux Office is free software developed by the AuxiNux project. It uses and
+modifies components of ONLYOFFICE Desktop Editors 9.4.0, originally developed by
+Ascensio System SIA, licensed under the GNU AGPL v3 with additional terms.
+AuxiNux Office is an independent project and is not an official product of
+ONLYOFFICE or Ascensio System SIA. ONLYOFFICE is a trademark of Ascensio System
+SIA. This is a modified version: changes made by the AuxiNux project since
+2026-10-01 are described in patches/ and in the installed NOTICE.txt file.

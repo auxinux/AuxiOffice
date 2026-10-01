@@ -36,6 +36,10 @@ QString configFile();   // fichier INI (Windows uniquement) : %APPDATA%\AuxiNux\
 // nom d'application écrit dans les métadonnées des documents produits.
 void adjustSettings(CAscApplicationSettings& settings);
 
+// Réglages par défaut respectueux de la vie privée, appliqués avant l'initialisation
+// du moteur (assistants IA désactivés tant que l'utilisateur ne les active pas).
+void applyPrivacyDefaults();
+
 // Fichiers texte brut gérés par AuxiText (extensions de branding/product.json, sauf CSV).
 bool isTextDocument(const QString& path);
 

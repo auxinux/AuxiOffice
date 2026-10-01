@@ -172,6 +172,16 @@ def wordmark(dark=False):
     return svg_doc(int(width + 24), int(height), body)
 
 
+def text_page_icon(dark):
+    """Grande icône « fichier texte » de la page d'accueil (108x100, comme docx-big upstream)."""
+    page = "#2D2D2D" if dark else "#FFFFFF"
+    line = "#4A4F57" if dark else "#CDD1D6"
+    widths = [58, 44, 52, 30, 58, 40, 22]
+    rects = "".join(f'<rect x="24" y="{10 + i * 12}" width="{w}" height="6" rx="1" fill="{line}"/>' for i, w in enumerate(widths))
+    return svg_doc(108, 100, f'''  <path fill="{page}" d="M14 4a4 4 0 0 1 4-4h72a4 4 0 0 1 4 4v92a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V4Z"/>
+  {rects}''')
+
+
 def splash():
     """Écran de démarrage / bannière (installateur, AppImage, documentation)."""
     mark = wordmark(dark=True)
@@ -232,6 +242,46 @@ def write_bmp(svg_text, width, height, out, background="#FFFFFF"):
 PRODUCT_VERSION = (BRANDING.parent / "VERSION").read_text().strip()
 
 
+def _inner(svg):
+    """Contenu d'un document SVG sans la balise racine."""
+    return svg.split("\n", 1)[1].rsplit("</svg>", 1)[0]
+
+
+def _size(svg):
+    w = float(svg.split('width="', 1)[1].split('"', 1)[0])
+    h = float(svg.split('height="', 1)[1].split('"', 1)[0])
+    return w, h
+
+
+def _scoped(svg, prefix):
+    """Préfixe les identifiants internes (dégradés) pour combiner plusieurs SVG."""
+    for ident in ("bg", "gloss", "glyph", "swoosh", "badge", "auxi", "nux"):
+        svg = svg.replace(f'id="{ident}"', f'id="{prefix}-{ident}"').replace(f"url(#{ident})", f"url(#{prefix}-{ident})")
+    return svg
+
+
+def welcome_illustration(dark, icons):
+    """Illustration de l'écran d'accueil (377x193) : les cinq applications de la suite."""
+    order = ["auxiwriter", "auxisheet", "auxipresent", "auxipdf", "auxitext"]
+    ground = "#2A2C31" if dark else "#E9E9E6"
+    parts = [f'  <ellipse cx="188.5" cy="166" rx="176" ry="15" fill="{ground}"/>']
+    positions = [(8, 84, 0.27), (80, 64, 0.29), (146, 42, 0.33), (222, 64, 0.29), (300, 84, 0.27)]
+    for name, (x, y, sc) in zip(order, positions):
+        parts.append(f'  <g transform="translate({x} {y}) scale({sc})">{_inner(_scoped(icons[name], name))}</g>')
+    parts.append(f'  <rect x="128" y="176" width="121" height="6" rx="3" fill="{ORANGE}"/>')
+    return svg_doc(377, 193, "\n".join(parts))
+
+
+def shell_logo(dark):
+    """Logo compact de la barre d'onglets du shell (85x20, comme upstream)."""
+    mark = wordmark(dark)
+    w, h = _size(mark)
+    scale = min(83 / w, 18 / h)
+    dx = (85 - w * scale) / 2
+    dy = (20 - h * scale) / 2
+    return svg_doc(85, 20, f'  <g transform="translate({dx:.2f} {dy:.2f}) scale({scale:.5f})">{_inner(mark)}</g>')
+
+
 def main():
     apps = PRODUCT["apps"]
     icons = {
@@ -263,6 +313,17 @@ def main():
         w = int(svg.split('width="', 1)[1].split('"', 1)[0])
         h = int(svg.split('height="', 1)[1].split('"', 1)[0])
         render_png_wh(svg, 600, int(600 * h / w), OUT / "png" / f"{variant}.png")
+    for variant, dark in (("welcome-light", False), ("welcome-dark", True)):
+        svg = welcome_illustration(dark, icons)
+        (svg_dir / f"{variant}.svg").write_text(svg, encoding="utf-8")
+        render_png_wh(svg, 754, 386, OUT / "png" / f"{variant}.png")
+    for variant, dark in (("shell-logo-light", False), ("shell-logo-dark", True)):
+        svg = shell_logo(dark)
+        (svg_dir / f"{variant}.svg").write_text(svg, encoding="utf-8")
+        for factor, suffix in ((1, ""), (1.25, "@1.25x"), (1.5, "@1.5x"), (1.75, "@1.75x"), (2, "@2x")):
+            render_png_wh(svg, round(85 * factor), round(20 * factor), OUT / "png" / f"{variant}{suffix}.png")
+    for variant, dark in (("txt-big", False), ("txt-big-dark", True)):
+        (svg_dir / f"{variant}.svg").write_text(text_page_icon(dark), encoding="utf-8")
     sp = splash()
     (svg_dir / "splash.svg").write_text(sp, encoding="utf-8")
     render_png_wh(sp, 720, 400, OUT / "png" / "splash.png")

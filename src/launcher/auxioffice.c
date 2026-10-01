@@ -63,6 +63,10 @@ static const char *HELP_TEXT =
     "  --new-presentation             nouvelle présentation (AuxiPresent)\n"
     "  --new-text                     nouveau fichier texte (AuxiText)\n"
     "  --writer FICHIER               force l'ouverture dans AuxiWriter (ex. un .txt)\n"
+    "  --app=writer|sheet|present|pdf|text\n"
+    "                                 application cible (entrées de menu) : sans fichier,\n"
+    "                                 crée un nouveau document ; avec fichiers, les ouvre\n"
+    "                                 dans cette application\n"
     "\n"
     "Les autres options sont transmises au moteur d'édition.\n";
 
@@ -171,6 +175,30 @@ static int is_text_document(const char *path)
 }
 #endif
 
+/* --app=... : application demandée par une entrée de menu / association. */
+enum target_app { APP_AUTO, APP_WRITER, APP_SHEET, APP_PRESENT, APP_PDF, APP_TEXT };
+
+static enum target_app parse_app(const char *value)
+{
+    if (!strcmp(value, "writer")) return APP_WRITER;
+    if (!strcmp(value, "sheet")) return APP_SHEET;
+    if (!strcmp(value, "present")) return APP_PRESENT;
+    if (!strcmp(value, "pdf")) return APP_PDF;
+    if (!strcmp(value, "text")) return APP_TEXT;
+    return APP_AUTO;
+}
+
+/* Argument du shell créant un nouveau document pour l'application demandée. */
+static const char *new_document_arg(enum target_app app)
+{
+    switch (app) {
+    case APP_WRITER:  return "--new:word";
+    case APP_SHEET:   return "--new:cell";
+    case APP_PRESENT: return "--new:slide";
+    default:          return NULL;
+    }
+}
+
 /* ------------------------------------------------------------------------ */
 /* Windows                                                                  */
 /* ------------------------------------------------------------------------ */
@@ -250,6 +278,7 @@ static int spawn(const wchar_t *dir, const wchar_t *exe, wchar_t **args, int cou
 int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmdline, int show)
 {
     int argc = 0, i, ntext = 0, nshell = 0, rc = 0, force_writer = 0;
+    enum target_app app = APP_AUTO;
     wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     wchar_t dir[MAX_PATH * 2], *slash;
     wchar_t **text_args, **shell_args;
@@ -280,16 +309,31 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmdline, int show)
 
     for (i = 1; i < argc; ++i) {
         const wchar_t *a = argv[i];
+        if (!wcsncmp(a, L"--app=", 6)) {
+            char value[32];
+            WideCharToMultiByte(CP_UTF8, 0, a + 6, -1, value, sizeof(value), NULL, NULL);
+            app = parse_app(value);
+            continue;
+        }
         if (!wcscmp(a, L"--new-text")) { text_args[ntext++] = (wchar_t *)L"--new"; continue; }
         if (!wcscmp(a, L"--new-document")) { shell_args[nshell++] = (wchar_t *)L"--new:word"; continue; }
         if (!wcscmp(a, L"--new-spreadsheet")) { shell_args[nshell++] = (wchar_t *)L"--new:cell"; continue; }
         if (!wcscmp(a, L"--new-presentation")) { shell_args[nshell++] = (wchar_t *)L"--new:slide"; continue; }
         if (!wcscmp(a, L"--writer")) { force_writer = 1; continue; }
         if (a[0] == L'-' && a[1] == L'-') { shell_args[nshell++] = argv[i]; continue; }
-        if (!force_writer && is_text_document(a))
+        if (app == APP_TEXT || (app == APP_AUTO && !force_writer && is_text_document(a)))
             text_args[ntext++] = argv[i];
         else
             shell_args[nshell++] = argv[i];
+    }
+    if (ntext == 0 && nshell == 0) {
+        if (app == APP_TEXT) {
+            text_args[ntext++] = (wchar_t *)L"--new";
+        } else if (new_document_arg(app)) {
+            static wchar_t newarg[32];
+            MultiByteToWideChar(CP_UTF8, 0, new_document_arg(app), -1, newarg, 32);
+            shell_args[nshell++] = newarg;
+        }
     }
 
     if (ntext > 0)
@@ -370,6 +414,7 @@ int main(int argc, char **argv)
     char dir[PATH_MAX];
     char **text_args, **shell_args;
     int i, ntext = 0, nshell = 0, rc = 0, force_writer = 0;
+    enum target_app app = APP_AUTO;
 
     for (i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-v")) {
@@ -394,22 +439,31 @@ int main(int argc, char **argv)
         return 1;
     for (i = 1; i < argc; ++i) {
         char *a = argv[i];
+        if (!strncmp(a, "--app=", 6)) { app = parse_app(a + 6); continue; }
         if (!strcmp(a, "--new-text")) { text_args[ntext++] = (char *)"--new"; continue; }
         if (!strcmp(a, "--new-document")) { shell_args[nshell++] = (char *)"--new:word"; continue; }
         if (!strcmp(a, "--new-spreadsheet")) { shell_args[nshell++] = (char *)"--new:cell"; continue; }
         if (!strcmp(a, "--new-presentation")) { shell_args[nshell++] = (char *)"--new:slide"; continue; }
         if (!strcmp(a, "--writer")) { force_writer = 1; continue; }
         if (a[0] == '-' && a[1] == '-') { shell_args[nshell++] = a; continue; }
-        if (!strncmp(a, "file://", 7) && !force_writer) {
+        if (!strncmp(a, "file://", 7)) {
             /* URI locale transmise par certains gestionnaires de fichiers */
-            if (is_text_document(a + 7)) { text_args[ntext++] = a + 7; continue; }
-            shell_args[nshell++] = a;
+            if (app == APP_TEXT || (app == APP_AUTO && !force_writer && is_text_document(a + 7)))
+                text_args[ntext++] = a + 7;
+            else
+                shell_args[nshell++] = a;
             continue;
         }
-        if (!force_writer && is_text_document(a))
+        if (app == APP_TEXT || (app == APP_AUTO && !force_writer && is_text_document(a)))
             text_args[ntext++] = a;
         else
             shell_args[nshell++] = a;
+    }
+    if (ntext == 0 && nshell == 0) {
+        if (app == APP_TEXT)
+            text_args[ntext++] = (char *)"--new";
+        else if (new_document_arg(app))
+            shell_args[nshell++] = (char *)new_document_arg(app);
     }
 
     if (ntext > 0 && nshell == 0)

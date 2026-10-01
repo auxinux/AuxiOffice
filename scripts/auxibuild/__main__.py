@@ -40,7 +40,7 @@ def parse_args(argv):
     p.add_argument("--skip-tests", action="store_true", help="ne pas exécuter les tests (déconseillé)")
     p.add_argument("--components", default="js,shell,auxitext,launcher",
                    type=lambda v: [c.strip() for c in v.split(",") if c.strip()],
-                   help="composants à construire (js, shell, auxitext, launcher)")
+                   help="composants à construire : js (= startpage + webapps + sdkjs), startpage, webapps, sdkjs, shell, auxitext, launcher")
     p.add_argument("--formats", default="",
                    help="formats de paquets (linux: deb,appimage ; windows: exe,msi)")
     return p.parse_args(argv)

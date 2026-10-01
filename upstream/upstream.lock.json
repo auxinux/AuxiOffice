@@ -1,6 +1,5 @@
 {
   "_comment": "Verrou upstream d'AuxiNux Office. Toute mise à jour upstream passe par ce fichier (voir docs/UPSTREAM.md). Les commits et sommes SHA-256 sont vérifiés à chaque récupération.",
-
   "upstream": {
     "product": "ONLYOFFICE Desktop Editors",
     "version": "9.4.0",
@@ -10,30 +9,42 @@
     "release_page": "https://github.com/ONLYOFFICE/DesktopEditors/releases/tag/v9.4.0",
     "locked_on": "2026-10-01"
   },
-
   "repositories": {
     "DesktopEditors": {
       "url": "https://github.com/ONLYOFFICE/DesktopEditors.git",
       "ref": "v9.4.0",
       "commit": "7b9cd379f428ce23c7ef9c93cbb93f1e3c75f613",
       "purpose": "Licence, CHANGELOG et métadonnées du produit upstream",
-      "required_for": ["legal"],
-      "sparse": ["/LICENSE", "/CHANGELOG.md", "/README.md"]
+      "required_for": [
+        "legal"
+      ],
+      "sparse": [
+        "/LICENSE",
+        "/CHANGELOG.md",
+        "/README.md"
+      ]
     },
     "desktop-apps": {
       "url": "https://github.com/ONLYOFFICE/desktop-apps.git",
       "ref": "v9.4.0.129",
       "commit": "3ad4e294ae5e25902ccc56088a760ad21a9d123a",
       "purpose": "Shell natif Qt (win-linux) et page d'accueil (common/loginpage)",
-      "required_for": ["shell", "startpage"]
+      "required_for": [
+        "shell",
+        "startpage"
+      ]
     },
     "desktop-sdk": {
       "url": "https://github.com/ONLYOFFICE/desktop-sdk.git",
       "ref": "v9.4.0.129",
       "commit": "8f6d24bfe9a5e7ea9405266d341ed4187cf5823e",
       "purpose": "En-têtes de libascdocumentscore / qt_wrapper nécessaires au shell",
-      "required_for": ["shell"],
+      "required_for": [
+        "shell"
+      ],
       "sparse": [
+        "/LICENSE",
+        "/3DPARTY.md",
         "/ChromiumBasedEditors/lib/include/",
         "/ChromiumBasedEditors/lib/qt_wrapper/include/",
         "/ChromiumBasedEditors/videoplayerlib/"
@@ -44,8 +55,12 @@
       "ref": "v9.4.0.129",
       "commit": "a016fc2868b9f99f59dd30aa2088e68bbe5104af",
       "purpose": "Fichiers qmake communs et en-têtes du moteur (le moteur lui-même est pris dans la release binaire)",
-      "required_for": ["shell"],
+      "required_for": [
+        "shell"
+      ],
       "sparse": [
+        "/LICENSE",
+        "/3DPARTY.md",
         "/Common/*.pri",
         "/Common/version.txt",
         "/Common/copyright.txt",
@@ -72,24 +87,35 @@
       "ref": "v9.4.0.129",
       "commit": "1993a6d89731af0fcb5129ebf0ee380076fea5a9",
       "purpose": "Interface des éditeurs (AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF)",
-      "required_for": ["webapps"]
+      "required_for": [
+        "webapps",
+        "legal"
+      ]
     },
     "sdkjs": {
       "url": "https://github.com/ONLYOFFICE/sdkjs.git",
       "ref": "v9.4.0.129",
       "commit": "75b53d504bfd81bfa35d59bb57dd9e56f7c9235d",
       "purpose": "Moteur JavaScript des éditeurs (compilé depuis les sources si sdkjs_mode=source)",
-      "required_for": ["sdkjs-source"]
+      "required_for": [
+        "legal",
+        "sdkjs-source"
+      ],
+      "sparse_when_not_built": [
+        "/3DPARTY.md",
+        "/LICENSE"
+      ]
     },
     "build_tools": {
       "url": "https://github.com/ONLYOFFICE/build_tools.git",
       "ref": "v9.4.0.129",
       "commit": "cf4cac0846d03e2e00a6fec5d1ecd4e9463086d5",
       "purpose": "Référence du build upstream complet (mode moteur depuis les sources, expérimental)",
-      "required_for": ["engine-source"]
+      "required_for": [
+        "engine-source"
+      ]
     }
   },
-
   "binaries": {
     "linux_x86_64": {
       "url": "https://github.com/ONLYOFFICE/DesktopEditors/releases/download/v9.4.0/onlyoffice-desktopeditors_amd64.deb",
@@ -108,7 +134,6 @@
       "purpose": "Moteur upstream précompilé : x2t, DLL core, CEF, Qt 5.15.2 (MSVC 2019), dictionnaires, polices, sdkjs compilé"
     }
   },
-
   "third_party_sources": {
     "icu4c": {
       "version": "74.2",
@@ -117,16 +142,42 @@
       "purpose": "En-têtes ICU correspondant à libicuuc.so.74 / icuuc74.dll livrés par upstream"
     }
   },
-
   "toolchains": {
-    "qt_linux":   { "version": "5.9.9",  "host": "linux",   "arch": "gcc_64",            "purpose": "Même version que la Qt embarquée par upstream sous Linux" },
-    "qt_windows": { "version": "5.15.2", "host": "windows", "arch": "win64_msvc2019_64", "purpose": "Même version que la Qt embarquée par upstream sous Windows" },
-    "qt_host_for_windows_cross": { "version": "5.15.2", "host": "linux", "arch": "gcc_64", "purpose": "moc/rcc/uic hôtes pour la compilation croisée Windows" },
+    "qt_linux": {
+      "version": "5.9.9",
+      "host": "linux",
+      "arch": "gcc_64",
+      "purpose": "Même version que la Qt embarquée par upstream sous Linux"
+    },
+    "qt_windows": {
+      "version": "5.15.2",
+      "host": "windows",
+      "arch": "win64_msvc2019_64",
+      "purpose": "Même version que la Qt embarquée par upstream sous Windows"
+    },
+    "qt_host_for_windows_cross": {
+      "version": "5.15.2",
+      "host": "linux",
+      "arch": "gcc_64",
+      "purpose": "moc/rcc/uic hôtes pour la compilation croisée Windows"
+    },
     "xwin": {
       "version": "0.10.0",
       "url": "https://github.com/Jake-Shadle/xwin/releases/download/0.10.0/xwin-0.10.0-x86_64-unknown-linux-musl.tar.gz",
       "sha256": "d870eb4b2f390878af6da1ccd3cf321d22fcb72720984853b4be732ae597fc88",
       "purpose": "Téléchargement du CRT MSVC et du SDK Windows (licence Microsoft à accepter explicitement)"
+    },
+    "appimagetool": {
+      "version": "1.9.1",
+      "url": "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage",
+      "sha256": "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0",
+      "purpose": "Création de l'AppImage"
+    },
+    "appimage_runtime": {
+      "version": "20251108",
+      "url": "https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64",
+      "sha256": "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d",
+      "purpose": "Runtime AppImage type 2 (statique, compatible fusermount3)"
     }
   }
 }

@@ -1,6 +1,5 @@
 {
   "_comment": "Source unique de l'identité AuxiNux Office. La version vient du fichier VERSION à la racine (ne pas la dupliquer ici). Consommé par scripts/auxibuild (branding, packaging, génération d'en-têtes).",
-
   "product": {
     "name": "AuxiNux Office",
     "short_name": "AuxiOffice",
@@ -16,7 +15,6 @@
     "description_fr": "Suite bureautique libre de l'écosystème AuxiNux",
     "description_en": "Free office suite from the AuxiNux ecosystem"
   },
-
   "upstream": {
     "name": "ONLYOFFICE Desktop Editors",
     "developer": "Ascensio System SIA",
@@ -24,22 +22,107 @@
     "trademark_notice_en": "ONLYOFFICE is a trademark of Ascensio System SIA.",
     "trademark_notice_fr": "ONLYOFFICE est une marque d'Ascensio System SIA."
   },
-
   "apps": {
-    "writer":  { "name": "AuxiWriter",  "kind_fr": "Traitement de texte", "kind_en": "Word processor", "color": "#2F6FDE", "letter": "W",
-                 "extensions": ["docx", "doc", "odt", "rtf", "dotx", "dot", "ott", "docm", "html", "htm", "epub", "fb2"] },
-    "sheet":   { "name": "AuxiSheet",   "kind_fr": "Tableur",             "kind_en": "Spreadsheet",    "color": "#1F9D55", "letter": "S",
-                 "extensions": ["xlsx", "xls", "ods", "csv", "xltx", "xlt", "ots", "xlsm", "xlsb"] },
-    "present": { "name": "AuxiPresent", "kind_fr": "Présentation",        "kind_en": "Presentation",   "color": "#E4572E", "letter": "P",
-                 "extensions": ["pptx", "ppt", "odp", "ppsx", "pps", "potx", "pot", "otp", "pptm"] },
-    "pdf":     { "name": "AuxiPDF",     "kind_fr": "Lecteur PDF",         "kind_en": "PDF viewer",     "color": "#C8283C", "letter": "PDF",
-                 "extensions": ["pdf", "djvu", "xps", "oxps"] },
-    "text":    { "name": "AuxiText",    "kind_fr": "Éditeur de texte",    "kind_en": "Text editor",    "color": "#5F6B7A", "letter": "T",
-                 "extensions": ["txt", "log", "md", "markdown", "json", "xml", "yaml", "yml", "ini", "conf", "cfg"] },
-    "mail":    { "name": "AuxiMail",    "kind_fr": "Courriel (futur)",    "kind_en": "Mail (future)",  "color": "#3A8FB7", "letter": "M",
-                 "extensions": [], "status": "study" }
+    "writer": {
+      "name": "AuxiWriter",
+      "kind_fr": "Traitement de texte",
+      "kind_en": "Word processor",
+      "color": "#2F6FDE",
+      "letter": "W",
+      "extensions": [
+        "docx",
+        "doc",
+        "odt",
+        "rtf",
+        "dotx",
+        "dot",
+        "ott",
+        "docm",
+        "html",
+        "htm",
+        "epub",
+        "fb2"
+      ]
+    },
+    "sheet": {
+      "name": "AuxiSheet",
+      "kind_fr": "Tableur",
+      "kind_en": "Spreadsheet",
+      "color": "#1F9D55",
+      "letter": "S",
+      "extensions": [
+        "xlsx",
+        "xls",
+        "ods",
+        "csv",
+        "xltx",
+        "xlt",
+        "ots",
+        "xlsm",
+        "xlsb"
+      ]
+    },
+    "present": {
+      "name": "AuxiPresent",
+      "kind_fr": "Présentation",
+      "kind_en": "Presentation",
+      "color": "#E4572E",
+      "letter": "P",
+      "extensions": [
+        "pptx",
+        "ppt",
+        "odp",
+        "ppsx",
+        "pps",
+        "potx",
+        "pot",
+        "otp",
+        "pptm"
+      ]
+    },
+    "pdf": {
+      "name": "AuxiPDF",
+      "kind_fr": "Lecteur PDF",
+      "kind_en": "PDF viewer",
+      "color": "#C8283C",
+      "letter": "PDF",
+      "extensions": [
+        "pdf",
+        "djvu",
+        "xps",
+        "oxps"
+      ]
+    },
+    "text": {
+      "name": "AuxiText",
+      "kind_fr": "Éditeur de texte",
+      "kind_en": "Text editor",
+      "color": "#5F6B7A",
+      "letter": "T",
+      "extensions": [
+        "txt",
+        "log",
+        "md",
+        "markdown",
+        "json",
+        "xml",
+        "yaml",
+        "yml",
+        "ini",
+        "conf",
+        "cfg"
+      ]
+    },
+    "mail": {
+      "name": "AuxiMail",
+      "kind_fr": "Courriel (futur)",
+      "kind_en": "Mail (future)",
+      "color": "#3A8FB7",
+      "letter": "M",
+      "extensions": [],
+      "status": "study"
+    }
   },
-
   "linux": {
     "executable": "auxioffice",
     "package": "auxinux-office",
@@ -51,7 +134,6 @@
     "single_instance_key": "auxioffice:editors",
     "maintainer": "AuxiNux <repo@auxinux.ca>"
   },
-
   "windows": {
     "executable": "auxioffice.exe",
     "shell_binary": "auxioffice-editors.exe",
@@ -68,7 +150,6 @@
     "msi_upgrade_code": "{6C1B6F3E-3B53-4E2F-9E0B-4A8F2E7C5D11}",
     "url_protocol": "auxioffice"
   },
-
   "colors": {
     "primary": "#F26F00",
     "primary_dark": "#C85A00",
@@ -78,17 +159,32 @@
     "background_light": "#F7F7F5",
     "background_dark": "#1E1F22"
   },
-
   "i18n": {
     "default_language": "fr",
-    "languages": ["fr", "en"]
+    "languages": [
+      "fr",
+      "en"
+    ]
   },
-
   "updates": {
     "enabled": false,
     "default_channel": "stable",
-    "channels": ["stable", "beta"],
+    "channels": [
+      "stable",
+      "beta"
+    ],
     "feed_url_template": "",
     "_comment": "Aucune URL de mise à jour n'est définie officiellement : laisser vide tant que l'infrastructure (ex. dep.auxinux.ca) n'est pas publiée. Voir docs/UPDATES.md."
+  },
+  "privacy": {
+    "_comment": "Plugins upstream non installés par défaut : leur fonction principale envoie le contenu du document à un service en ligne tiers. Ils restent installables volontairement via le gestionnaire de plugins. Voir PRIVACY.md.",
+    "removed_plugins": {
+      "{b78a062b-e349-4634-8a44-99825600d299}": "DeepL (traduction en ligne)",
+      "{7CDB02C9-A0BF-4B56-9A1A-71C860B8498F}": "LanguageTool (correction grammaticale en ligne)",
+      "{BFC5D5C6-89DE-4168-9565-ABD8D1E48711}": "Zotero (bibliographie en ligne)",
+      "{BE5CBF95-C0AD-4842-B157-AC40FEDD9840}": "Thesaurus (API words.bighugelabs.com)",
+      "{440EBF13-9B19-4BD8-8621-05200E58140B}": "OCR (données de langue téléchargées en ligne)"
+    },
+    "ai_disabled_by_default": true
   }
 }

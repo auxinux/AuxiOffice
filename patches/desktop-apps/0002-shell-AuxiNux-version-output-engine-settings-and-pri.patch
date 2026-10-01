@@ -1,17 +1,18 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Projet AuxiNux <repo@auxinux.ca>
 Date: Thu, 1 Oct 2026 17:51:40 +0000
-Subject: [PATCH] shell: AuxiNux version output and engine settings
+Subject: [PATCH] shell: AuxiNux version output, engine settings and privacy
+ defaults
 
---version prints 'AuxiNux Office <version>' on stdout; after setup_paths() the CEF cache moves to the XDG cache directory and the converter writes the AuxiNux application name into document metadata.
+--version prints 'AuxiNux Office <version>' on stdout; after setup_paths() the CEF cache moves to the XDG cache directory, the converter writes the AuxiNux application name into document metadata, and privacy-friendly defaults (AI assistants off until enabled) are stored before the engine starts.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- win-linux/src/main.cpp | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ win-linux/src/main.cpp | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/win-linux/src/main.cpp b/win-linux/src/main.cpp
-index 9e8fd7c..fb07258 100644
+index 9e8fd7c..dd4c339 100644
 --- a/win-linux/src/main.cpp
 +++ b/win-linux/src/main.cpp
 @@ -32,6 +32,9 @@
@@ -52,3 +53,13 @@ index 9e8fd7c..fb07258 100644
          return 0;
      } else
      if ( InputArgs::contains(L"--help") ) {
+@@ -175,6 +188,9 @@ int main( int argc, char *argv[] )
+     CApplicationCEF::Prepare(argc, argv);
+     CApplicationCEF* application_cef = new CApplicationCEF();
+     setup_paths(&AscAppManager::getInstance());
++#ifdef AUXI_PRODUCT_NAME
++    AuxiNux::applyPrivacyDefaults();
++#endif
+     application_cef->Init_CEF(&AscAppManager::getInstance(), argc, argv);
+     /* ********************** */
+ 

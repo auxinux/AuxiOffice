@@ -100,6 +100,18 @@ void adjustSettings(CAscApplicationSettings& settings)
     settings.converter_application_company = AUXI_DOCUMENT_APPLICATION_COMPANY;
 }
 
+void applyPrivacyDefaults()
+{
+    // settings.xml du moteur est rangé à côté du cache des polices : le dossier doit exister.
+    const std::wstring fonts = AscAppManager::getInstance().m_oSettings.fonts_cache_info_path;
+    QDir().mkpath(QString::fromStdWString(fonts) + QStringLiteral("/.."));
+    QDir().mkpath(QString::fromStdWString(fonts));
+#ifdef AUXI_DEFAULT_DISABLE_AI
+    if ( AscAppManager::userSettings(L"disable-ai").empty() )
+        AscAppManager::setUserSettings(L"disable-ai", L"1");
+#endif
+}
+
 static QStringList textExtensions()
 {
     static const QStringList list = QString::fromLatin1(AUXI_TEXT_EXTENSIONS).split(';', QString::SkipEmptyParts);

@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Projet AuxiNux <repo@auxinux.ca>
+Date: Thu, 1 Oct 2026 18:19:38 +0000
+Subject: [PATCH] editors: AuxiNux attribution in the About panel
+
+Hides empty publisher fields, shows the version without the build suffix and adds the notices required by the additional terms of the original program (original developer, modified version and date, license, trademark).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ apps/common/main/lib/view/About.js | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/apps/common/main/lib/view/About.js b/apps/common/main/lib/view/About.js
+index ab1d7088..52a81613 100644
+--- a/apps/common/main/lib/view/About.js
++++ b/apps/common/main/lib/view/About.js
+@@ -32,6 +32,9 @@
+  *
+  * SPDX-License-Identifier: AGPL-3.0-only
+  */
++/*
++ * Modified by Projet AuxiNux on 2026-10-01 for AuxiNux Office (see patches/web-apps/ in the AuxiNux Office repository).
++ */
+ /**
+  *  About.js
+  *
+@@ -54,7 +57,7 @@ define([
+         initialize: function(options) {
+             Common.UI.BaseView.prototype.initialize.call(this,arguments);
+ 
+-            this.txtVersionNum = '{{PRODUCT_VERSION}}';
++            this.txtVersionNum = '{{PRODUCT_VERSION}}'.replace(/\.0$/, '');   // AuxiNux: 0.1.0.0 -> 0.1.0
+ 
+             !(/\s$/.test(this.txtAddress)) && (this.txtAddress += " ");
+             !(/\s$/.test(this.txtMail)) && (this.txtMail += " ");
+@@ -190,6 +193,19 @@ define([
+                 this.$el.html(_$l);
+                 this.$el.addClass('about-dlg');
+ 
++                // AuxiNux: hide empty publisher fields and show the attribution required by the
++                // additional terms of the original program (original developer, modified version, license).
++                this.cntLicensorInfo.find('label.asc-about-desc, a').each(function () {
++                    if ( !$(this).text().trim() ) $(this).closest('tr').addClass('hidden');
++                });
++                if ( this.txtAuxiBasedOn ) {
++                    $('<div class="auxinux-about-legal" style="text-align:center;max-width:540px;margin:4px auto 16px;padding:0 12px;line-height:1.5;opacity:.85;">' +
++                        '<p>' + Common.Utils.String.htmlEncode(this.txtAuxiBasedOn) + '</p>' +
++                        '<p>' + Common.Utils.String.htmlEncode(this.txtAuxiIndependent) + '</p>' +
++                        '<p>' + Common.Utils.String.htmlEncode(this.txtAuxiLicense) + '</p>' +
++                      '</div>').insertAfter(this.cntLicensorInfo);
++                }
++
+                 if ( this.licData )
+                     this.setLicInfo(this.licData);
+ 
+@@ -295,7 +311,10 @@ define([
+         txtAddress: 'address: ',
+         txtMail: 'email: ',
+         txtTel: 'tel.: ',
+-        txtEdition: 'Integration Edition '
++        txtEdition: 'Integration Edition ',
++        txtAuxiBasedOn: 'Based on ONLYOFFICE, originally developed by Ascensio System SIA. This is a modified version (changes by the AuxiNux project since 2026-10-01).',
++        txtAuxiIndependent: 'AuxiNux Office is an independent project and is not an official product of ONLYOFFICE or Ascensio System SIA.',
++        txtAuxiLicense: 'Free software licensed under the GNU AGPL v3. ONLYOFFICE is a trademark of Ascensio System SIA.'
+ 
+     }, Common.Views.About || {}));
+ });
