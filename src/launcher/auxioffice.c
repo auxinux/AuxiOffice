@@ -175,6 +175,17 @@ static int is_text_document(const char *path)
 }
 #endif
 
+/* Commutateurs Chromium/CEF ajoutés à chaque lancement du moteur d'édition :
+ * aucune communication réseau d'arrière-plan (sondes DNS-over-HTTPS vers Google et
+ * Cloudflare observées au démarrage, services d'arrière-plan, pings). Voir PRIVACY.md. */
+#define ENGINE_SWITCH_COUNT 4
+static const char *ENGINE_SWITCHES[ENGINE_SWITCH_COUNT] = {
+    "--disable-features=DnsOverHttps",
+    "--disable-background-networking",
+    "--disable-domain-reliability",
+    "--no-pings",
+};
+
 /* --app=... : application demandée par une entrée de menu / association. */
 enum target_app { APP_AUTO, APP_WRITER, APP_SHEET, APP_PRESENT, APP_PDF, APP_TEXT };
 
@@ -275,6 +286,24 @@ static int spawn(const wchar_t *dir, const wchar_t *exe, wchar_t **args, int cou
     return 0;
 }
 
+/* Les bibliothèques du moteur (kernel.dll, graphics.dll, ICU, PdfFile.dll…) sont dans converter\ :
+ * comme le lanceur upstream, on place ce dossier en tête du PATH hérité par le shell. */
+static void prepend_converter_to_path(const wchar_t *dir)
+{
+    DWORD len = GetEnvironmentVariableW(L"PATH", NULL, 0);
+    size_t cap = (size_t)len + wcslen(dir) + 16;
+    size_t used;
+    wchar_t *value = (wchar_t *)calloc(cap, sizeof(wchar_t));
+    if (!value)
+        return;
+    _snwprintf_s(value, cap, _TRUNCATE, L"%s\\converter;", dir);
+    used = wcslen(value);
+    if (len > 0)
+        GetEnvironmentVariableW(L"PATH", value + used, (DWORD)(cap - used));
+    SetEnvironmentVariableW(L"PATH", value);
+    free(value);
+}
+
 int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmdline, int show)
 {
     int argc = 0, i, ntext = 0, nshell = 0, rc = 0, force_writer = 0;
@@ -338,8 +367,22 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmdline, int show)
 
     if (ntext > 0)
         rc |= spawn(dir, TEXT_BINARY, text_args, ntext);
-    if (nshell > 0 || ntext == 0)
-        rc |= spawn(dir, SHELL_BINARY, shell_args, nshell);
+    if (nshell > 0 || ntext == 0) {
+        wchar_t **full = (wchar_t **)calloc((size_t)nshell + ENGINE_SWITCH_COUNT + 1, sizeof(wchar_t *));
+        static wchar_t switches[ENGINE_SWITCH_COUNT][64];
+        int n = 0;
+        if (!full)
+            return 1;
+        for (i = 0; i < ENGINE_SWITCH_COUNT; ++i) {
+            MultiByteToWideChar(CP_UTF8, 0, ENGINE_SWITCHES[i], -1, switches[i], 64);
+            full[n++] = switches[i];
+        }
+        for (i = 0; i < nshell; ++i)
+            full[n++] = shell_args[i];
+        prepend_converter_to_path(dir);
+        rc |= spawn(dir, SHELL_BINARY, full, n);
+        free(full);
+    }
     LocalFree(argv);
     return rc;
 }
@@ -470,7 +513,17 @@ int main(int argc, char **argv)
         return launch(dir, TEXT_BINARY, text_args, ntext, 1);
     if (ntext > 0)
         rc |= launch(dir, TEXT_BINARY, text_args, ntext, 0);
-    return rc | launch(dir, SHELL_BINARY, shell_args, nshell, 1);
+    {
+        char **full = (char **)calloc((size_t)nshell + ENGINE_SWITCH_COUNT + 1, sizeof(char *));
+        int n = 0;
+        if (!full)
+            return 1;
+        for (i = 0; i < ENGINE_SWITCH_COUNT; ++i)
+            full[n++] = (char *)ENGINE_SWITCHES[i];
+        for (i = 0; i < nshell; ++i)
+            full[n++] = shell_args[i];
+        return rc | launch(dir, SHELL_BINARY, full, n, 1);
+    }
 }
 
 #endif

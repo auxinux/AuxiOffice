@@ -165,7 +165,9 @@
       "version": "0.10.0",
       "url": "https://github.com/Jake-Shadle/xwin/releases/download/0.10.0/xwin-0.10.0-x86_64-unknown-linux-musl.tar.gz",
       "sha256": "d870eb4b2f390878af6da1ccd3cf321d22fcb72720984853b4be732ae597fc88",
-      "purpose": "Téléchargement du CRT MSVC et du SDK Windows (licence Microsoft à accepter explicitement)"
+      "purpose": "Téléchargement du CRT MSVC et du SDK Windows (licence Microsoft à accepter explicitement). crt_version doit rester cohérent avec windows_runtime.vc_redist_x64 (même ensemble d'outils 14.44).",
+      "crt_version": "14.44.17.14",
+      "sdk_version": "10.0.26100"
     },
     "appimagetool": {
       "version": "1.9.1",
@@ -178,6 +180,16 @@
       "url": "https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64",
       "sha256": "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d",
       "purpose": "Runtime AppImage type 2 (statique, compatible fusermount3)"
+    }
+  },
+  "windows_runtime": {
+    "vc_redist_x64": {
+      "version": "14.44.35211.0",
+      "url": "https://download.visualstudio.microsoft.com/download/pr/bd1c8d9d-ba95-4eee-bc6e-df1fcc876373/CC0FF0EB1DC3F5188AE6300FAEF32BF5BEEBA4BDD6E8E445A9184072096B713B/VC_redist.x64.exe",
+      "sha256": "cc0ff0eb1dc3f5188ae6300faef32bf5beeba4bdd6e8e445a9184072096b713b",
+      "size": 25635768,
+      "min_installed": "14.44.35211",
+      "purpose": "Microsoft Visual C++ 2015-2022 Redistributable x64, requis par les binaires MSVC (moteur upstream et binaires AuxiNux) ; installé par l'installateur Windows s'il est absent ou plus ancien. Redistribuable selon la licence Microsoft (voir LICENSING.md)."
     }
   }
 }

@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Projet AuxiNux <repo@auxinux.ca>
+Date: Thu, 1 Oct 2026 20:25:12 +0000
+Subject: [PATCH] shell: AuxiNux version resource on Windows
+
+version.rc now also includes src/prop/version_p.h, so the product name, company, copyright and version shown in the Windows file properties come from the white-label header (generated from branding/product.json) instead of the upstream defaults.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ win-linux/version.rc | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/win-linux/version.rc b/win-linux/version.rc
+index 89bdc83..a2ee120 100644
+--- a/win-linux/version.rc
++++ b/win-linux/version.rc
+@@ -7,6 +7,9 @@ CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "./res/manifest/DesktopEditors.ex
+ 
+ #define RC_COMPILE_FLAG
+ # include "src/version.h"
++// Modified by Projet AuxiNux on 2026-10-01: the white-label values of src/prop/version_p.h
++// (product name, company, copyright, version) also go into the Windows version resource.
++# include "src/prop/version_p.h"
+ #undef RC_COMPILE_FLAG
+ 
+ VS_VERSION_INFO VERSIONINFO

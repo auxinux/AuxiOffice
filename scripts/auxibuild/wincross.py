@@ -70,20 +70,25 @@ def _llvm_ld_path(llvm_bin):
 
 def ensure_winsysroot(accept_license):
     """Download the MSVC CRT + Windows SDK with xwin (only after explicit consent)."""
+    spec = lock()["toolchains"]["xwin"]
     if (WINSYSROOT / "VC").exists() and (WINSYSROOT / "Windows Kits").exists():
+        crt = WINSYSROOT / "VC" / "Tools" / "MSVC" / spec["crt_version"]
+        if not crt.exists():
+            fail(f"le sysroot Windows ne contient pas le CRT MSVC {spec['crt_version']} épinglé "
+                 f"(upstream.lock.json) : supprimer {WINSYSROOT} et relancer")
         return WINSYSROOT
     if not accept_license:
         fail("La compilation croisée Windows télécharge le CRT MSVC et le SDK Windows de Microsoft "
              "via xwin. Ces composants sont soumis aux licences Microsoft : relancer avec "
              "--accept-msvc-license (ou AUXI_ACCEPT_MSVC_LICENSE=1) après les avoir lues.")
-    step("CRT MSVC + SDK Windows (xwin)")
-    spec = lock()["toolchains"]["xwin"]
+    step(f"CRT MSVC {spec['crt_version']} + SDK Windows {spec['sdk_version']} (xwin)")
     archive = download(spec["url"], TOOLCHAINS_DIR / "downloads" / spec["url"].rsplit("/", 1)[-1],
                        sha256=spec["sha256"])
     rmtree(XWIN_DIR)
     extract_tar(archive, XWIN_DIR)
     xwin = next(XWIN_DIR.rglob("xwin"))
     run([xwin, "--accept-license", "--arch", "x86_64", "--variant", "desktop",
+         "--manifest-version", "17", "--crt-version", spec["crt_version"], "--sdk-version", spec["sdk_version"],
          "--cache-dir", TOOLCHAINS_DIR / "xwin-cache", "splat", "--use-winsysroot-style",
          "--preserve-ms-arch-notation", "--output", WINSYSROOT],
         log_file=TOOLCHAINS_DIR / "logs" / "xwin.log")
@@ -191,7 +196,8 @@ def fix_nmake_inline_files(makefile):
                 body.append(lines[i])
                 i += 1
             n += 1
-            rsp = f"$(OBJECTS_DIR)auxi_link_{n}.rsp"
+            # relatif au dossier de build (OBJECTS_DIR peut valoir « . » suivi d'un espace)
+            rsp = f"auxi_{Path(makefile).name.lower().replace('.', '_')}_{n}.rsp"
             out.append(f"\t@rm -f {rsp}")
             for b in body:
                 for tok in b.split():

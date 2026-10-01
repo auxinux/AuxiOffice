@@ -88,11 +88,18 @@ static QString shellLocale()
 {
 #ifdef Q_OS_WIN
     QSettings shell(windowsConfigDir() + QStringLiteral("/settings.ini"), QSettings::IniFormat);
+    const QString user = shell.value(QStringLiteral("locale")).toString();
+    if (!user.isEmpty())
+        return user;
+    // Comme le shell : langue choisie à l'installation (HKLM\Software\AuxiNux\AuxiOffice).
+    QSettings machine(QSettings::NativeFormat, QSettings::SystemScope, QStringLiteral("AuxiNux"),
+                      QStringLiteral("AuxiOffice"));
+    return machine.value(QStringLiteral("locale")).toString();
 #else
     QSettings shell(QSettings::NativeFormat, QSettings::UserScope, QStringLiteral("auxioffice"),
                     QStringLiteral("AuxiOffice"));
-#endif
     return shell.value(QStringLiteral("locale")).toString();
+#endif
 }
 
 QString uiLanguagePreference()
@@ -241,10 +248,12 @@ QString installDir()
 
 QString writerExecutable()
 {
+    // Le lanceur (et non le shell directement) : environnement du moteur et réglages de
+    // confidentialité du moteur web ; à utiliser avec --writer.
 #ifdef Q_OS_WIN
-    return installDir() + QStringLiteral("/auxioffice-editors.exe");
+    return installDir() + QStringLiteral("/auxioffice.exe");
 #else
-    return installDir() + QStringLiteral("/auxioffice-editors");
+    return installDir() + QStringLiteral("/auxioffice");
 #endif
 }
 

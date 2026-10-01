@@ -89,6 +89,11 @@ ALL = ["doctor", "fetch", "prepare", "build", "assemble", "test", "package"]
 
 
 def run_command(args):
+    if args.command == "patches":
+        from .devpatches import run_patches
+        return run_patches(args.extra)
+    if args.extra:
+        fail(f"arguments inattendus : {' '.join(args.extra)}")
     if args.command == "all":
         if args.clean:
             stage_clean(args)

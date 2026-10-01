@@ -36,7 +36,7 @@ bool isDark();
 void applyPalette(bool dark);
 
 QString installDir();
-QString writerExecutable();     // shell AuxiNux Office (AuxiWriter)
+QString writerExecutable();     // lanceur AuxiNux Office (ouverture dans AuxiWriter avec --writer)
 QString licensesIndex();        // page des licences livrée avec AuxiNux Office
 
 }

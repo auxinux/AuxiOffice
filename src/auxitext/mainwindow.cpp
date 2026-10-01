@@ -606,7 +606,8 @@ void MainWindow::openInWriter()
             return;
     }
     const QString writer = App::writerExecutable();
-    if (!QFileInfo::exists(writer) || !QProcess::startDetached(writer, {m_path})) {
+    if (!QFileInfo::exists(writer)
+        || !QProcess::startDetached(writer, {QStringLiteral("--writer"), m_path})) {
         QMessageBox::warning(this, tr("Open in AuxiWriter"), tr("AuxiNux Office could not be started."));
     }
 }

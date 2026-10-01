@@ -57,6 +57,21 @@ def ensure_venv():
     return venv_python()
 
 
+TEST_PACKAGES = ["python-docx==1.2.0", "openpyxl==3.1.5", "python-pptx==1.0.2", "pypdf==6.19.0",
+                 "reportlab==5.0.1", "python-xlib==0.33", "pillow==12.3.0"]
+
+
+def ensure_test_venv():
+    """Bibliothèques Python des tests (création/vérification de documents, captures X11)."""
+    py = ensure_venv()
+    probe = subprocess.run([str(py), "-c", "import docx, openpyxl, pptx, pypdf, reportlab, Xlib, PIL"],
+                           capture_output=True)
+    if probe.returncode != 0:
+        step("Dépendances Python des tests")
+        run([py, "-m", "pip", "install", "-q", *TEST_PACKAGES])
+    return py
+
+
 def qt_arch_dir(arch):
     # aqtinstall installs win64_msvc2019_64 into msvc2019_64
     return arch.replace("win64_", "")
@@ -127,6 +142,35 @@ def ensure_local_dev_packages():
         pc.write_text(text.replace("prefix=/usr\n", f"prefix={SYSDEPS_DIR}/usr\n", 1))
     write_text(SYSDEPS_DIR / ".ready", "ok\n")
     ok(f"paquets extraits dans {SYSDEPS_DIR}")
+
+
+TOOLS_ROOT = TOOLCHAINS_DIR / "tools-root"
+LOCAL_TOOL_PACKAGES = {
+    # outil : paquets Debian nécessaires (extraits sans root)
+    "file": ["file", "libmagic1t64", "libmagic-mgc"],
+    "desktop-file-validate": ["desktop-file-utils"],
+    "makensis": ["nsis", "nsis-common"],
+    "wixl": ["wixl", "wixl-data", "libmsi-1.0-0", "libgcab-1.0-0", "libgsf-1-114", "libgsf-1-common"],
+}
+
+
+def local_tool_env(tools):
+    """--local-deps : extrait localement des outils en ligne de commande manquants et
+    renvoie l'environnement (PATH, LD_LIBRARY_PATH, MAGIC) permettant de les utiliser."""
+    missing = [t for t in tools if not which(t) and not (TOOLS_ROOT / "usr" / "bin" / t).exists()]
+    if missing:
+        debs = TOOLCHAINS_DIR / "debs-tools"
+        debs.mkdir(parents=True, exist_ok=True)
+        pkgs = sorted({p for t in missing for p in LOCAL_TOOL_PACKAGES.get(t, [t])})
+        run(["apt-get", "download", *pkgs], cwd=debs)
+        for deb in debs.glob("*.deb"):
+            run(["dpkg-deb", "-x", deb, TOOLS_ROOT], quiet=True)
+    env = {"PATH": f"{TOOLS_ROOT}/usr/bin:{os.environ['PATH']}",
+           "LD_LIBRARY_PATH": f"{TOOLS_ROOT}/usr/lib/x86_64-linux-gnu"}
+    magic = TOOLS_ROOT / "usr" / "lib" / "file" / "magic.mgc"
+    if magic.exists():
+        env["MAGIC"] = str(magic)
+    return env
 
 
 def doctor(target, local_deps=False):

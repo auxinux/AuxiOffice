@@ -54,6 +54,9 @@ def fetch_repo(name, spec, full=False):
         _git(dest, "init", "-q")
         _git(dest, "remote", "add", "origin", spec["url"])
         _git(dest, "config", "advice.detachedHead", "false")
+    # Sources telles que publiées (LF) quel que soit l'hôte : sinon, avec Git pour Windows
+    # (core.autocrlf=true), les patches AuxiNux ne s'appliqueraient plus.
+    _git(dest, "config", "core.autocrlf", "false")
     if sparse:
         _git(dest, "config", "core.sparseCheckout", "true")
         _git(dest, "config", "core.sparseCheckoutCone", "false")
@@ -112,7 +115,7 @@ def fetch_engine(target):
     archive = download(spec["url"], CACHE_DIR / filename, sha256=spec["sha256"], size=spec.get("size"))
     out = engine_dir(target)
     marker = out / ".auxi-engine-sha256"
-    if marker.exists() and marker.read_text().strip() == spec["sha256"]:
+    if marker.exists() and marker.read_text().strip() == spec["sha256"] and (out / ".auxi-manifest").exists():
         ok(f"moteur déjà extrait dans {out}")
         return out
     rmtree(out)
@@ -127,6 +130,10 @@ def fetch_engine(target):
     root = tmp / spec["root"] if spec["root"] else tmp
     root.rename(out)
     rmtree(tmp)
+    # Manifeste de la release vérifiée : l'assemblage ne copiera que ces entrées
+    # (aucun fichier parasite ajouté après l'extraction ne peut se retrouver dans un paquet).
+    entries = sorted(str(p.relative_to(out)) for p in out.rglob("*"))
+    write_text(out / ".auxi-manifest", "\n".join(entries) + "\n")
     write_text(marker, spec["sha256"] + "\n")
     ok(f"moteur extrait dans {out}")
     return out

@@ -47,7 +47,7 @@ def build_auxitext_linux(args):
     env["PATH"] = f"{qt}/bin:{os.environ['PATH']}"
     from .build_native import engine_qt_link_dir, check_elf
     from .fetch import engine_dir
-    run([qt / "bin" / "qmake", AUXITEXT_SRC / "auxitext.pro", "QMAKE_RPATHDIR=",
+    run([qt / "bin" / "qmake", AUXITEXT_SRC / "auxitext.pro", f"CONFIG+={args.mode}", "QMAKE_RPATHDIR=",
          f"LIBS+=-L{engine_qt_link_dir()}", f"QMAKE_LFLAGS+=-Wl,-rpath-link,{engine_dir('linux')}"],
         cwd=out, env=env, log_file=out / "qmake.log")
     run(["make", f"-j{args.jobs}"], cwd=out, env=env, log_file=out / "make.log")
@@ -75,8 +75,10 @@ def build_auxitext_windows(args):
     _prepare_translations(qt_host / "bin", qt_win / "translations", out)
     conf = qt_cross_conf(qt_win, qt_host, out / "qt-cross.conf")
     env = {"PATH": f"{wrappers}:{os.environ['PATH']}"}
-    run([qt_host / "bin" / "qmake", "-qtconf", conf, "-spec", "win32-clang-msvc", "CONFIG+=release",
-         "QMAKE_TARGET.arch=x86_64", AUXITEXT_SRC / "auxitext.pro"], cwd=out, env=env, log_file=out / "qmake.log")
+    # no_batch : pas de règles d'inférence NMake « {src}.cpp{obj}.obj:: », illisibles par GNU make
+    run([qt_host / "bin" / "qmake", "-qtconf", conf, "-spec", "win32-clang-msvc", f"CONFIG+={args.mode}",
+         "CONFIG-=debug_and_release", "CONFIG+=no_batch", "QMAKE_TARGET.arch=x86_64", AUXITEXT_SRC / "auxitext.pro"],
+        cwd=out, env=env, log_file=out / "qmake.log")
     for mk in out.glob("Makefile*"):
         fix_nmake_inline_files(mk)
     run(["make", f"-j{args.jobs}"], cwd=out, env=env, log_file=out / "make.log")
@@ -100,7 +102,8 @@ def build_launcher_linux(args):
     step("Lanceur auxioffice (Linux)")
     dest = NATIVE_DIR / "linux" / "bin"
     dest.mkdir(parents=True, exist_ok=True)
-    run(["gcc", "-std=c99", "-D_DEFAULT_SOURCE", "-D_GNU_SOURCE", "-O2", "-Wall", "-Wextra", "-Werror",
+    opt = ["-O2"] if args.mode == "release" else ["-Og", "-g"]  # _FORTIFY_SOURCE exige une optimisation
+    run(["gcc", "-std=c99", "-D_DEFAULT_SOURCE", "-D_GNU_SOURCE", *opt, "-Wall", "-Wextra", "-Werror",
          "-fstack-protector-strong", "-D_FORTIFY_SOURCE=2", "-pie", "-fPIE", "-Wl,-z,relro,-z,now",
          *_launcher_defines(), LAUNCHER_SRC / "auxioffice.c", "-o", dest / "auxioffice"])
     ok(f"lanceur : {dest / 'auxioffice'}")
@@ -121,7 +124,8 @@ def build_launcher_windows(args):
     run([wrappers / "rc", "/NOLOGO", "-fo", out / "auxioffice.res", out / "auxioffice.rc"])
     dest = NATIVE_DIR / "windows" / "bin"
     dest.mkdir(parents=True, exist_ok=True)
-    run([wrappers / "clang-cl", "/nologo", "/O2", "/W3", "/MD", "/DUNICODE", "/D_UNICODE",
+    opt = ["/O2"] if args.mode == "release" else ["/Od", "/Z7"]
+    run([wrappers / "clang-cl", "/nologo", *opt, "/W3", "/MD", "/DUNICODE", "/D_UNICODE",
          *[d.replace("-D", "/D", 1) for d in _launcher_defines()],
          LAUNCHER_SRC / "auxioffice.c", out / "auxioffice.res", f"/Fo{out}/", f"/Fe{dest / 'auxioffice.exe'}",
          "/link", "/SUBSYSTEM:WINDOWS", "shell32.lib", "user32.lib"])

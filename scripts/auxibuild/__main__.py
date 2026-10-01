@@ -4,7 +4,8 @@
 
     python3 scripts/auxibuild <commande> [options]
 
-Commandes : doctor, fetch, prepare, build, assemble, test, package, all.
+Commandes : doctor, fetch, prepare, build, assemble, test, package, all, clean,
+patches (checkout|export|status <dépôt> : gestion des files de patches upstream).
 Les scripts scripts/build-linux.sh et scripts/build-windows.ps1 l'appellent."""
 
 import argparse
@@ -25,7 +26,8 @@ STAGES = ["doctor", "fetch", "prepare", "build", "assemble", "test", "package"]
 
 def parse_args(argv):
     p = argparse.ArgumentParser(prog="auxibuild", description="Build d'AuxiNux Office")
-    p.add_argument("command", choices=STAGES + ["all", "clean"], help="étape à exécuter")
+    p.add_argument("command", choices=STAGES + ["all", "clean", "patches"], help="étape à exécuter")
+    p.add_argument("extra", nargs="*", help="patches : checkout <dépôt> | export <dépôt> | status")
     p.add_argument("--target", choices=["linux", "windows"], default="linux")
     p.add_argument("--mode", choices=["release", "debug"], default="release")
     p.add_argument("--clean", action="store_true", help="repartir de sources et d'arbres de build propres")
