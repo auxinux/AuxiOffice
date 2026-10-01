@@ -23,7 +23,9 @@ JS = BUILD_DIR / "js"
 # Fichiers upstream remplacés ou retirés (chemins relatifs à la racine du moteur)
 UPSTREAM_REMOVED = {
     "linux": ["DesktopEditors", "index.html", "LICENSE.txt", "editors/web-apps", "editors/webext/noconnect.html",
-              ".auxi-engine-sha256"],
+              ".auxi-engine-sha256",
+              # plugin Qt livré par upstream sans ses dépendances (QtQml/QtQuick) : ne peut pas se charger
+              "platforminputcontexts/libqtvirtualkeyboardplugin.so"],
     "windows": ["DesktopEditors.exe", "editors.exe", "updatesvc.exe", "app.ico", "index.html",
                 "editors/web-apps", "editors/webext/noconnect.html", ".auxi-engine-sha256"],
 }
@@ -38,8 +40,15 @@ def stage_dir(target):
 
 
 def _copy_engine(src, dst):
+    """Copie uniquement les entrées du manifeste de la release upstream vérifiée."""
+    manifest = src / ".auxi-manifest"
+    if not manifest.exists():
+        fail("manifeste du moteur absent : relancer l'étape fetch")
+    allowed = set(manifest.read_text(encoding="utf-8").splitlines())
+
     def ignore(directory, names):
-        return [n for n in names if n == ".auxi-engine-sha256"]
+        rel = Path(directory).relative_to(src)
+        return [n for n in names if str(rel / n) not in allowed]
     shutil.copytree(src, dst, symlinks=True, ignore=ignore)
 
 

@@ -166,14 +166,22 @@ def install_desktop_integration(root, p, exec_cmd):
     write_text(share / "metainfo" / f"{app_id}.metainfo.xml", metainfo(p))
 
 
-def validate_desktop_files(root):
+def validate_desktop_files(root, local_deps=False):
+    env = {}
     validator = shutil.which("desktop-file-validate")
-    if not validator:
+    if not validator and local_deps:
+        from .toolchain import local_tool_env, TOOLS_ROOT
+        env = local_tool_env(["desktop-file-validate"])
+        validator = str(TOOLS_ROOT / "usr" / "bin" / "desktop-file-validate")
+    if not validator or not Path(validator).exists():
         warn("desktop-file-validate absent : validation des fichiers .desktop ignorée")
         return
     for f in sorted((root / "usr" / "share" / "applications").glob("*.desktop")):
-        run([validator, f], quiet=True)
-    ok("fichiers .desktop valides")
+        res = run([validator, f], env=env, quiet=True, check=False, capture=True)
+        if res.returncode != 0 or res.stdout.strip():
+            print(res.stdout + res.stderr)
+            fail(f"fichier .desktop invalide : {f.name}")
+    ok("fichiers .desktop valides (desktop-file-validate)")
 
 
 # ---------------------------------------------------------------------------
@@ -259,7 +267,7 @@ def build_deb(p):
                  f"{__import__('email.utils').utils.formatdate(source_date_epoch())}\n")
     with gzip.GzipFile(doc / "changelog.gz", "wb", mtime=source_date_epoch()) as gz:
         gz.write(changelog.encode("utf-8"))
-    validate_desktop_files(work)
+    validate_desktop_files(work, getattr(p, 'local_deps', False))
 
     depends = compute_depends(libdir)
     info(f"Depends calculé : {depends}")
@@ -337,16 +345,26 @@ exec "$HERE/usr/lib/auxioffice/auxioffice" "$@"
     out = DIST_DIR / "linux" / f"AuxiNuxOffice-{version()}-x86_64.AppImage"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.unlink(missing_ok=True)
+    env = {"ARCH": "x86_64", "SOURCE_DATE_EPOCH": str(source_date_epoch())}
+    if not shutil.which("file"):
+        if not getattr(p, "local_deps", False) and not os.environ.get("AUXI_LOCAL_DEPS"):
+            fail("appimagetool nécessite la commande « file » (paquet file) ; ou relancer avec --local-deps")
+        from .toolchain import local_tool_env
+        env.update(local_tool_env(["file"]))
     run([tool, "--appimage-extract-and-run", "--no-appstream", "--runtime-file", runtime, "--comp", "zstd",
-         appdir, out], env={"ARCH": "x86_64", "SOURCE_DATE_EPOCH": str(source_date_epoch())},
-        log_file=BUILD_DIR / "package" / "appimage" / "appimagetool.log")
+         appdir, out], env=env, log_file=BUILD_DIR / "package" / "appimage" / "appimagetool.log")
     out.chmod(0o755)
     ok(f"{out.name} ({out.stat().st_size // (1024 * 1024)} Mio)")
     return out
 
 
+class _Product(dict):
+    """product.json + options de la ligne de commande utiles à l'empaquetage."""
+
+
 def package(args):
-    p = product()
+    p = _Product(product())
+    p.local_deps = args.local_deps
     formats = [f.strip() for f in (args.formats or "deb,appimage").split(",") if f.strip()]
     produced = []
     if "deb" in formats:
