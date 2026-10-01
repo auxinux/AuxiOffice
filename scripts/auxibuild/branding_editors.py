@@ -5,12 +5,32 @@
 Uses the white-label mechanism built into the upstream web-apps build
 (environment variables replacing {{APP_TITLE_TEXT}}, {{PUBLISHER_NAME}}...),
 renames the editors (AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF) in every UI
-language and adds the French/English strings of the AuxiNux About notices."""
+language, adds the French/English strings of the AuxiNux About notices and replaces
+the ONLYOFFICE logos and favicons of the editors with the AuxiNux identity."""
 
 import json
+import re
+import shutil
 from pathlib import Path
 
-from .common import UPSTREAM_SRC, fail, ok, version, build_number
+from .common import ROOT, UPSTREAM_SRC, fail, ok, version, build_number
+
+GEN = ROOT / "branding" / "generated"
+
+# Logos de l'interface des éditeurs : (ressource AuxiNux, fichier web-apps, hauteur affichée).
+# Ils sont affichés par CSS (« content: url() », « background-image ») à leur taille propre :
+# la taille déclarée du SVG est ramenée à celle du logo d'origine (même viewBox).
+EDITOR_LOGOS = [
+    ("svg/logo-light.svg", "common/main/resources/img/about/logo_s.svg", 45),           # À propos, thème clair
+    ("svg/logo-dark.svg", "common/main/resources/img/about/logo-white_s.svg", 45),      # À propos, thème sombre
+    ("svg/shell-logo-light.svg", "common/main/resources/img/header/dark-logo_s.svg", 20),  # en-tête, thème clair
+    ("svg/shell-logo-dark.svg", "common/main/resources/img/header/header-logo_s.svg", 20),  # en-tête, thème sombre
+]
+# Icônes d'onglet (favicon) de chaque éditeur
+EDITOR_FAVICONS = {
+    "documenteditor": "auxiwriter", "spreadsheeteditor": "auxisheet", "presentationeditor": "auxipresent",
+    "pdfeditor": "auxipdf", "visioeditor": "auxioffice",
+}
 
 # préfixe des clés de traduction -> (dossier de l'application, clé d'app dans product.json)
 EDITORS = {
@@ -90,11 +110,44 @@ def brand_desktop_config(p, apps):
     f.write_text(text, encoding="utf-8")
 
 
+def _svg_with_height(src, height):
+    text = src.read_text(encoding="utf-8")
+    tag = re.search(r"<svg\b[^>]*>", text).group(0)
+    box = re.search(r'viewBox="([^"]+)"', tag)
+    if not box:
+        fail(f"{src} : attribut viewBox absent")
+    w, h = (float(v) for v in box.group(1).split()[2:4])
+    sized = re.sub(r'\swidth="[^"]*"', f' width="{round(w * height / h)}"', tag)
+    sized = re.sub(r'\sheight="[^"]*"', f' height="{height}"', sized)
+    return text.replace(tag, sized, 1)
+
+
+def brand_logos(p, apps):
+    """Logos (À propos, en-tête, formulaires), favicons et lien du logo des formulaires."""
+    for src, dst, height in EDITOR_LOGOS:
+        target = apps / dst
+        if not target.exists():
+            fail(f"logo des éditeurs introuvable : {target} (structure de web-apps modifiée upstream ?)")
+        target.write_text(_svg_with_height(GEN / src, height), encoding="utf-8")
+    for folder, icon in EDITOR_FAVICONS.items():
+        target = apps / folder / "main" / "resources" / "img" / "favicon.ico"
+        if target.exists():
+            shutil.copy2(GEN / "ico" / f"{icon}.ico", target)
+    forms = apps / "documenteditor" / "forms" / "index.html"
+    if forms.exists():
+        text = forms.read_text(encoding="utf-8")
+        old = 'class="brand-logo" href="http://www.onlyoffice.com/"'
+        if old not in text:
+            fail(f"motif upstream introuvable dans {forms} : {old!r}")
+        forms.write_text(text.replace(old, f'class="brand-logo" href="{p["product"]["website"]}"'), encoding="utf-8")
+
+
 def apply(p, args):
     apps = UPSTREAM_SRC / "web-apps" / "apps"
     if not apps.exists():
         return
     brand_desktop_config(p, apps)
+    brand_logos(p, apps)
     count = 0
     for prefix, (folder, app_key) in EDITORS.items():
         name = p["apps"][app_key]["name"]
@@ -112,4 +165,5 @@ def apply(p, args):
             target = apps / folder / "main" / "locale" / f"{lang}.json"
             if target.exists():
                 _rewrite_json(target, strings)
-    ok(f"éditeurs : noms AuxiNux appliqués ({count} fichiers de langue), mentions « À propos » FR/EN")
+    ok(f"éditeurs : noms AuxiNux appliqués ({count} fichiers de langue), mentions « À propos » FR/EN, "
+       f"logos et icônes AuxiNux")

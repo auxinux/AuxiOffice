@@ -112,6 +112,33 @@ def test_static(r, stage, target):
         r.add("service de mise à jour upstream absent", not (stage / "DesktopEditors").exists())
     else:
         r.add("service de mise à jour upstream absent", not (stage / "updatesvc.exe").exists())
+    test_no_upstream_logo(r, stage)
+
+
+# Débuts des tracés des logos ONLYOFFICE (en-tête 85×20 et À propos 245×45), tels qu'écrits dans
+# les sources et après optimisation des SVG par le build de web-apps.
+UPSTREAM_LOGO_SIGNATURES = ("M20.211 7.003", "M64.7249 13.8022", "M64.725 13.802")
+
+
+def test_no_upstream_logo(r, stage):
+    """Identité visuelle : aucun logo ONLYOFFICE dans l'interface livrée (SVG, CSS dont les
+    images intégrées encodées, HTML, JS) ; icônes d'onglet des éditeurs aux couleurs AuxiNux."""
+    signatures = UPSTREAM_LOGO_SIGNATURES + tuple(sig.replace(" ", "%20") for sig in UPSTREAM_LOGO_SIGNATURES)
+    found = []
+    files = [stage / "index.html", *(stage / "editors" / "web-apps").rglob("*")]
+    for f in files:
+        if f.is_file() and f.suffix in (".svg", ".css", ".html", ".js"):
+            text = f.read_text(encoding="utf-8", errors="ignore")
+            if any(sig in text for sig in signatures):
+                found.append(str(f.relative_to(stage)))
+    r.add("aucun logo ONLYOFFICE dans l'interface", not found, ", ".join(found[:4]) or "logos AuxiNux")
+    from .branding_editors import EDITOR_FAVICONS, GEN
+    apps = stage / "editors" / "web-apps" / "apps"
+    wrong = [folder for folder, icon in EDITOR_FAVICONS.items()
+             if (apps / folder / "main" / "resources" / "img" / "favicon.ico").exists()
+             and (apps / folder / "main" / "resources" / "img" / "favicon.ico").read_bytes()
+             != (GEN / "ico" / f"{icon}.ico").read_bytes()]
+    r.add("icônes d'onglet des éditeurs AuxiNux", not wrong, ", ".join(wrong) or "favicon AuxiNux")
 
 
 def test_gui(r, stage, py):

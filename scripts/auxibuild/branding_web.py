@@ -34,6 +34,8 @@ DESKTOP_APPS_ASSETS = [
     ("png/shell-logo-dark@1.75x.png", "win-linux/res/icons/logo_dark@1.75x.png"),
     ("ico/auxioffice.ico", "win-linux/res/icons/desktopeditors.ico"),
     ("png/64x64/auxioffice.png", "win-linux/res/icons/app-icon_64.png"),
+    # Écran de démarrage (compilé dans les ressources du shell)
+    ("svg/splash.svg", "win-linux/res/icons/splash.svg"),
 ]
 
 
