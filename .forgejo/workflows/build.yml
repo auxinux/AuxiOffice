@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Projet AuxiNux
+#
+# Intégration continue d'AuxiNux Office (Forgejo Actions, par ex. git.auxinux.ca).
+# Modèle préparé pour la 0.1.0, pas encore exécuté : le build manuel (BUILD.md) reste la
+# référence et ne dépend pas de ce fichier.
+#
+# Exécuteur attendu : forgejo-runner en mode « host » sur Debian 13 x86_64, utilisateur
+# non root (AuxiNux Office refuse de s'exécuter en root, y compris pendant les tests), avec
+# ≈ 20 Go libres. Adapter l'étiquette « runs-on » à celles de l'instance.
+#
+# Variable du dépôt : AUXI_ACCEPT_MSVC_LICENSE = 1 (acceptation des licences Microsoft du CRT
+# MSVC et du SDK Windows par les mainteneurs, nécessaire au job windows).
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  AUXI_BUILD_NUMBER: ${{ github.run_number }}
+
+jobs:
+  linux:
+    runs-on: debian-13
+    steps:
+      - uses: https://code.forgejo.org/actions/checkout@v4
+
+      - name: Vérification de l'hôte
+        # Les paquets -dev manquants sont extraits localement (--local-deps) ; Xvfb, xdotool
+        # et strace doivent être installés sur l'exécuteur pour les tests graphiques.
+        run: python3 scripts/auxibuild doctor --target linux --local-deps
+
+      - name: Build, tests et paquets
+        run: ./scripts/build-linux.sh --release --local-deps
+
+      - uses: https://code.forgejo.org/actions/upload-artifact@v3
+        with:
+          name: auxinux-office-linux
+          path: dist/linux/
+
+      - uses: https://code.forgejo.org/actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-reports-linux
+          path: build/test-reports/linux/
+
+  windows:
+    runs-on: debian-13
+    env:
+      AUXI_ACCEPT_MSVC_LICENSE: ${{ vars.AUXI_ACCEPT_MSVC_LICENSE }}
+    steps:
+      - uses: https://code.forgejo.org/actions/checkout@v4
+
+      - name: Build, tests et installateurs (compilation croisée)
+        run: python3 scripts/auxibuild all --target windows --mode release --local-deps
+
+      - uses: https://code.forgejo.org/actions/upload-artifact@v3
+        with:
+          name: auxinux-office-windows
+          path: dist/windows/
+
+      - uses: https://code.forgejo.org/actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-reports-windows
+          path: build/test-reports/windows/

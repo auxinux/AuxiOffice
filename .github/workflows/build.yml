@@ -1,0 +1,104 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Projet AuxiNux
+#
+# Intégration continue d'AuxiNux Office (GitHub Actions ; voir aussi .forgejo/workflows/).
+# Modèle préparé pour la 0.1.0, pas encore exécuté : le build manuel (BUILD.md) reste la
+# référence et ne dépend pas de ce fichier.
+#
+# Variables du dépôt (Settings > Variables) :
+#   AUXI_ACCEPT_MSVC_LICENSE = 1   acceptation, par les mainteneurs, des licences Microsoft
+#                                  du CRT MSVC et du SDK Windows (job windows) ; sans elle,
+#                                  le job windows s'arrête avec une explication.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  AUXI_BUILD_NUMBER: ${{ github.run_number }}
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Libérer de l'espace disque (≈ 20 Go nécessaires)
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Dépendances
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config git curl python3 python3-venv nodejs npm \
+            libgtk-3-dev libglib2.0-dev libnotify-dev libcups2-dev libcupsimage2-dev libx11-dev \
+            libx11-xcb-dev libxcb1-dev libxext-dev libdbus-1-dev libpulse-dev libgl-dev libatk1.0-dev \
+            dpkg-dev fakeroot file desktop-file-utils xvfb xdotool strace
+          # tests graphiques dans un espace de noms réseau isolé (restreint par AppArmor sur Ubuntu 24.04)
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .toolchains
+            upstream/cache
+            ~/.npm
+          key: auxioffice-linux-${{ hashFiles('upstream/upstream.lock.json') }}
+
+      - name: Build, tests et paquets
+        run: ./scripts/build-linux.sh --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: auxinux-office-linux
+          path: dist/linux/
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports-linux
+          path: build/test-reports/linux/
+
+  windows:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      AUXI_ACCEPT_MSVC_LICENSE: ${{ vars.AUXI_ACCEPT_MSVC_LICENSE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Libérer de l'espace disque
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Dépendances (compilation croisée)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git curl python3 python3-venv nodejs npm make
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .toolchains
+            upstream/cache
+            ~/.npm
+          key: auxioffice-windows-${{ hashFiles('upstream/upstream.lock.json') }}
+
+      - name: Build, tests et installateurs
+        run: python3 scripts/auxibuild all --target windows --mode release --local-deps
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: auxinux-office-windows
+          path: dist/windows/
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports-windows
+          path: build/test-reports/windows/
