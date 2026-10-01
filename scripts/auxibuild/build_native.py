@@ -75,6 +75,23 @@ def _link_engine_for_qmake(target):
         shutil.copy2(winbuild / "icuuc74.lib", winbuild / "icuuc.lib")
 
 
+def engine_qt_link_dir():
+    """Link against the Qt libraries actually shipped (upstream engine), not the SDK
+    ones: symbol versions must match the runtime (see scripts/tools/check_elf_imports.py)."""
+    eng = engine_dir("linux")
+    link = NATIVE_DIR / "linux" / "qt-link"
+    rmtree(link)
+    link.mkdir(parents=True)
+    for so in sorted(eng.glob("libQt5*.so.5")):
+        (link / so.name[:-2]).symlink_to(so)
+    return link
+
+
+def check_elf(binary):
+    eng = engine_dir("linux")
+    run(["python3", ROOT / "scripts" / "tools" / "check_elf_imports.py", binary, eng, eng / "converter"])
+
+
 def build_shell_linux(args):
     step("Shell natif Linux (desktop-apps/win-linux)")
     qt = ensure_qt("qt_linux")
@@ -90,6 +107,7 @@ def build_shell_linux(args):
                   "QMAKE_LFLAGS+=-Wl,--as-needed",
                   # no build-machine paths in the RPATH (Qt is shipped next to the binary)
                   "QMAKE_RPATHDIR=", "QMAKE_LFLAGS_RPATH="]
+    qmake_args += [f"LIBS+=-L{engine_qt_link_dir()}", f"QMAKE_LFLAGS+=-Wl,-rpath-link,{engine_dir('linux')}"]
     if sysdeps_lib:
         qmake_args.append(f"LIBS+=-L{sysdeps_lib}")
     run(qmake_args, cwd=out, env=env, log_file=out / "qmake.log")
@@ -100,6 +118,7 @@ def build_shell_linux(args):
     dest = NATIVE_DIR / "linux" / "bin"
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(binary, dest / "auxioffice-editors")
+    check_elf(dest / "auxioffice-editors")
     ok(f"shell Linux : {dest / 'auxioffice-editors'}")
 
 
@@ -134,9 +153,10 @@ def build_shell_windows(args):
 
 
 def build_all(args):
-    if args.target == "linux":
-        build_shell_linux(args)
-    else:
-        build_shell_windows(args)
+    if "shell" in args.components:
+        if args.target == "linux":
+            build_shell_linux(args)
+        else:
+            build_shell_windows(args)
     from . import build_auxitext
     build_auxitext.build(args)

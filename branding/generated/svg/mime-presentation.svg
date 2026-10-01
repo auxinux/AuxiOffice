@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E8704D"/><stop offset="1" stop-color="#B64524"/>
+    </linearGradient>
+  </defs>
+  <path d="M56 14 H166 L216 64 V242 H56 Z" fill="#FFFFFF" stroke="#BFC3C8" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M166 14 V64 H216 Z" fill="#E4E6E9" stroke="#BFC3C8" stroke-width="4" stroke-linejoin="round"/>
+  <g fill="#D5D8DC">
+    <rect x="80" y="74" width="72" height="10" rx="5"/>
+    <rect x="80" y="96" width="112" height="10" rx="5"/>
+    <rect x="80" y="210" width="112" height="10" rx="5"/>
+  </g>
+  <rect x="40" y="124" width="136" height="76" rx="14" fill="url(#badge)"/>
+  <rect x="40" y="194" width="136" height="6" rx="3" fill="#F26F00"/>
+  <g fill="#FFFFFF"><path transform="translate(89.83 180.75)" d="M11.75 -14.5 9.96875 0.0H2.125L7.1875 -41.5H20.3125Q23.96875 -41.5 26.59375 -40.640625Q29.21875 -39.78125 30.90625 -38.234375Q32.59375 -36.6875 33.40625 -34.5625Q34.21875 -32.4375 34.21875 -29.9375Q34.21875 -26.59375 33.15625 -23.765625Q32.09375 -20.9375 29.953125 -18.875Q27.8125 -16.8125 24.578125 -15.65625Q21.34375 -14.5 17.0 -14.5ZM14.375 -35.4375 12.53125 -20.65625H17.75Q19.96875 -20.65625 21.578125 -21.28125Q23.1875 -21.90625 24.21875 -23.0625Q25.25 -24.21875 25.75 -25.796875Q26.25 -27.375 26.25 -29.3125Q26.25 -30.6875 25.84375 -31.828125Q25.4375 -32.96875 24.625 -33.765625Q23.8125 -34.5625 22.546875 -35.0Q21.28125 -35.4375 19.5625 -35.4375Z"/></g>
+</svg>
