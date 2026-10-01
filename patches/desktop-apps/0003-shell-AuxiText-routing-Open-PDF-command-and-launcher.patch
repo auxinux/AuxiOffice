@@ -1,0 +1,100 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Projet AuxiNux <repo@auxinux.ca>
+Date: Thu, 1 Oct 2026 17:51:40 +0000
+Subject: [PATCH] shell: AuxiText routing, 'Open PDF' command and launcher name
+
+Plain text documents opened from the start page, recent files or drag and drop are handed to AuxiText; 'create:new text' starts AuxiText; 'auxinux:open-pdf' opens a PDF-filtered dialog; the restart helper starts the auxioffice launcher.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../cascapplicationmanagerwrapper_private.h   | 38 ++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 2 deletions(-)
+
+diff --git a/win-linux/src/cascapplicationmanagerwrapper_private.h b/win-linux/src/cascapplicationmanagerwrapper_private.h
+index c824f7e..2cda0e6 100644
+--- a/win-linux/src/cascapplicationmanagerwrapper_private.h
++++ b/win-linux/src/cascapplicationmanagerwrapper_private.h
+@@ -32,6 +32,9 @@
+  *
+  * SPDX-License-Identifier: AGPL-3.0-only
+  */
++/*
++ * Modified by Projet AuxiNux on 2026-10-01 for AuxiNux Office (see patches/desktop-apps/ in the AuxiNux Office repository).
++ */
+ 
+ #ifndef CASCAPPLICATIONMANAGERWRAPPER_PRIVATE_H
+ #define CASCAPPLICATIONMANAGERWRAPPER_PRIVATE_H
+@@ -48,15 +51,26 @@
+ #include "cprintdata.h"
+ #include "clogger.h"
+ #include "common/File.h"
++#ifdef AUXI_PRODUCT_NAME
++# include "auxinux/auxinux.h"
++#endif
+ #include <QApplication>
+ #include <QJsonParseError>
+ #ifdef _WIN32
+-# define APP_LAUNCH_NAME "\\DesktopEditors.exe"
++# ifdef AUXI_LAUNCH_NAME
++#  define APP_LAUNCH_NAME "\\" AUXI_LAUNCH_NAME
++# else
++#  define APP_LAUNCH_NAME "\\DesktopEditors.exe"
++# endif
+ # define RESTART_BATCH "/apprestart.bat"
+ #else
+ # include "platform_linux/xcbutils.h"
+ # include <QProcess>
+-# define APP_LAUNCH_NAME "/DesktopEditors"
++# ifdef AUXI_LAUNCH_NAME
++#  define APP_LAUNCH_NAME "/" AUXI_LAUNCH_NAME
++# else
++#  define APP_LAUNCH_NAME "/DesktopEditors"
++# endif
+ # define RESTART_BATCH "/apprestart.sh"
+ #endif
+ 
+@@ -308,10 +322,19 @@ public:
+                 }
+             } else
+             if ( cmd.compare(L"open:folder") == 0 ||
++#ifdef AUXI_PRODUCT_NAME
++                    cmd.compare(L"auxinux:open-pdf") == 0 ||
++#endif
+                     (!(cmd.find(L"editor:event") == std::wstring::npos) &&
+                      !(data.get_Param().find(L"file:open") == std::wstring::npos)) )
+             {
++#ifdef AUXI_PRODUCT_NAME
++                std::wstring file_path = cmd.compare(L"auxinux:open-pdf") == 0 ?
++                            AuxiNux::selectPdfFile(event.m_nSenderId).toStdWString() :
++                            CEditorTools::getlocalfile(data.get_Param(), event.m_nSenderId).toStdWString();
++#else
+                 std::wstring file_path = CEditorTools::getlocalfile(data.get_Param(), event.m_nSenderId).toStdWString();
++#endif
+ 
+                 if ( !file_path.empty() ) {
+                     QString qfile_path = QString::fromStdWString(file_path);
+@@ -335,6 +358,13 @@ public:
+             if ( cmd.compare(L"create:new") == 0 ) {
+                 const std::wstring & format = data.get_Param();
+                 const std::wstring search_tpl = L"template:";
++#ifdef AUXI_PRODUCT_NAME
++                if ( format == L"text" ) {
++                    if ( !AuxiNux::launchTextEditor(QStringList()) )
++                        CMessage::error(m_appmanager.mainWindow()->handle(), QObject::tr("AuxiText cannot be started."));
++                    return true;
++                }
++#endif
+ 
+                 if ( format.rfind(search_tpl, 0) == 0 ) {
+                     std::wstring type = format.substr(search_tpl.length());
+@@ -513,6 +543,10 @@ public:
+ 
+     auto openDocument(const COpenOptions& opts) -> bool
+     {
++#ifdef AUXI_PRODUCT_NAME
++        if ( AuxiNux::routeToTextEditor(opts) )
++            return true;
++#endif
+         COpenOptions opts_ext{opts};
+         if ( preferOpenEditorWindow() ) {
+             GET_REGISTRY_USER(reg_user);

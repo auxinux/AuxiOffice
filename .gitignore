@@ -1,0 +1,18 @@
+# Upstream sources and binary caches (fetched by scripts/auxibuild fetch)
+/upstream/src/
+/upstream/cache/
+# Build trees and toolchains
+/build/
+/.toolchains/
+# Release artifacts
+/dist/*
+!/dist/.gitkeep
+# Python
+__pycache__/
+*.pyc
+/.venv/
+# Misc
+*.log
+*.swp
+.DS_Store
+aqtinstall.log

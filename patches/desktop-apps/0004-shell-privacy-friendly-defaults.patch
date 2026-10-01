@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Projet AuxiNux <repo@auxinux.ca>
+Date: Thu, 1 Oct 2026 17:51:40 +0000
+Subject: [PATCH] shell: privacy-friendly defaults
+
+No online template gallery unless --templates-url is given; AI assistants disabled until the user enables them; no sign-up page when none is configured.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ win-linux/src/cascapplicationmanagerwrapper.cpp | 13 +++++++++++++
+ win-linux/src/windows/cmainwindow.cpp           |  5 +++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/win-linux/src/cascapplicationmanagerwrapper.cpp b/win-linux/src/cascapplicationmanagerwrapper.cpp
+index ce5a55a..1b23c93 100644
+--- a/win-linux/src/cascapplicationmanagerwrapper.cpp
++++ b/win-linux/src/cascapplicationmanagerwrapper.cpp
+@@ -32,6 +32,9 @@
+  *
+  * SPDX-License-Identifier: AGPL-3.0-only
+  */
++/*
++ * Modified by Projet AuxiNux on 2026-10-01 for AuxiNux Office (see patches/desktop-apps/ in the AuxiNux Office repository).
++ */
+ 
+ 
+ #include "cascapplicationmanagerwrapper.h"
+@@ -516,7 +519,11 @@ bool CAscApplicationManagerWrapper::processCommonEvent(NSEditorApi::CAscCefMenuE
+                 if ( _json_to_open.isEmpty() ) {
+                     QString _templates_url{QString::fromStdWString(InputArgs::argument_value(L"--templates-url"))};
+                     if ( _templates_url.isEmpty() )
++#ifdef AUXI_PRODUCT_NAME
++                        return true;    // AuxiNux: no online template gallery unless --templates-url is given
++#else
+                         _templates_url = "https://templates.onlyoffice.com/?desktop=true";
++#endif
+ 
+                     QJsonObject _json_obj{
+                         {"portal", _templates_url},
+@@ -1327,6 +1334,12 @@ void CAscApplicationManagerWrapper::initializeApp()
+         AscAppManager::setUserSettings(L"system-scale", L"1");
+     }
+ 
++#ifdef AUXI_DEFAULT_DISABLE_AI
++    // AuxiNux: AI assistants (which send content to a third-party provider) are opt-in
++    if ( AscAppManager::userSettings(L"disable-ai").empty() )
++        AscAppManager::setUserSettings(L"disable-ai", L"1");
++#endif
++
+     SingleApplication * app = static_cast<SingleApplication *>(QCoreApplication::instance());
+     connect(app, &SingleApplication::receivedMessage, [](const QString &args) {
+         std::vector<std::wstring> vec_inargs;
+diff --git a/win-linux/src/windows/cmainwindow.cpp b/win-linux/src/windows/cmainwindow.cpp
+index 346ea57..e74d9dc 100644
+--- a/win-linux/src/windows/cmainwindow.cpp
++++ b/win-linux/src/windows/cmainwindow.cpp
+@@ -32,6 +32,9 @@
+  *
+  * SPDX-License-Identifier: AGPL-3.0-only
+  */
++/*
++ * Modified by Projet AuxiNux on 2026-10-01 for AuxiNux Office (see patches/desktop-apps/ in the AuxiNux Office repository).
++ */
+ 
+ #include "windows/cmainwindow.h"
+ #include "ceditortools.h"
+@@ -1474,6 +1477,8 @@ void CMainWindow::onPortalNew(QString in)
+ void CMainWindow::onPortalCreate()
+ {
+     QString _url = URL_SIGNUP;
++    if ( _url.isEmpty() )   // no sign-up page configured for this build
++        return;
+     GET_REGISTRY_SYSTEM(reg_system)
+     if (reg_system.contains("Store"))
+             _url += "&store=" + reg_system.value("Store").toString();
