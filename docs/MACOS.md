@@ -29,6 +29,25 @@ deux emplacements).
 
 ## 2. Construction
 
+### Sur votre Mac (recommandé)
+
+```sh
+git clone git@git.auxinux.ca:Auxinux/AuxiNux_Office.git
+cd AuxiNux_Office
+./build.sh --install
+```
+
+Le script vérifie les outils de ligne de commande d'Apple et Homebrew, installe Qt 5 et Node.js
+avec Homebrew, construit l'application **avec AuxiText** (compilé sur le Mac, Qt intégré à
+`AuxiText.app`), puis l'installe dans /Applications. Une application construite localement
+n'est pas mise en quarantaine : aucune commande `xattr` n'est nécessaire. AuxiText est placé
+dans `AuxiNux Office.app/Contents/Applications/AuxiText.app` ; la tuile « Nouveau fichier
+texte » de l'accueil le lance (adresse `auxitext://new`), et il apparaît dans « Ouvrir avec »
+pour les fichiers texte.
+
+### Depuis Linux (sans AuxiText)
+
+
 Le shell macOS d'upstream (Objective-C, `desktop-apps/macos`) ne peut être compilé qu'avec Xcode
 et le SDK d'Apple. La version préliminaire est donc produite **depuis Linux**, sans compilation
 macOS, en réempaquetant l'application d'upstream épinglée :
@@ -55,7 +74,7 @@ elle-même (`rcodesign notary-submit`) demande une clé d'API App Store Connect.
 | Sujet | État |
 |---|---|
 | Shell natif (fenêtres, menus, dialogues) | celui d'**upstream, non modifié** : les patches AuxiNux du shell (routage vers AuxiText, « Ouvrir PDF » avec filtre, réglages appliqués avant le moteur, arrêt sur SIGTERM, traductions) ne s'appliquent pas |
-| AuxiText | **absent** (application Qt non compilée pour macOS) ; les fichiers texte s'ouvrent dans AuxiWriter ; la tuile « Nouveau fichier texte » est masquée |
+| AuxiText | inclus quand l'application est construite **sur un Mac** (`./build.sh`) ; absent des builds faits depuis Linux (tuile « Nouveau fichier texte » alors masquée) |
 | « Ouvrir PDF » | ouvre le dialogue d'ouverture standard (tous types) |
 | Assistant IA | désactivé par l'écran d'accueil au premier lancement (l'option reste dans les paramètres) |
 | Réglages réseau du moteur web (DNS sur HTTPS, réseau d'arrière-plan) | **non appliqués** (pas de lanceur AuxiNux sous macOS) : à vérifier (§4) |
@@ -74,7 +93,7 @@ Ces limites disparaîtront avec la compilation du shell macOS dans Xcode (patche
 | M-1 | Installation (§1), premier lancement | l'application démarre ; nom « AuxiNux Office » dans la barre des menus |
 | M-2 | Menus AuxiNux Office (À propos, Masquer, Quitter) en français et en anglais | « AuxiNux Office » partout ; fenêtre À propos : version 0.1.0, copyright Projet AuxiNux |
 | M-3 | Icônes : Finder, Launchpad, Dock, fichiers DOCX/XLSX/PPTX/PDF | icônes AuxiNux ; noter les éventuelles icônes ONLYOFFICE (Dock pendant l'exécution, onglet d'accueil) |
-| M-4 | Écran d'accueil | « Bienvenue dans AuxiNux Office ! », cinq tuiles (sans « Nouveau fichier texte ») |
+| M-4 | Écran d'accueil ; tuile « Nouveau fichier texte » | « Bienvenue dans AuxiNux Office ! », six tuiles (cinq si construit depuis Linux) ; la tuile ouvre AuxiText |
 | M-5 | DOCX, XLSX, PPTX : créer, ouvrir, modifier, enregistrer, exporter en PDF | fonctionnel |
 | M-6 | PDF : ouvrir, naviguer, zoomer, rechercher, copier | fonctionnel |
 | M-7 | Double-clic sur des documents dans le Finder ; Ouvrir avec | AuxiNux Office proposé ; l'application par défaut existante n'est pas modifiée |

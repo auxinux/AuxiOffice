@@ -183,6 +183,13 @@ def doctor(target, local_deps=False):
         tools += ["make", "g++", "pkg-config", "dpkg-deb", "fakeroot"]
     elif not IS_WINDOWS_HOST:
         tools += ["make"]  # compilation croisée Windows depuis Linux (clang-cl : voir wincross.py)
+    if target == "macos" and sys.platform == "darwin":
+        from .common import BuildError
+        from .build_auxitext import _qt_macos
+        try:
+            ok(f"Qt 5 (AuxiText) : {_qt_macos()}")
+        except BuildError as e:
+            problems.append(str(e))
     for t in tools:
         if which(t):
             ok(f"{t} : {which(t)}")

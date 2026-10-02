@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Projet AuxiNux
-"""Build AuxiText (Qt) and the auxioffice launcher (C) for Linux or Windows.
-Both use the same sources on every platform."""
+"""Build AuxiText (Qt) and the auxioffice launcher (C) for Linux, Windows or macOS.
+Both use the same sources on every platform (macOS: AuxiText only, built on a Mac)."""
 
 import os
 import shutil
@@ -132,8 +132,81 @@ def build_launcher_windows(args):
     ok(f"lanceur : {dest / 'auxioffice.exe'}")
 
 
+def _qt_macos():
+    """Qt 5 pour macOS : AUXI_QT_MACOS, sinon Homebrew (brew install qt@5)."""
+    prefix = os.environ.get("AUXI_QT_MACOS")
+    if not prefix:
+        res = run(["brew", "--prefix", "qt@5"], check=False, capture=True, quiet=True)
+        prefix = res.stdout.strip() if res.returncode == 0 else ""
+    qt = Path(prefix) if prefix else None
+    if not qt or not (qt / "bin" / "qmake").exists():
+        fail("Qt 5 introuvable : brew install qt@5 (ou définir AUXI_QT_MACOS)")
+    return qt
+
+
+def build_auxitext_macos(args):
+    """AuxiText.app (Apple Silicon) : Qt intégré à l'application (macdeployqt)."""
+    import plistlib
+    from .common import IS_MACOS_HOST
+    step("AuxiText (macOS)")
+    if not IS_MACOS_HOST:
+        fail("AuxiText pour macOS se compile sur un Mac (voir docs/MACOS.md)")
+    qt = _qt_macos()
+    out = NATIVE_DIR / "macos" / "auxitext"
+    rmtree(out)
+    out.mkdir(parents=True)
+    _prepare_translations(qt / "bin", qt / "translations", out)
+    run([qt / "bin" / "qmake", AUXITEXT_SRC / "auxitext.pro", f"CONFIG+={args.mode}",
+         "QMAKE_MACOSX_DEPLOYMENT_TARGET=11.0", "QMAKE_APPLE_DEVICE_ARCHS=arm64"],
+        cwd=out, log_file=out / "qmake.log")
+    run(["make", f"-j{args.jobs}"], cwd=out, log_file=out / "make.log")
+    built = out / "auxitext.app"
+    if not built.exists():
+        fail("auxitext.app introuvable après la compilation")
+    run([qt / "bin" / "macdeployqt", built], log_file=out / "macdeployqt.log")
+
+    from .macos import _icon_pngs, write_icns
+    p = product()
+    contents = built / "Contents"
+    write_icns(_icon_pngs("auxitext"), contents / "Resources" / "AuxiText.icns")
+    with open(contents / "Info.plist", "rb") as fh:
+        plist = plistlib.load(fh)
+    exts = [e for e in p["apps"]["text"]["extensions"] if e != "csv"] + ["csv"]
+    plist.update({
+        "CFBundleName": "AuxiText",
+        "CFBundleDisplayName": "AuxiText",
+        "CFBundleIdentifier": f"{p['linux']['app_id']}.Text",
+        "CFBundleShortVersionString": version(),
+        "CFBundleVersion": version(),
+        "CFBundleIconFile": "AuxiText",
+        "LSMinimumSystemVersion": "11.0",
+        "NSHighResolutionCapable": True,
+        "NSHumanReadableCopyright": f"© {p['product']['copyright_first_year']} {p['product']['copyright_holder']}. "
+                                    "Logiciel libre (AGPL v3).",
+        # adresse auxitext://new : tuile « Nouveau fichier texte » de l'accueil d'AuxiNux Office
+        "CFBundleURLTypes": [{"CFBundleURLName": "AuxiText", "CFBundleURLSchemes": ["auxitext"]}],
+        # proposé (« Ouvrir avec ») sans revendiquer le rôle par défaut
+        "CFBundleDocumentTypes": [{"CFBundleTypeName": "Texte brut", "CFBundleTypeRole": "Editor",
+                                   "LSHandlerRank": "Alternate", "CFBundleTypeExtensions": exts,
+                                   "LSItemContentTypes": ["public.plain-text", "public.text"]}],
+    })
+    with open(contents / "Info.plist", "wb") as fh:
+        plistlib.dump(plist, fh, fmt=plistlib.FMT_XML)
+    dest = NATIVE_DIR / "macos" / "AuxiText.app"
+    rmtree(dest)
+    run(["ditto", built, dest], quiet=True)
+    res = run([dest / "Contents" / "MacOS" / "auxitext", "--version"], capture=True, quiet=True)
+    if f"AuxiText {version()}" not in res.stdout:
+        fail(f"AuxiText.app ne répond pas correctement à --version : {res.stdout!r}")
+    ok(f"AuxiText : {dest} ({res.stdout.strip()})")
+
+
 def build(args):
     wanted = args.components
+    if args.target == "macos":
+        if "auxitext" in wanted:
+            build_auxitext_macos(args)
+        return
     if args.target == "linux":
         if "auxitext" in wanted:
             build_auxitext_linux(args)

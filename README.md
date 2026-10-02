@@ -109,14 +109,23 @@ Sous Windows, la commande est `auxioffice.exe` (enregistrée dans « App Paths �
 
 ## Construire AuxiNux Office
 
+Un `git clone` puis une seule commande, sur la machine cible :
+
 ```sh
-./scripts/build-linux.sh --release            # Linux : .deb + AppImage dans dist/linux/
-python3 scripts/auxibuild all --target windows --accept-msvc-license   # Windows depuis Linux
+git clone git@git.auxinux.ca:Auxinux/AuxiNux_Office.git
+cd AuxiNux_Office
+./build.sh              # Linux x86_64 : .deb + AppImage dans dist/linux/
+./build.sh --install    # Mac Apple Silicon : AuxiNux Office.app (avec AuxiText) installé dans /Applications
 ```
 
 ```powershell
-.\scripts\build-windows.ps1 -Release -AcceptMsvcLicense   # Windows (via WSL 2)
+powershell -ExecutionPolicy Bypass -File .\build.ps1     # Windows 11 : .exe + .msi dans dist\windows\ (via WSL 2)
 ```
+
+Prérequis installés ou proposés automatiquement : sur Mac, les outils de ligne de commande
+d'Apple et Homebrew (puis Qt 5 et Node.js) ; sous Windows, WSL 2 (Ubuntu 24.04). Pour les
+options avancées (compilation croisée, composants, CI) : `scripts/build-linux.sh`,
+`scripts/build-windows.ps1`, `python3 scripts/auxibuild --help`.
 
 Les versions de toutes les sources, binaires et outils sont épinglées (commit git ou SHA-256)
 dans [`upstream/upstream.lock.json`](upstream/upstream.lock.json). Procédure complète,

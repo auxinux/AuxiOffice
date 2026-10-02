@@ -11,6 +11,7 @@
 
 #include <QSettings>
 #include <QString>
+#include <QStringList>
 
 namespace App {
 
@@ -37,6 +38,7 @@ void applyPalette(bool dark);
 
 QString installDir();
 QString writerExecutable();     // lanceur AuxiNux Office (ouverture dans AuxiWriter avec --writer)
+QStringList writerArguments(const QString& path);  // arguments de writerExecutable() pour ce fichier
 QString licensesIndex();        // page des licences livrée avec AuxiNux Office
 
 }

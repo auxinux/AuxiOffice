@@ -17,7 +17,9 @@
 # include <unistd.h>
 #endif
 #include <QFileInfo>
+#include <QFileOpenEvent>
 #include <QIcon>
+#include <QTimer>
 #include <QStyleFactory>
 #include <QUrl>
 
@@ -56,6 +58,28 @@ static void ensureBundledLibraryPath(char* argv[])
     setenv("AUXITEXT_ENV_READY", "1", 1);
     execv(exe, argv);   // en cas d'échec on continue sans relance
 }
+#endif
+
+#ifdef Q_OS_MACOS
+// macOS transmet les fichiers (Finder, « Ouvrir avec ») et les adresses auxitext://new
+// (tuile « Nouveau fichier texte » d'AuxiNux Office) par des événements, pas par argv.
+class OpenEventFilter : public QObject
+{
+public:
+    int handled = 0;
+    bool eventFilter(QObject* obj, QEvent* event) override
+    {
+        if (event->type() != QEvent::FileOpen)
+            return QObject::eventFilter(obj, event);
+        const QUrl url = static_cast<QFileOpenEvent*>(event)->url();
+        if (url.isLocalFile())
+            MainWindow::openInNewWindow(url.toLocalFile());
+        else
+            MainWindow::openInNewWindow();      // auxitext://new
+        ++handled;
+        return true;
+    }
+};
 #endif
 
 int main(int argc, char* argv[])
@@ -105,8 +129,16 @@ int main(int argc, char* argv[])
     int opened = 0;
     for (const QString& f : files)
         opened += MainWindow::openInNewWindow(f) ? 1 : 0;
+#ifdef Q_OS_MACOS
+    static OpenEventFilter openEvents;
+    app.installEventFilter(&openEvents);
+    // Les événements d'ouverture arrivent juste après le démarrage : fenêtre vide seulement s'il n'y en a pas.
+    if (opened == 0)
+        QTimer::singleShot(400, [] { if (openEvents.handled == 0) MainWindow::openInNewWindow(); });
+#else
     if (opened == 0)
         MainWindow::openInNewWindow();
+#endif
 
     return app.exec();
 }

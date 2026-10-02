@@ -26,7 +26,7 @@ import struct
 import zipfile
 from pathlib import Path
 
-from .common import (BUILD_DIR, DIST_DIR, ROOT, TOOLCHAINS_DIR, download, extract_tar, fail, info, lock, ok,
+from .common import (BUILD_DIR, DIST_DIR, IS_MACOS_HOST, ROOT, TOOLCHAINS_DIR, download, extract_tar, fail, info, lock, ok,
                      product, rmtree, run, step, version, warn, which, write_text)
 
 GEN = ROOT / "branding" / "generated"
@@ -67,15 +67,30 @@ def seven_zip():
 
 
 def extract_dmg(archive, dest):
-    """Extrait le contenu du volume HFS+ d'une image DMG (liens symboliques conservés)."""
+    """Extrait le contenu du volume d'une image DMG (liens symboliques conservés) :
+    hdiutil sur Mac, 7-Zip (lecture HFS+) ailleurs."""
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
+    if IS_MACOS_HOST:
+        mnt = dest.parent / (dest.name + ".mnt")
+        rmtree(mnt)
+        mnt.mkdir(parents=True)
+        run(["hdiutil", "attach", "-nobrowse", "-readonly", "-noautoopen", "-mountpoint", mnt, archive], quiet=True)
+        try:
+            for entry in mnt.iterdir():
+                if entry.suffix == ".app":
+                    (dest / "ONLYOFFICE").mkdir(exist_ok=True)
+                    run(["ditto", entry, dest / "ONLYOFFICE" / entry.name], quiet=True)
+        finally:
+            run(["hdiutil", "detach", "-quiet", mnt], check=False, quiet=True)
+            rmtree(mnt)
+        return
     run([seven_zip(), "x", "-snl", "-y", f"-o{dest}", archive], quiet=True, log_file=dest.parent / "dmg-extract.log")
 
 
 def rcodesign():
-    spec = lock()["toolchains"]["rcodesign"]
-    home = TOOLCHAINS_DIR / f"rcodesign-{spec['version']}"
+    spec = lock()["toolchains"]["rcodesign_macos" if IS_MACOS_HOST else "rcodesign"]
+    home = TOOLCHAINS_DIR / f"rcodesign-{spec['version']}-{'macos' if IS_MACOS_HOST else 'linux'}"
     found = list(home.rglob("rcodesign")) if home.exists() else []
     if found:
         return found[0]
@@ -366,6 +381,7 @@ def assemble(args):
             info(f"plugin retiré (confidentialité) : {label}")
 
     brand_bundle(app, product())
+    integrate_auxitext(app)
     # Mentions légales : à côté de la page d'accueil (liens relatifs de l'écran À propos)
     install_legal_files(resources, "macos")
     write_text(resources / "license" / "README.txt",
@@ -374,6 +390,26 @@ def assemble(args):
     sign(app, args)
     total = sum(f.stat().st_size for f in app.rglob("*") if f.is_file() and not f.is_symlink())
     ok(f"application macOS : {app} ({total // (1024 * 1024)} Mio)")
+
+
+def integrate_auxitext(app):
+    """AuxiText.app (compilé sur un Mac) dans AuxiNux Office.app/Contents/Applications/ ;
+    la page d'accueil affiche alors la tuile « Nouveau fichier texte » (auxitext://new)."""
+    built = BUILD_DIR / "native" / "macos" / "AuxiText.app"
+    if not built.exists():
+        warn("AuxiText.app absent (non compilé sur un Mac) : pas d'éditeur de texte brut dans ce paquet")
+        return False
+    dest = app / "Contents" / "Applications" / "AuxiText.app"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(built, dest, symlinks=True)
+    home = app / "Contents" / "Resources" / "login" / "index.html"
+    text = home.read_text(encoding="utf-8")
+    marker = "window.AUXINUX_BRANDING={"
+    if text.count(marker) != 1:
+        fail(f"page d'accueil : {marker!r} introuvable ou ambigu")
+    home.write_text(text.replace(marker, marker + "macTextEditor:!0,"), encoding="utf-8")
+    ok("AuxiText intégré (Contents/Applications/AuxiText.app)")
+    return True
 
 
 def sign(app, args):
@@ -488,6 +524,16 @@ def test_static(r, stage_app_dir):
     left = [u for u, _ in UPSTREAM_URLS if u.encode() in exe]
     r.add("shell : adresses ONLYOFFICE remplacées (Aide…)", not left, ", ".join(left) or "site AuxiNux")
     r.add("Info.plist sans mention ONLYOFFICE", "ONLYOFFICE" not in str(plist), "")
+    text_app = contents / "Applications" / "AuxiText.app"
+    if text_app.exists():
+        with open(text_app / "Contents" / "Info.plist", "rb") as fh:
+            tplist = plistlib.load(fh)
+        home = (contents / "Resources" / "login" / "index.html").read_text(encoding="utf-8", errors="ignore")
+        r.add("AuxiText intégré (adresse auxitext://, tuile de l'accueil)",
+              tplist.get("CFBundleURLTypes", [{}])[0].get("CFBundleURLSchemes") == ["auxitext"]
+              and "macTextEditor:!0" in home and (text_app / "Contents" / "MacOS" / "auxitext").exists())
+    else:
+        r.add("AuxiText", False, "non compilé : construire sur un Mac avec ./build.sh", skipped=True)
     good, detail = signature_check(stage_app_dir)
     r.add("signature du bundle", good, detail)
     r.add("tests fonctionnels macOS", False, "à exécuter sur un Mac Apple Silicon (docs/MACOS.md)", skipped=True)

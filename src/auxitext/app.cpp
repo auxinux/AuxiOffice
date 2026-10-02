@@ -177,6 +177,12 @@ bool systemPrefersDark()
     QSettings personalize(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
                           QSettings::NativeFormat);
     return personalize.value(QStringLiteral("AppsUseLightTheme"), 1).toInt() == 0;
+#elif defined(Q_OS_MACOS)
+    QProcess defaults;
+    defaults.start(QStringLiteral("/usr/bin/defaults"),
+                   {QStringLiteral("read"), QStringLiteral("-g"), QStringLiteral("AppleInterfaceStyle")});
+    return defaults.waitForFinished(1500)
+           && QString::fromUtf8(defaults.readAllStandardOutput()).contains(QLatin1String("Dark"));
 #else
     const QString gtkTheme = QString::fromLocal8Bit(qgetenv("GTK_THEME")).toLower();
     if (gtkTheme.contains(QLatin1String("dark")))
@@ -250,16 +256,34 @@ QString writerExecutable()
 {
     // Le lanceur (et non le shell directement) : environnement du moteur et réglages de
     // confidentialité du moteur web ; à utiliser avec --writer.
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN)
     return installDir() + QStringLiteral("/auxioffice.exe");
+#elif defined(Q_OS_MACOS)
+    // macOS : AuxiNux Office est ouvert par son identifiant d'application (open -b).
+    return QStringLiteral("/usr/bin/open");
 #else
     return installDir() + QStringLiteral("/auxioffice");
 #endif
 }
 
+QStringList writerArguments(const QString& path)
+{
+#ifdef Q_OS_MACOS
+    return {QStringLiteral("-b"), QStringLiteral("ca.auxinux.AuxiOffice"), path};
+#else
+    return {QStringLiteral("--writer"), path};
+#endif
+}
+
 QString licensesIndex()
 {
+#ifdef Q_OS_MACOS
+    // AuxiText.app est dans AuxiNux Office.app/Contents/Applications/ :
+    // licences dans AuxiNux Office.app/Contents/Resources/licenses/
+    return QDir::cleanPath(installDir() + QStringLiteral("/../../../../Resources/licenses/index.html"));
+#else
     return installDir() + QStringLiteral("/licenses/index.html");
+#endif
 }
 
 }

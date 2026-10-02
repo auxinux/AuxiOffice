@@ -31,6 +31,7 @@ TOOLCHAINS_DIR = _env_path("AUXI_TOOLCHAINS_DIR", ROOT / ".toolchains")
 DIST_DIR = _env_path("AUXI_DIST_DIR", ROOT / "dist")
 
 IS_WINDOWS_HOST = os.name == "nt"
+IS_MACOS_HOST = sys.platform == "darwin"
 
 
 class BuildError(RuntimeError):

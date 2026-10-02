@@ -116,7 +116,8 @@
         formatLabel: { value: label, gradientColorStart: color[0], gradientColorEnd: color[1], bgColorWinXP: color[1] },
     });
 
-    // macOS : shell natif d'upstream (pas de commandes AuxiNux, pas d'AuxiText en 0.1.0).
+    // macOS : shell natif d'upstream (pas de commandes AuxiNux) ; AuxiText présent seulement si
+    // l'application a été construite sur un Mac (config.macTextEditor, ajouté par l'assemblage).
     const upstreamShell = /Mac/.test(navigator.platform);
 
     function documentTypes() {
@@ -128,7 +129,7 @@
             tile('auxinux-new-text', 'auxNewText', 'TXT', colors.text || ['#7A8594', '#5F6B7A'], '#txt-big'),
             tile('auxinux-open', 'auxOpenFile', '…', colors.open || ['#F2B713', '#F26F00'], '#folder-big'),
         ];
-        return upstreamShell ? tiles.filter(t => t.id !== 'auxinux-new-text') : tiles;
+        return upstreamShell && !config.macTextEditor ? tiles.filter(t => t.id !== 'auxinux-new-text') : tiles;
     }
 
     // Renvoie true si l'action a été prise en charge ici.
@@ -138,7 +139,11 @@
             if (upstreamShell) openFile(OPEN_FILE_FOLDER, '');
             else window.sdk.command('auxinux:open-pdf', '');
             return true;
-        case 'auxinux-new-text':  window.sdk.command('create:new', 'text'); return true;
+        case 'auxinux-new-text':
+            // macOS : le shell ouvre les liens avec le système, qui lance AuxiText.app (adresse auxitext://)
+            if (upstreamShell) window.open('auxitext://new');
+            else window.sdk.command('create:new', 'text');
+            return true;
         case 'auxinux-open':      openFile(OPEN_FILE_FOLDER, ''); return true;
         default:                  return false;
         }
