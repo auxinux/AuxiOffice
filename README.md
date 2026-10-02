@@ -30,9 +30,11 @@ propres paquets. Voir [ARCHITECTURE.md](ARCHITECTURE.md).
 Résumé honnête de ce qui a été vérifié (détails : [CHANGELOG.md](CHANGELOG.md),
 [docs/TESTING-LINUX.md](docs/TESTING-LINUX.md), [docs/TESTING-WINDOWS.md](docs/TESTING-WINDOWS.md)) :
 
-- **Linux x86_64** : compilé, assemblé et testé automatiquement (étape `test` : versions, tests
-  unitaires d'AuxiText, contrôles statiques, conversions du moteur, tests graphiques des cinq
-  applications sous Xvfb, audit réseau hors ligne). Paquets `.deb` et AppImage produits.
+- **Linux x86_64** : compilé depuis zéro et testé automatiquement — **40 tests sur 40
+  réussis** (versions, tests unitaires d'AuxiText, contrôles statiques, conversions du moteur,
+  tests graphiques des cinq applications sous Xvfb sans réseau, audit réseau : 0 connexion).
+  Paquets `.deb` (installation simulée par APT sur Debian 13) et AppImage produits ; pas encore
+  essayés dans une vraie session de bureau.
 - **Windows 10/11 x64** : compilé (compilation croisée), installateur `.exe` et paquet `.msi`
   produits ; contrôles statiques automatiques ; installation, désinstallation et ouverture de
   documents DOCX/XLSX/PPTX/PDF/TXT vérifiées **sous Wine** (indicatif). **Pas encore testé sur

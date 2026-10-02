@@ -127,16 +127,35 @@ msiexec /x AuxiNuxOffice-0.1.0-x64.msi /qn
 
 ### Vérifications automatiques (build)
 
-Étape `test` de la cible Windows (`build/test-reports/windows/report.md`) : tous les imports
-des trois exécutables résolus par les DLL livrées (`auxioffice.exe` et `auxitext.exe` depuis le
-dossier de l'application seul, le shell avec `converter\` comme le prévoit le lanceur),
-sous-système graphique, métadonnées « AuxiNux Office 0.1.0 ».
+Étape `test` de la cible Windows, build complet du 2026-10-02 (compilation croisée sur
+Debian 13) : **21 tests réussis, 1 ignoré** (tests fonctionnels à faire sur Windows) —
+`build/test-reports/windows/report.md`. Tous les imports des trois exécutables sont résolus par
+les DLL livrées (`auxioffice.exe` et `auxitext.exe` depuis le dossier de l'application seul,
+le shell avec `converter\` comme le prévoit le lanceur) ; sous-système graphique ; métadonnées
+« AuxiNux Office 0.1.0 » ; mentions légales ; aucun logo ONLYOFFICE dans l'interface.
 
 ### Vérifications sous Wine (indicatives)
 
-Wine 10.0 (Debian 13), préfixe 64 bits neuf. **Wine n'est pas Windows** : ces essais
-détectent des erreurs grossières (installation, registre, chargement des DLL, démarrage) mais
-ne remplacent pas les scénarios ci-dessus. Résultats détaillés dans [CHANGELOG.md](../CHANGELOG.md).
+Wine 10.0 (Debian 13), préfixe 64 bits, langue française, redistribuable Visual C++ simulé
+dans le registre (Wine fournit ses propres DLL). **Wine n'est pas Windows** : ces essais
+détectent des erreurs grossières mais ne remplacent pas les scénarios ci-dessus. Résultats
+avec les artefacts finaux (`AuxiNuxOffice-0.1.0-x64.exe` sha256 `1331d792…`,
+`AuxiNuxOffice-0.1.0-x64.msi` sha256 `afb3fcf6…`) :
+
+| Vérification | Résultat |
+|---|---|
+| Installation silencieuse `/S` | code 0 ; 5 159 fichiers ; contenu identique octet pour octet à l'arbre de build |
+| Registre | `HKLM\Software\AuxiNux\AuxiOffice` (locale `fr-FR`), Applications installées (nom, version, éditeur, taille, désinstallation silencieuse), `RegisteredApplications`, 33 types déclarés, App Paths |
+| Association existante (`.docx` → Word simulé) | conservée ; AuxiNux Office ajouté à « Ouvrir avec » seulement |
+| Raccourcis | dossier du menu Démarrer (6 raccourcis), raccourci du Bureau public |
+| Démarrage par `auxioffice.exe` (cible des raccourcis) | accueil en français ; DOCX, XLSX (formules), PPTX, PDF ouverts dans AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF ; TXT (CRLF, UTF-8) dans AuxiText |
+| Options `/NODESKTOP`, `/NOASSOC`, `/LANG=en`, échec simulé du redistribuable (code 2, rien d'installé) | conformes (installateur de test, même script) |
+| Désinstallation silencieuse | code 0 ; fichiers, raccourcis, clés et déclarations supprimés ; association de l'autre application intacte ; données personnelles conservées |
+| MSI `/qn` puis `msiexec /x` | installation (5 158 fichiers identiques à l'arbre de build, `--version` correct) et désinstallation complètes ; sans redistribuable : arrêt par la condition de lancement |
+| Identifiant d'application (AppUserModelID) des raccourcis | posé par l'installateur (appels exécutés) mais non vérifiable sous Wine (stockage non implémenté par Wine) |
+
+Défaut trouvé et corrigé grâce à ces essais : le lanceur ne plaçait pas `converter\` dans le
+`PATH` du shell, qui n'aurait pas démarré sous Windows (voir CHANGELOG).
 
 ### Restant à faire sur un vrai Windows 10 et Windows 11
 

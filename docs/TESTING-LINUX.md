@@ -126,13 +126,24 @@ Documents volumineux (100 pages, 50 000 lignes), plusieurs fenêtres, écrans Hi
 
 ## 12. Résultats pour la version 0.1.0
 
-- **Automatiques** (Debian 13, Xvfb, sans réseau) : voir le rapport de la dernière exécution
-  dans `build/test-reports/linux/report.md` ; le résumé de la version est reporté dans
-  [CHANGELOG.md](../CHANGELOG.md).
-- **Vérifié manuellement sous Xvfb** (Debian 13, sans réseau) : accueil, À propos et mentions
-  légales, documents récents, ouverture/modification/enregistrement DOCX, XLSX (formules),
-  PPTX (nouvelle diapositive), PDF (navigation, zoom, recherche, panneau d'impression),
-  AuxiText (CRLF, UTF-8, Markdown, sans extension), dialogue « Ouvrir PDF » en français.
-- **Restant à faire** : installation du `.deb` et de l'AppImage sur Debian 13, Ubuntu 24.04 et
-  AuxiNux OS avec un vrai bureau (scénarios 2 et 9), impression réelle, Wayland, HiDPI,
-  documents réels variés.
+Hôte : Debian 13 (trixie) x86_64, build complet depuis zéro (`./scripts/build-linux.sh --clean
+--release --local-deps`), 2026-10-02.
+
+- **Tests automatiques : 40 sur 40 réussis** (`build/test-reports/linux/report.md`) :
+  contrôles statiques (dont « aucun logo ONLYOFFICE dans l'interface »), versions, 19 tests
+  unitaires d'AuxiText, tests graphiques sous Xvfb dans un espace de noms réseau isolé (accueil,
+  DOCX, XLSX avec formules, PPTX, PDF avec recherche, AuxiText CRLF/UTF-8/Markdown/sans
+  extension, arrêt par SIGTERM sans plantage), **0 tentative de connexion réseau**, 10
+  conversions x2t.
+- **Paquet `.deb`** : sommes SHA-256 vérifiées ; installation simulée par APT sur Debian 13
+  (`apt-get -s install ./auxinux-office_0.1.0_amd64.deb`) : toutes les dépendances satisfaites ;
+  arbre extrait : `auxioffice --version`, `auxitext --version`, `auxioffice-editors --version`
+  corrects.
+- **AppImage** : `--version` correct ; lancée (extraite) sous Xvfb avec un profil neuf et sans
+  réseau : ouverture d'un DOCX dans AuxiWriter, répertoires XDG créés, arrêt propre sans
+  core dump.
+- **Vérifié manuellement sous Xvfb** : accueil, À propos et mentions légales, documents
+  récents, dialogue « Ouvrir PDF » (filtre « Documents PDF »), menu Fichier des éditeurs.
+- **Restant à faire** : installation réelle (`sudo apt install`) et scénarios 2 à 11 sur
+  Debian 13, Ubuntu 24.04 et AuxiNux OS avec un vrai bureau (GNOME, KDE ; X11 et Wayland),
+  impression réelle, HiDPI, documents réels variés.
