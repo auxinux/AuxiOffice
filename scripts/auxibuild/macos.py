@@ -54,10 +54,13 @@ def stage_app():
 # ---------------------------------------------------------------------------
 
 def seven_zip():
-    """7-Zip (lecture des DMG et volumes HFS+) : système, sinon paquet Debian extrait localement."""
+    """7-Zip (lecture des DMG et volumes HFS+, sans montage) : système, Homebrew sur Mac
+    (brew install sevenzip, installé par build.sh), sinon paquet Debian extrait localement."""
     for name in ("7zz", "7z"):
         if which(name):
             return which(name)
+    if IS_MACOS_HOST:
+        fail("7-Zip introuvable : brew install sevenzip (installé par ./build.sh)")
     from .toolchain import TOOLS_ROOT, local_tool_env
     local_tool_env(["7z"])
     exe = TOOLS_ROOT / "usr" / "lib" / "7zip" / "7z"
@@ -67,24 +70,12 @@ def seven_zip():
 
 
 def extract_dmg(archive, dest):
-    """Extrait le contenu du volume d'une image DMG (liens symboliques conservés) :
-    hdiutil sur Mac, 7-Zip (lecture HFS+) ailleurs."""
+    """Extrait le contenu du volume d'une image DMG (liens symboliques conservés) avec 7-Zip,
+    sur Mac comme sous Linux : pas de montage (hdiutil peut être refusé par macOS, par exemple
+    quand le projet est sur un autre disque que le disque système)."""
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
-    if IS_MACOS_HOST:
-        mnt = dest.parent / (dest.name + ".mnt")
-        rmtree(mnt)
-        mnt.mkdir(parents=True)
-        run(["hdiutil", "attach", "-nobrowse", "-readonly", "-noautoopen", "-mountpoint", mnt, archive], quiet=True)
-        try:
-            for entry in mnt.iterdir():
-                if entry.suffix == ".app":
-                    (dest / "ONLYOFFICE").mkdir(exist_ok=True)
-                    run(["ditto", entry, dest / "ONLYOFFICE" / entry.name], quiet=True)
-        finally:
-            run(["hdiutil", "detach", "-quiet", mnt], check=False, quiet=True)
-            rmtree(mnt)
-        return
+    rmtree(dest.parent / (dest.name + ".mnt"))   # point de montage laissé par une ancienne version
     run([seven_zip(), "x", "-snl", "-y", f"-o{dest}", archive], quiet=True, log_file=dest.parent / "dmg-extract.log")
 
 

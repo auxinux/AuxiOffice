@@ -63,7 +63,8 @@ Darwin)
     # Qt 5 (AuxiText), Node.js (page d'accueil, éditeurs), optimiseurs d'images natifs Apple Silicon
     # (ceux fournis par npm sont des programmes Intel), Python 3
     NEED=()
-    for f in qt@5 node gifsicle optipng jpeg-turbo; do
+    # sevenzip : lecture de l'image disque d'ONLYOFFICE sans la monter
+    for f in qt@5 node gifsicle optipng jpeg-turbo sevenzip; do
         brew list --versions "$f" >/dev/null 2>&1 || NEED+=("$f")
     done
     command -v python3 >/dev/null || NEED+=(python)
