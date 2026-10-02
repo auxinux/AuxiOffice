@@ -143,6 +143,80 @@ def english_storyboard_overrides(resources):
     return count
 
 
+def _set_strings(path, entries):
+    """Fixe des valeurs dans un fichier .strings (remplace la valeur si la clé existe, sinon ajoute)."""
+    if path.exists():
+        text, enc = _read_strings(path)
+    else:
+        text, enc = "", "utf-16"
+    for key, value in entries.items():
+        pattern = re.compile(r'^(\s*"' + re.escape(key) + r'"\s*=\s*)"(?:[^"\\]|\\.)*";', re.M)
+        line = '"' + value.replace('"', '\\"') + '";'
+        if pattern.search(text):
+            text = pattern.sub(lambda m: m.group(1) + line, text)
+        else:
+            text += ("\n" if text and not text.endswith("\n") else "") + f'"{key}" = {line}\n'
+    path.write_bytes(text.encode(enc) if enc != "utf-16" else b"\xff\xfe" + text.encode("utf-16-le"))
+
+
+def localize_about(resources, p):
+    """Fenêtre « À propos » native : nom, copyright (pris dans InfoPlist.strings localisé),
+    « Community version » remplacé par « Version » ; messages anglais nommant le produit."""
+    prod = p["product"]
+    copyright_fr = (f"© {prod['copyright_first_year']} {prod['copyright_holder']}. Logiciel libre (AGPL v3), "
+                    f"basé sur ONLYOFFICE d'Ascensio System SIA.")
+    copyright_en = (f"© {prod['copyright_first_year']} {prod['copyright_holder']}. Free software (AGPL v3), "
+                    f"based on ONLYOFFICE by Ascensio System SIA.")
+    count = 0
+    for lproj in sorted(resources.glob("*.lproj")):
+        fr = lproj.name.startswith("fr")
+        _set_strings(lproj / "InfoPlist.strings", {
+            "CFBundleName": APP_NAME, "CFBundleDisplayName": APP_NAME,
+            "NSHumanReadableCopyright": copyright_fr if fr else copyright_en})
+        if (lproj / "Localizable.strings").exists() or lproj.name == "en.lproj":
+            _set_strings(lproj / "Localizable.strings", {"Community version %@": "Version %@"})
+        count += 1
+    # Anglais : les clés sources contenant le nom d'upstream s'affichent telles quelles
+    keys = {}
+    for f in resources.glob("*.lproj/Localizable.strings"):
+        text, _ = _read_strings(f)
+        for m in _STRINGS_PAIR.finditer(text):
+            key = m.group(1)[1:-1]
+            if re.search(r"ONLYOFFICE" + _UPSTREAM_SERVICES, key):
+                keys[key] = rebrand_text(key)
+    if keys:
+        _set_strings(resources / "en.lproj" / "Localizable.strings", keys)
+    return count
+
+
+def write_license_html(dest):
+    """« Accord de licence » de la fenêtre À propos : licence et mentions d'AuxiNux Office."""
+    import html
+    from .common import UPSTREAM_SRC
+    lic = (UPSTREAM_SRC / "desktop-apps" / "LICENSE").read_text(encoding="utf-8")
+    notice = (ROOT / "NOTICE").read_text(encoding="utf-8")
+    write_text(dest, "<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"utf-8\">"
+               f"<title>{APP_NAME} — licence</title><style>body{{font:13px -apple-system,sans-serif;"
+               "margin:24px;max-width:780px}pre{white-space:pre-wrap;font:12px Menlo,monospace}</style></head><body>"
+               f"<h2>{APP_NAME}</h2><pre>{html.escape(notice)}</pre><hr>"
+               f"<h3>GNU Affero General Public License v3 + conditions additionnelles</h3>"
+               f"<pre>{html.escape(lic)}</pre></body></html>\n")
+
+
+def hide_catalog_images(car, names):
+    """Rend des images du catalogue compilé Assets.car introuvables (nom modifié sur place,
+    même longueur, ordre du tri conservé) : macOS charge alors les images du même nom placées
+    dans Resources/ (versions AuxiNux)."""
+    data = bytearray(car.read_bytes())
+    for name in names:
+        old = name.encode()
+        if data.count(old) != 1:
+            fail(f"{car.name} : entrée {name} introuvable ou ambiguë ({data.count(old)})")
+        i = data.find(old)
+        data[i:i + len(old)] = old[:-1] + b"_"
+    car.write_bytes(bytes(data))
+
+
 def write_icns(pngs, dest):
     """Fichier .icns (PNG intégrés) : pngs = {taille en pixels: chemin PNG}."""
     types = [("icp4", 16), ("ic11", 32), ("icp5", 32), ("ic12", 64), ("ic07", 128), ("ic13", 256),
@@ -206,7 +280,11 @@ def brand_bundle(app, p):
     brand_info_plist(contents, p)
     changed = [f for f in resources.glob("*.lproj/*.strings") if rebrand_strings_file(f)]
     overrides = english_storyboard_overrides(resources)
-    info(f"textes : {len(changed)} fichiers .strings, {overrides} titres de menus anglais")
+    localized = localize_about(resources, p)
+    info(f"textes : {len(changed)} fichiers .strings, {overrides} titres de menus anglais, "
+         f"{localized} langues (À propos)")
+    write_license_html(resources / "license" / "LICENSE.html")
+    hide_catalog_images(resources / "Assets.car", ("logo-tab-dark", "logo-tab-light"))
     # Icônes : application, types de documents ; images de l'onglet d'accueil (essai : elles
     # ne s'appliquent que si macOS les préfère au catalogue Assets.car compilé)
     write_icns(_icon_pngs("auxioffice"), resources / "AppIcon.icns")
@@ -359,10 +437,20 @@ def test_static(r, stage_app_dir):
     for f in (contents / "Resources").glob("*.lproj/*.strings"):
         text, _ = _read_strings(f)
         for m in _STRINGS_PAIR.finditer(text):
-            if re.search(r"ONLYOFFICE" + _UPSTREAM_SERVICES, m.group(3)):
+            # seule exception : l'attribution exigée par la licence (« basé sur ONLYOFFICE »)
+            value = re.sub(r"(based on|basé sur) ONLYOFFICE", "", m.group(3))
+            if re.search(r"ONLYOFFICE" + _UPSTREAM_SERVICES, value):
                 leftovers.append(f"{f.parent.name}/{f.name}")
                 break
     r.add("textes de l'interface : nom AuxiNux", not leftovers, ", ".join(leftovers[:4]) or "aucun « ONLYOFFICE »")
+    rights = [f.parent.name for f in (contents / "Resources").glob("*.lproj/InfoPlist.strings")
+              if any(m.group(1) == '"NSHumanReadableCopyright"' and "AuxiNux" not in m.group(3)
+                     for m in _STRINGS_PAIR.finditer(_read_strings(f)[0]))]
+    r.add("copyright AuxiNux dans toutes les langues", not rights, ", ".join(rights[:4]) or "Projet AuxiNux")
+    car = (contents / "Resources" / "Assets.car").read_bytes()
+    r.add("onglet d'accueil : logo ONLYOFFICE du catalogue neutralisé",
+          b"logo-tab-dark" not in car and b"logo-tab-light" not in car
+          and (contents / "Resources" / "logo-tab-dark.png").exists())
     good, detail = signature_check(stage_app_dir)
     r.add("signature du bundle", good, detail)
     r.add("tests fonctionnels macOS", False, "à exécuter sur un Mac Apple Silicon (docs/MACOS.md)", skipped=True)
