@@ -282,7 +282,9 @@ def copytree(src, dst, symlinks=True):
 def write_text(path, content):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8", newline="\n")
+    # open(newline=) : Path.write_text(newline=) n'existe qu'à partir de Python 3.10 (macOS fournit 3.9)
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(content)
     return path
 
 

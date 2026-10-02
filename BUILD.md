@@ -70,7 +70,7 @@ dans `.toolchains/` (aucun fichier système modifié). `doctor` indique ce qui m
 | Outil | Version testée | Remarque |
 |---|---|---|
 | Debian | 13 (trixie), noyau 6.12 | |
-| Python | 3.13.5 | 3.10 minimum |
+| Python | 3.13.5 | 3.9 minimum (Python fourni par macOS) |
 | GCC / G++ | 14.2.0 | shell, AuxiText, lanceur Linux ; `-static-libstdc++` |
 | GNU Make | 4.4.1 | |
 | Node.js / npm | 22.23.2 / 10.9.8 | Node.js 18 minimum (vérifié par `doctor`) |
