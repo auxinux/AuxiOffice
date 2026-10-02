@@ -115,7 +115,7 @@ Un `git clone` puis une seule commande, sur la machine cible :
 git clone git@git.auxinux.ca:Auxinux/AuxiNux_Office.git
 cd AuxiNux_Office
 ./build.sh              # Linux x86_64 : .deb + AppImage dans dist/linux/
-./build.sh --install    # Mac Apple Silicon : AuxiNux Office.app (avec AuxiText) installé dans /Applications
+./build.sh              # Mac Apple Silicon : AuxiNux Office.app (avec AuxiText) dans dist/macos/
 ```
 
 ```powershell

@@ -4,12 +4,11 @@
 #
 # Construit AuxiNux Office (avec AuxiText) sur la machine courante :
 #   - Linux x86_64 (Debian 13, Ubuntu 24.04…) : paquets .deb et AppImage dans dist/linux/
-#   - macOS Apple Silicon (macOS 11+)         : AuxiNux Office.app dans dist/macos/
+#   - macOS Apple Silicon (macOS 11+)         : AuxiNux Office.app (+ AuxiText) dans dist/macos/
 #
 #   git clone git@git.auxinux.ca:Auxinux/AuxiNux_Office.git
 #   cd AuxiNux_Office
-#   ./build.sh                 # build complet
-#   ./build.sh --install       # macOS : copie aussi l'application dans /Applications
+#   ./build.sh                 # build complet (rien n'est installé sur la machine)
 #   ./build.sh --clean         # repartir de zéro
 #
 # Durée : 30 à 60 minutes la première fois (téléchargements, compilation), moins ensuite.
@@ -19,11 +18,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-INSTALL=0
 ARGS=()
 for a in "$@"; do
     case "$a" in
-        --install) INSTALL=1 ;;
         -h|--help) sed -n '5,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) ARGS+=("$a") ;;
     esac
@@ -77,21 +74,17 @@ Darwin)
     say "Build macOS (AuxiNux Office + AuxiText)"
     python3 scripts/auxibuild all --target macos --mode release ${ARGS[@]+"${ARGS[@]}"}
 
-    APP="build/stage/macos/AuxiNux Office.app"
-    if [ $INSTALL -eq 1 ]; then
-        say "Installation dans /Applications"
-        rm -rf "/Applications/AuxiNux Office.app"
-        ditto "$APP" "/Applications/AuxiNux Office.app"
-        # enregistre AuxiText (adresse auxitext://, « Ouvrir avec ») auprès de macOS
-        LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
-        "$LSREG" -f "/Applications/AuxiNux Office.app" "/Applications/AuxiNux Office.app/Contents/Applications/AuxiText.app" || true
-        echo "Installé : /Applications/AuxiNux Office.app"
-    fi
+    # Fait connaître AuxiText.app à macOS (adresse auxitext:// de la tuile « Nouveau fichier texte »,
+    # « Ouvrir avec ») : simple enregistrement, rien n'est copié ni installé.
+    TEXT_APP="build/stage/macos/AuxiNux Office.app/Contents/Applications/AuxiText.app"
+    LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+    [ -d "$TEXT_APP" ] && [ -x "$LSREG" ] && "$LSREG" -f "$TEXT_APP" || true
+
     say "Terminé."
     ls -lh dist/macos/
     echo
-    echo "Application : $ROOT/$APP"
-    [ $INSTALL -eq 1 ] || echo "Pour l'installer : ./build.sh --install (ou glissez l'application dans Applications)"
+    echo "Application : $ROOT/build/stage/macos/AuxiNux Office.app"
+    echo "Archive     : $ROOT/dist/macos/AuxiNuxOffice-$(cat VERSION)-arm64.zip"
     ;;
 *)
     die "système non pris en charge : $(uname -s). Sous Windows, utilisez build.ps1"

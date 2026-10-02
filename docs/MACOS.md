@@ -34,12 +34,13 @@ deux emplacements).
 ```sh
 git clone git@git.auxinux.ca:Auxinux/AuxiNux_Office.git
 cd AuxiNux_Office
-./build.sh --install
+./build.sh
 ```
 
 Le script vérifie les outils de ligne de commande d'Apple et Homebrew, installe Qt 5 et Node.js
 avec Homebrew, construit l'application **avec AuxiText** (compilé sur le Mac, Qt intégré à
-`AuxiText.app`), puis l'installe dans /Applications. Une application construite localement
+`AuxiText.app`). Rien n'est installé : le résultat est dans `dist/macos/` (archive .zip) et
+`build/stage/macos/AuxiNux Office.app`. Une application construite localement
 n'est pas mise en quarantaine : aucune commande `xattr` n'est nécessaire. AuxiText est placé
 dans `AuxiNux Office.app/Contents/Applications/AuxiText.app` ; la tuile « Nouveau fichier
 texte » de l'accueil le lance (adresse `auxitext://new`), et il apparaît dans « Ouvrir avec »
