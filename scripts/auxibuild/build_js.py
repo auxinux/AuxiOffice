@@ -19,11 +19,40 @@ def _npm_install(directory, log_dir):
     lock = directory / "package-lock.json"
     stamp = directory / "node_modules" / ".auxi-lock"
     wanted = lock.read_text(encoding="utf-8") if lock.exists() else ""
-    if stamp.exists() and stamp.read_text(encoding="utf-8") == wanted:
+    if not (stamp.exists() and stamp.read_text(encoding="utf-8") == wanted):
+        env = {"PUPPETEER_SKIP_DOWNLOAD": "1", "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "1"}
+        run(["npm", "ci", "--no-audit", "--no-fund"], cwd=directory, env=env, log_file=log_dir / "npm-ci.log")
+        stamp.write_text(wanted, encoding="utf-8")
+    _native_image_tools(directory)
+
+
+# Optimiseurs d'images de grunt-contrib-imagemin : leurs binaires macOS téléchargés par npm sont
+# des exécutables Intel (inutilisables sans Rosetta sur Apple Silicon) -> versions Homebrew natives.
+MACOS_IMAGE_TOOLS = [("gifsicle", "gifsicle", "gifsicle"), ("optipng-bin", "optipng", "optipng"),
+                     ("jpegtran-bin", "jpegtran", "jpeg-turbo")]
+
+
+def _native_image_tools(directory):
+    from .common import IS_MACOS_HOST
+    if not IS_MACOS_HOST:
         return
-    env = {"PUPPETEER_SKIP_DOWNLOAD": "1", "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "1"}
-    run(["npm", "ci", "--no-audit", "--no-fund"], cwd=directory, env=env, log_file=log_dir / "npm-ci.log")
-    stamp.write_text(wanted, encoding="utf-8")
+    modules = directory / "node_modules"
+    for package, binary, formula in MACOS_IMAGE_TOOLS:
+        copies = [d for d in [modules / package, *modules.glob(f"**/node_modules/{package}")]
+                  if (d / "package.json").exists()]
+        if not copies:
+            continue
+        res = run(["brew", "--prefix", formula], check=False, capture=True, quiet=True)
+        native = Path(res.stdout.strip()) / "bin" / binary
+        if res.returncode != 0 or not native.exists():
+            fail(f"{binary} introuvable : brew install {formula} (installé par ./build.sh)")
+        for pkg in copies:
+            target = pkg / "vendor" / binary
+            target.parent.mkdir(exist_ok=True)
+            if target.exists() or target.is_symlink():
+                target.unlink()
+            target.symlink_to(native)
+        info(f"{binary} : version Apple Silicon de Homebrew ({native})")
 
 
 def _grunt(directory, log_file, env=None, force=False):

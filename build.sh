@@ -60,10 +60,12 @@ Darwin)
     fi
     command -v brew >/dev/null || die "Homebrew est requis : voir https://brew.sh puis relancez ./build.sh"
 
-    # Qt 5 (AuxiText), Node.js (page d'accueil, éditeurs), Python 3
+    # Qt 5 (AuxiText), Node.js (page d'accueil, éditeurs), optimiseurs d'images natifs Apple Silicon
+    # (ceux fournis par npm sont des programmes Intel), Python 3
     NEED=()
-    brew list --versions qt@5 >/dev/null 2>&1 || NEED+=(qt@5)
-    brew list --versions node >/dev/null 2>&1 || NEED+=(node)
+    for f in qt@5 node gifsicle optipng jpeg-turbo; do
+        brew list --versions "$f" >/dev/null 2>&1 || NEED+=("$f")
+    done
     command -v python3 >/dev/null || NEED+=(python)
     if [ ${#NEED[@]} -gt 0 ]; then
         say "Installation avec Homebrew : ${NEED[*]}"

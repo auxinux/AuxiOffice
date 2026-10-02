@@ -192,6 +192,9 @@ def build_auxitext_macos(args):
     })
     with open(contents / "Info.plist", "wb") as fh:
         plistlib.dump(plist, fh, fmt=plistlib.FMT_XML)
+    # Signature ad hoc refaite après macdeployqt et la modification d'Info.plist : sur Apple Silicon,
+    # un programme dont la signature ne correspond plus est arrêté au lancement.
+    run(["codesign", "--force", "--deep", "--sign", "-", built], log_file=out / "codesign.log")
     dest = NATIVE_DIR / "macos" / "AuxiText.app"
     rmtree(dest)
     run(["ditto", built, dest], quiet=True)

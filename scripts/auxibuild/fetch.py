@@ -6,7 +6,7 @@ pinned upstream binary releases (verified SHA-256)."""
 from pathlib import Path
 
 from .common import (BUILD_DIR, CACHE_DIR, UPSTREAM_SRC, download, extract_deb, extract_tar,
-                     extract_zip, fail, info, lock, ok, rmtree, run, step, write_text)
+                     extract_zip, fail, info, lock, ok, rmtree, run, step, warn, write_text)
 
 ENGINE_DIR = BUILD_DIR / "engine"
 THIRD_PARTY_DIR = BUILD_DIR / "third_party"
@@ -39,6 +39,12 @@ def fetch_repo(name, spec, full=False):
     sparse = spec.get("sparse") or (None if full else spec.get("sparse_when_not_built"))
     wanted_sparse = "\n".join(sparse) + "\n" if sparse else ""
     sparse_file = dest / ".git" / "info" / "sparse-checkout"
+    if (dest / ".git").exists():
+        # Téléchargement précédent interrompu (dépôt initialisé, commit jamais récupéré) : on recommence.
+        probe = _git(dest, "rev-parse", "-q", "--verify", "HEAD^{commit}", check=False, capture=True)
+        if probe.returncode != 0:
+            warn(f"{name} : téléchargement précédent incomplet, nouvelle récupération")
+            rmtree(dest)
     if (dest / ".git").exists():
         current = head_commit(dest)
         current_sparse = sparse_file.read_text() if sparse_file.exists() and _git(
