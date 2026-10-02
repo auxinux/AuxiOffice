@@ -163,10 +163,10 @@ def localize_about(resources, p):
     """Fenêtre « À propos » native : nom, copyright (pris dans InfoPlist.strings localisé),
     « Community version » remplacé par « Version » ; messages anglais nommant le produit."""
     prod = p["product"]
-    copyright_fr = (f"© {prod['copyright_first_year']} {prod['copyright_holder']}. Logiciel libre (AGPL v3), "
-                    f"basé sur ONLYOFFICE d'Ascensio System SIA.")
-    copyright_en = (f"© {prod['copyright_first_year']} {prod['copyright_holder']}. Free software (AGPL v3), "
-                    f"based on ONLYOFFICE by Ascensio System SIA.")
+    # Les mentions d'origine exigées par la licence sont accessibles par « Accord de licence ».
+    copyright_fr = f"© {prod['copyright_first_year']} {prod['copyright_holder']}. Logiciel libre (AGPL v3)."
+    copyright_en = f"© {prod['copyright_first_year']} {prod['copyright_holder']}. Free software (AGPL v3)."
+
     count = 0
     for lproj in sorted(resources.glob("*.lproj")):
         fr = lproj.name.startswith("fr")
@@ -217,6 +217,33 @@ def hide_catalog_images(car, names):
     car.write_bytes(bytes(data))
 
 
+# Adresses ONLYOFFICE compilées dans le shell macOS (menu Aide, page produit, inscription)
+UPSTREAM_URLS = [
+    ("http://helpcenter.onlyoffice.com/%@ONLYOFFICE-Editors/index.aspx", True),
+    ("https://onlyoffice.com/desktopeditors.aspx", False),
+    ("https://onlyoffice.com/registration.aspx?desktop=true", False),
+]
+
+
+def patch_binary_urls(exe, website):
+    """Remplace sur place (même longueur, binaire re-signé ensuite) les adresses ONLYOFFICE du
+    shell par le site AuxiNux. L'adresse d'aide garde son unique « %@ » (code de langue)."""
+    data = bytearray(Path(exe).read_bytes())
+    base = website.rstrip("/") + "/"
+    for url, has_format in UPSTREAM_URLS:
+        old = url.encode() + b"\0"
+        if data.count(old) != 1:
+            fail(f"adresse d'upstream introuvable ou ambiguë dans le shell macOS : {url}")
+        new = base + ("?langue=%@" if has_format else "")
+        if len(new) > len(url):
+            fail(f"adresse AuxiNux trop longue pour remplacer {url}")
+        new = new + ("&" if "?" in new else "?") if len(new) < len(url) else new
+        new = (new + "x" * len(url))[:len(url)] if len(new) < len(url) else new
+        i = data.find(old)
+        data[i:i + len(url)] = new.encode()
+    Path(exe).write_bytes(bytes(data))
+
+
 def write_icns(pngs, dest):
     """Fichier .icns (PNG intégrés) : pngs = {taille en pixels: chemin PNG}."""
     types = [("icp4", 16), ("ic11", 32), ("icp5", 32), ("ic12", 64), ("ic07", 128), ("ic13", 256),
@@ -247,8 +274,8 @@ def brand_info_plist(contents, p):
         "CFBundleShortVersionString": version(),
         "CFBundleVersion": version(),
         "CFBundleIconFile": "AppIcon",
-        "NSHumanReadableCopyright": f"© {prod['copyright_first_year']} {prod['copyright_holder']} — AGPL-3.0. "
-                                    f"Basé sur ONLYOFFICE (Ascensio System SIA) ; projet indépendant.",
+        "NSHumanReadableCopyright": f"© {prod['copyright_first_year']} {prod['copyright_holder']}. "
+                                    f"Logiciel libre (AGPL v3).",
         # Sparkle : aucune vérification ni installation automatique de mise à jour
         "SUEnableAutomaticChecks": False,
         "SUAutomaticallyUpdate": False,
@@ -264,6 +291,12 @@ def brand_info_plist(contents, p):
     # Types de documents : AuxiNux Office se propose sans revendiquer le rôle par défaut
     for doc in plist.get("CFBundleDocumentTypes", []):
         doc["LSHandlerRank"] = "Alternate"
+        if isinstance(doc.get("CFBundleTypeName"), str):
+            doc["CFBundleTypeName"] = rebrand_text(doc["CFBundleTypeName"])
+    for key in ("UTExportedTypeDeclarations", "UTImportedTypeDeclarations"):
+        for decl in plist.get(key, []):
+            if isinstance(decl.get("UTTypeDescription"), str):
+                decl["UTTypeDescription"] = rebrand_text(decl["UTTypeDescription"])
     with open(path, "wb") as fh:
         plistlib.dump(plist, fh, fmt=plistlib.FMT_XML)
     return plist
@@ -277,6 +310,7 @@ def brand_bundle(app, p):
     if not old_exe.exists():
         fail(f"exécutable d'upstream introuvable : {old_exe}")
     old_exe.rename(contents / "MacOS" / APP_NAME)
+    patch_binary_urls(contents / "MacOS" / APP_NAME, p["product"]["website"])
     brand_info_plist(contents, p)
     changed = [f for f in resources.glob("*.lproj/*.strings") if rebrand_strings_file(f)]
     overrides = english_storyboard_overrides(resources)
@@ -437,8 +471,7 @@ def test_static(r, stage_app_dir):
     for f in (contents / "Resources").glob("*.lproj/*.strings"):
         text, _ = _read_strings(f)
         for m in _STRINGS_PAIR.finditer(text):
-            # seule exception : l'attribution exigée par la licence (« basé sur ONLYOFFICE »)
-            value = re.sub(r"(based on|basé sur) ONLYOFFICE", "", m.group(3))
+            value = m.group(3)
             if re.search(r"ONLYOFFICE" + _UPSTREAM_SERVICES, value):
                 leftovers.append(f"{f.parent.name}/{f.name}")
                 break
@@ -451,6 +484,10 @@ def test_static(r, stage_app_dir):
     r.add("onglet d'accueil : logo ONLYOFFICE du catalogue neutralisé",
           b"logo-tab-dark" not in car and b"logo-tab-light" not in car
           and (contents / "Resources" / "logo-tab-dark.png").exists())
+    exe = (contents / "MacOS" / APP_NAME).read_bytes()
+    left = [u for u, _ in UPSTREAM_URLS if u.encode() in exe]
+    r.add("shell : adresses ONLYOFFICE remplacées (Aide…)", not left, ", ".join(left) or "site AuxiNux")
+    r.add("Info.plist sans mention ONLYOFFICE", "ONLYOFFICE" not in str(plist), "")
     good, detail = signature_check(stage_app_dir)
     r.add("signature du bundle", good, detail)
     r.add("tests fonctionnels macOS", False, "à exécuter sur un Mac Apple Silicon (docs/MACOS.md)", skipped=True)

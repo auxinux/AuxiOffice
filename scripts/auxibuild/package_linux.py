@@ -134,8 +134,7 @@ def metainfo(p):
     <p xml:lang="fr">AuxiNux Office est la suite bureautique libre de l'écosystème AuxiNux. Elle fonctionne hors ligne,
     sans compte, publicité ni télémétrie, et reste compatible avec les formats Microsoft Office (DOCX, XLSX, PPTX)
     et OpenDocument.</p>
-    <p>It includes AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF and AuxiText. AuxiNux Office is based on
-    ONLYOFFICE Desktop Editors (Ascensio System SIA) and is an independent project.</p>
+    <p>It includes AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF and AuxiText.</p>
   </description>
   <launchable type="desktop-id">{app_id}.desktop</launchable>
   <url type="homepage">{prod['website']}</url>
@@ -289,8 +288,6 @@ Description: AuxiNux Office - suite bureautique libre
  et AuxiText (éditeur de texte brut). Compatible avec les formats Microsoft
  Office (DOCX, XLSX, PPTX) et OpenDocument. Fonctionne hors ligne, sans compte,
  sans publicité ni télémétrie.
- .
- Basé sur ONLYOFFICE Desktop Editors (Ascensio System SIA) ; projet indépendant.
 """
     debian = work / "DEBIAN"
     write_text(debian / "control", control)

@@ -173,12 +173,12 @@ def shell_version_p(p):
 #define VER_PRODUCTVERSION          VER_FILEVERSION
 #define VER_PRODUCTVERSION_STR      "{version()}\\0"
 #define VER_COMPANYNAME_STR         {c_str(prod['vendor'])[:-1]}\\0"
-#define VER_LEGALCOPYRIGHT_STR      "© {year} {prod['copyright_holder']}. Logiciel libre (AGPL-3.0), basé sur ONLYOFFICE d'Ascensio System SIA.\\0"
+#define VER_LEGALCOPYRIGHT_STR      "© {year} {prod['copyright_holder']}. Logiciel libre (AGPL-3.0).\\0"
 #define VER_COMPANYDOMAIN_STR       {c_str(prod['website'].split('://', 1)[-1])[:-1]}\\0"
 #define ABOUT_COPYRIGHT_STR         "© {year} {prod['copyright_holder']}"
 #define VER_FILEDESCRIPTION_STR     {c_str(prod['name'])[:-1]}\\0"
 #define VER_INTERNALNAME_STR        {c_str(p['linux']['shell_binary'])[:-1]}\\0"
-#define VER_LEGALTRADEMARKS1_STR    "ONLYOFFICE is a trademark of Ascensio System SIA.\\0"
+#define VER_LEGALTRADEMARKS1_STR    "\\0"
 #define VER_LEGALTRADEMARKS2_STR    VER_LEGALTRADEMARKS1_STR
 #define VER_ORIGINALFILENAME_STR    {c_str(p['windows']['shell_binary'])[:-1]}\\0"
 #define VER_PRODUCTNAME_STR         {c_str(prod['name'])[:-1]}\\0"

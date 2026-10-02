@@ -2,8 +2,8 @@
 ; SPDX-License-Identifier: AGPL-3.0-or-later
 ; Copyright (C) 2026 Projet AuxiNux
 
-LangString TXT_WELCOME ${LANG_FRENCH} "Cet assistant va installer ${PRODUCT_NAME} ${PRODUCT_VERSION} : AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF et AuxiText.$\r$\n$\r$\nLogiciel libre, utilisable hors ligne et sans compte, sans publicité ni télémétrie.$\r$\n$\r$\n${PRODUCT_NAME} est basé sur ONLYOFFICE Desktop Editors (Ascensio System SIA). C'est un projet indépendant, qui n'est pas un produit officiel d'ONLYOFFICE ni d'Ascensio System SIA.$\r$\n$\r$\nCliquez sur Suivant pour continuer."
-LangString TXT_WELCOME ${LANG_ENGLISH} "This wizard will install ${PRODUCT_NAME} ${PRODUCT_VERSION}: AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF and AuxiText.$\r$\n$\r$\nFree software that works offline and without an account, with no ads and no telemetry.$\r$\n$\r$\n${PRODUCT_NAME} is based on ONLYOFFICE Desktop Editors (Ascensio System SIA). It is an independent project, not an official product of ONLYOFFICE or Ascensio System SIA.$\r$\n$\r$\nClick Next to continue."
+LangString TXT_WELCOME ${LANG_FRENCH} "Cet assistant va installer ${PRODUCT_NAME} ${PRODUCT_VERSION} : AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF et AuxiText.$\r$\n$\r$\nLogiciel libre, utilisable hors ligne et sans compte, sans publicité ni télémétrie.$\r$\n$\r$\nCliquez sur Suivant pour continuer."
+LangString TXT_WELCOME ${LANG_ENGLISH} "This wizard will install ${PRODUCT_NAME} ${PRODUCT_VERSION}: AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF and AuxiText.$\r$\n$\r$\nFree software that works offline and without an account, with no ads and no telemetry.$\r$\n$\r$\nClick Next to continue."
 
 LangString TXT_LICENSE_HEADER ${LANG_FRENCH} "Licence et mentions légales"
 LangString TXT_LICENSE_HEADER ${LANG_ENGLISH} "License and legal notices"

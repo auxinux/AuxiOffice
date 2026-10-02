@@ -63,6 +63,14 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
   légales, mises à jour Sparkle désactivées, signature ad hoc). Sans AuxiText ; shell
   d'upstream non modifié. Non testée sur un Mac à ce jour ([docs/MACOS.md](docs/MACOS.md)).
 
+### Mentions d'ONLYOFFICE
+
+- Seules restent les mentions exigées par la licence d'origine : section « Logiciels libres et
+  licences », fichiers LICENSE/NOTICE/licences, page « Accord de licence » (macOS), fichier
+  `copyright` du paquet Debian. Retirées : copyright des exécutables et de l'application macOS,
+  descriptions des paquets, page d'accueil de l'installateur, adresses d'aide du shell macOS.
+- Panneau « Clouds » de l'accueil masqué (offres cloud d'ONLYOFFICE).
+
 ### Corrections par rapport à ONLYOFFICE 9.4.0
 
 - Linux : la fermeture de session (SIGTERM) provoquait une erreur de segmentation et un core

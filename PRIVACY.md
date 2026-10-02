@@ -26,7 +26,7 @@ AuxiNux Office est conçu pour fonctionner **entièrement en local et hors ligne
 | Modules réseau : DeepL, LanguageTool, Zotero, Thésaurus (API words.bighugelabs.com), OCR (données de langue téléchargées) | services tiers | à l'utilisation | **retirés** de la distribution (`privacy.removed_plugins` de `branding/product.json`) |
 | Assistant IA (modules « AI » et « Agent IA ») | fournisseurs d'IA configurés par l'utilisateur | à l'utilisation | **désactivé par défaut** (`disable-ai=1`, écrit avant l'initialisation du moteur) ; l'utilisateur peut l'activer dans les paramètres et doit alors choisir et configurer lui-même un fournisseur |
 | Gestionnaire de modules (catalogue) | onlyoffice.github.io | **à l'ouverture** du gestionnaire par l'utilisateur | conservé (action volontaire) |
-| Clouds (DocSpace, Nextcloud, ownCloud, kDrive, Seafile…) | serveur saisi par l'utilisateur | après connexion par l'utilisateur | conservé (facultatif) |
+| Clouds (DocSpace, Nextcloud, ownCloud, kDrive, Seafile…) | serveur saisi par l'utilisateur | après connexion par l'utilisateur | **masqué** en 0.1.0 (panneau « Clouds » de l'accueil) |
 | Liens (site AuxiNux, licences) | navigateur de l'utilisateur | au clic | conservés |
 | Module « Envoyer » | client de messagerie du système | à l'utilisation | conservé (local) |
 | Instance unique (Linux) | 127.0.0.1:13012 (UDP) | au lancement | interface locale uniquement |
@@ -69,7 +69,7 @@ Wireshark.
 L'application macOS réutilise le shell d'upstream sans lanceur AuxiNux : les options réseau
 du moteur web (DNS sur HTTPS, réseau d'arrière-plan) n'y sont **pas** appliquées et n'ont pas
 encore été auditées ; Sparkle est désactivé ; l'assistant IA est désactivé au premier
-lancement ; le menu Aide ouvre l'aide en ligne d'ONLYOFFICE. Voir [docs/MACOS.md](docs/MACOS.md).
+lancement ; le menu Aide ouvre le site AuxiNux. Voir [docs/MACOS.md](docs/MACOS.md).
 
 ## 4. Données enregistrées localement
 

@@ -60,8 +60,8 @@ elle-même (`rcodesign notary-submit`) demande une clé d'API App Store Connect.
 | Assistant IA | désactivé par l'écran d'accueil au premier lancement (l'option reste dans les paramètres) |
 | Réglages réseau du moteur web (DNS sur HTTPS, réseau d'arrière-plan) | **non appliqués** (pas de lanceur AuxiNux sous macOS) : à vérifier (§4) |
 | Mises à jour (Sparkle) | vérifications automatiques désactivées, flux supprimé ; le menu « Rechercher des mises à jour » affichera une erreur |
-| Menu Aide | ouvre l'aide en ligne d'ONLYOFFICE (adresse compilée dans le shell d'upstream) |
-| Logo de l'onglet d'accueil, icône du Dock pendant l'exécution | peuvent rester ceux d'ONLYOFFICE : ils sont dans le catalogue compilé `Assets.car`, non régénérable sous Linux ; des images AuxiNux sont placées à côté, à vérifier (§4) |
+| Menu Aide | ouvre le site AuxiNux (adresses d'ONLYOFFICE remplacées dans le shell) |
+| Logo de l'onglet d'accueil | entrées du catalogue compilé `Assets.car` neutralisées pour que macOS charge les images AuxiNux : à vérifier (§4) |
 | Signature | ad hoc, non notarisée (§1) |
 
 Ces limites disparaîtront avec la compilation du shell macOS dans Xcode (patches AuxiNux,

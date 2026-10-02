@@ -81,13 +81,19 @@
     for (const lang in strings)
         l10n[lang] = Object.assign(l10n[lang] || {}, strings[lang]);
 
-    // Nom du produit dans toutes les langues livrées par upstream.
+    // Nom du produit dans toutes les langues livrées par upstream ; les autres mentions
+    // d'ONLYOFFICE (offres cloud d'upstream) prennent le texte AuxiNux anglais, ou le nom du produit.
     const productRe = /ONLYOFFICE Desktop Editors|ONLYOFFICE Desktop/g;
     for (const lang in l10n) {
         for (const key in l10n[lang]) {
-            const value = l10n[lang][key];
-            if (typeof value === 'string')
-                l10n[lang][key] = value.replace(productRe, product);
+            let value = l10n[lang][key];
+            if (typeof value !== 'string')
+                continue;
+            value = value.replace(productRe, product);
+            if (/ONLYOFFICE/i.test(value) && !(strings[lang] && key in strings[lang]))
+                value = key in strings.en ? strings.en[key]
+                                          : value.replace(/ONLYOFFICE( Cloud Service| cloud| Cloud)?/gi, product);
+            l10n[lang][key] = value;
         }
     }
 
@@ -181,6 +187,8 @@
     /* ------------------------------------------------------------------ */
     const css = `
         .newportal, #link-create { display: none !important; }
+        /* Pas de connexion aux clouds proposés par upstream (offres ONLYOFFICE) en 0.1.0 */
+        #idx-sidebar-portals { display: none !important; }
         .auxinux-legal { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border-divider, rgba(128,128,128,.3)); max-width: 560px; }
         .auxinux-legal h4 { margin: 0 0 8px; font-weight: bold; }
         .auxinux-legal p { margin: 0 0 6px; line-height: 1.45; opacity: .9; }

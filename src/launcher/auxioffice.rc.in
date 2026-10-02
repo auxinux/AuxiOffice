@@ -33,7 +33,7 @@ BEGIN
             VALUE "FileDescription",  "AuxiNux Office"
             VALUE "FileVersion",      "@VERSION@"
             VALUE "InternalName",     "auxioffice"
-            VALUE "LegalCopyright",   "© 2026 Projet AuxiNux — AGPL-3.0. Basé sur ONLYOFFICE (Ascensio System SIA)."
+            VALUE "LegalCopyright",   "© 2026 Projet AuxiNux — logiciel libre (AGPL-3.0)."
             VALUE "OriginalFilename", "auxioffice.exe"
             VALUE "ProductName",      "AuxiNux Office"
             VALUE "ProductVersion",   "@VERSION@"
