@@ -6,6 +6,7 @@ the sdkjs engine. These outputs are platform independent (shared by Linux and Wi
 
 import os
 import shutil
+import sys
 from pathlib import Path
 
 from .common import BUILD_DIR, UPSTREAM_SRC, fail, info, ok, product, rmtree, run, step, warn
@@ -15,15 +16,22 @@ JS_DIR = BUILD_DIR / "js"
 
 
 def _npm_install(directory, log_dir):
-    """Installe les dépendances de build (npm ci, reproductible grâce au package-lock)."""
+    """Installe les dépendances de build (npm ci, reproductible grâce au package-lock).
+
+    Aucun script d'installation de paquet n'est exécuté (--ignore-scripts) : ils téléchargent des
+    programmes propres à chaque plateforme (PhantomJS, qui ne sert qu'aux tests d'upstream ; les
+    optimiseurs d'images) et échouaient sur Mac. Seuls les optimiseurs d'images sont nécessaires :
+    leur installation est lancée explicitement sous Linux, et remplacée par Homebrew sur Mac."""
     lock = directory / "package-lock.json"
     stamp = directory / "node_modules" / ".auxi-lock"
-    wanted = lock.read_text(encoding="utf-8") if lock.exists() else ""
+    wanted = (lock.read_text(encoding="utf-8") if lock.exists() else "") + "\n--ignore-scripts v1\n"
     if not (stamp.exists() and stamp.read_text(encoding="utf-8") == wanted):
-        env = {"PUPPETEER_SKIP_DOWNLOAD": "1", "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "1"}
-        run(["npm", "ci", "--no-audit", "--no-fund"], cwd=directory, env=env, log_file=log_dir / "npm-ci.log")
+        run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], cwd=directory,
+            log_file=log_dir / "npm-ci.log")
+        _image_tools(directory, log_dir)
         stamp.write_text(wanted, encoding="utf-8")
-    _native_image_tools(directory)
+    else:
+        _image_tools(directory, log_dir)
 
 
 # Optimiseurs d'images de grunt-contrib-imagemin : leurs binaires macOS téléchargés par npm sont
@@ -32,27 +40,49 @@ MACOS_IMAGE_TOOLS = [("gifsicle", "gifsicle", "gifsicle"), ("optipng-bin", "opti
                      ("jpegtran-bin", "jpegtran", "jpeg-turbo")]
 
 
-def _native_image_tools(directory):
-    from .common import IS_MACOS_HOST
-    if not IS_MACOS_HOST:
-        return
+def _package_copies(directory, package):
     modules = directory / "node_modules"
+    return [d for d in [modules / package, *modules.glob(f"**/node_modules/{package}")]
+            if (d / "package.json").exists()]
+
+
+def _image_tools(directory, log_dir):
+    """Optimiseurs d'images de grunt-contrib-imagemin, avec un programme utilisable sur cet hôte."""
+    from .common import IS_MACOS_HOST
     for package, binary, formula in MACOS_IMAGE_TOOLS:
-        copies = [d for d in [modules / package, *modules.glob(f"**/node_modules/{package}")]
-                  if (d / "package.json").exists()]
-        if not copies:
-            continue
-        res = run(["brew", "--prefix", formula], check=False, capture=True, quiet=True)
-        native = Path(res.stdout.strip()) / "bin" / binary
-        if res.returncode != 0 or not native.exists():
-            fail(f"{binary} introuvable : brew install {formula} (installé par ./build.sh)")
-        for pkg in copies:
+        for pkg in _package_copies(directory, package):
             target = pkg / "vendor" / binary
-            target.parent.mkdir(exist_ok=True)
-            if target.exists() or target.is_symlink():
-                target.unlink()
-            target.symlink_to(native)
-        info(f"{binary} : version Apple Silicon de Homebrew ({native})")
+            if IS_MACOS_HOST:
+                res = run(["brew", "--prefix", formula], check=False, capture=True, quiet=True)
+                native = Path(res.stdout.strip()) / "bin" / binary
+                if res.returncode != 0 or not native.exists():
+                    fail(f"{binary} introuvable : brew install {formula} (installé par ./build.sh)")
+                target.parent.mkdir(exist_ok=True)
+                if target.exists() or target.is_symlink():
+                    target.unlink()
+                target.symlink_to(native)
+            elif not target.exists():
+                run(["node", "lib/install.js"], cwd=pkg, log_file=log_dir / f"install-{package}.log")
+            if not target.exists():
+                fail(f"{binary} absent après installation ({target}) — voir {log_dir}")
+
+
+# Variantes des éditeurs inutiles à l'application de bureau (supprimées après le build) :
+# ne pas les construire évite un second « npm install » et webpack (éditeurs mobiles).
+SKIPPED_DEPLOY_TASKS = ("deploy-app-mobile", "deploy-app-embed")
+
+
+def _desktop_only_tasks(build_dir):
+    import json
+    for cfg in sorted(build_dir.glob("*.json")):
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        tasks = data.get("tasks", {}).get("deploy") if isinstance(data, dict) else None
+        if isinstance(tasks, list) and any(t in tasks for t in SKIPPED_DEPLOY_TASKS):
+            data["tasks"]["deploy"] = [t for t in tasks if t not in SKIPPED_DEPLOY_TASKS]
+            cfg.write_text(json.dumps(data, ensure_ascii=False, indent=4) + "\n", encoding="utf-8")
 
 
 def _grunt(directory, log_file, env=None, force=False):
@@ -91,8 +121,9 @@ def build_webapps(args):
     src = UPSTREAM_SRC / "web-apps"
     logs = JS_DIR / "logs" / "web-apps"
     logs.mkdir(parents=True, exist_ok=True)
-    run(["python3", "merge_and_check.py"], cwd=src / "translation", log_file=logs / "merge.log")
+    run([sys.executable, "merge_and_check.py"], cwd=src / "translation", log_file=logs / "merge.log")
     _npm_install(src / "build", logs)
+    _desktop_only_tasks(src / "build")
     env = webapps_env(product())
     _grunt(src / "build", logs / "grunt.log", env=env)
     deploy = src / "deploy" / "web-apps"
