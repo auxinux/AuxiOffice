@@ -46,6 +46,9 @@ def stage_build(args):
 
 
 def stage_assemble(args):
+    if args.target == "macos":
+        from . import macos
+        return macos.assemble(args)
     from . import assemble
     assemble.assemble(args)
 
@@ -62,6 +65,9 @@ def stage_package(args):
     if args.target == "linux":
         from . import package_linux
         package_linux.package(args)
+    elif args.target == "macos":
+        from . import macos
+        macos.package(args)
     else:
         from . import package_windows
         package_windows.package(args)

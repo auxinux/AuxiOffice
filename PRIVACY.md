@@ -64,6 +64,13 @@ Ubuntu 24.04, les espaces de noms non privilégiés peuvent être restreints par
 Sous Windows : Moniteur de ressources (onglet Réseau), pare-feu Windows (règles sortantes) ou
 Wireshark.
 
+### macOS (version préliminaire)
+
+L'application macOS réutilise le shell d'upstream sans lanceur AuxiNux : les options réseau
+du moteur web (DNS sur HTTPS, réseau d'arrière-plan) n'y sont **pas** appliquées et n'ont pas
+encore été auditées ; Sparkle est désactivé ; l'assistant IA est désactivé au premier
+lancement ; le menu Aide ouvre l'aide en ligne d'ONLYOFFICE. Voir [docs/MACOS.md](docs/MACOS.md).
+
 ## 4. Données enregistrées localement
 
 | Données | Linux | Windows |

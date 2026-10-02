@@ -209,6 +209,17 @@ Dans les deux cas, AuxiNux Office est **déclaré** pour ses types de fichiers (
 `AuxiOffice.<ext>`, `OpenWithProgids`, `Capabilities`, `RegisteredApplications`) mais
 **jamais imposé** : les applications par défaut existantes ne sont pas modifiées.
 
+### 5.4 macOS Apple Silicon (préliminaire)
+
+```sh
+python3 scripts/auxibuild all --target macos --local-deps     # dist/macos/AuxiNuxOffice-0.1.0-arm64.zip
+```
+
+Construit depuis Linux en réempaquetant l'application d'upstream épinglée (`ONLYOFFICE-arm.dmg`,
+extraite avec 7-Zip) avec la page d'accueil, les éditeurs et l'identité AuxiNux, puis signée
+avec rcodesign 0.29.0 (épinglé). Aucun outil Apple n'est nécessaire ; le shell macOS n'est
+pas recompilé. Voir [docs/MACOS.md](docs/MACOS.md).
+
 ## 6. Référence de l'orchestrateur
 
 ```text
@@ -219,7 +230,7 @@ commandes : doctor fetch prepare build assemble test package all clean
 
 | Option | Rôle |
 |---|---|
-| `--target linux\|windows` | cible (défaut `linux`) |
+| `--target linux\|windows\|macos` | cible (défaut `linux`) |
 | `--mode release\|debug` | type de build (défaut `release`) |
 | `--clean` | sources upstream remises à zéro (y compris fichiers ignorés) et arbres de build supprimés |
 | `-j N` | tâches parallèles |

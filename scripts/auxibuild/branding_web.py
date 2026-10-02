@@ -8,7 +8,7 @@ import json
 import shutil
 from pathlib import Path
 
-from .common import ROOT, UPSTREAM_SRC, fail, ok, version, write_text
+from .common import ROOT, UPSTREAM_SRC, fail, lock, ok, version, write_text
 
 GEN = ROOT / "branding" / "generated"
 
@@ -55,6 +55,16 @@ def startpage_config(p):
         "website": p["product"]["website"],
         "websiteLabel": p["product"]["website"].split("://", 1)[-1],
         "colors": colors,
+        # Mentions légales par défaut (le shell AuxiNux de Linux/Windows les fournit aussi ; sous
+        # macOS, shell d'upstream, ces valeurs et des liens relatifs au bundle sont utilisés).
+        "legal": {
+            "upstream_name": p["upstream"]["name"],
+            "upstream_version": lock()["upstream"]["version"],
+            "upstream_developer": p["upstream"]["developer"],
+            "modified_since": p["product"]["modification_start_date"],
+            "source_url": p["product"]["source_url"],
+            "upstream_url": p["upstream"]["url"],
+        },
     }
 
 

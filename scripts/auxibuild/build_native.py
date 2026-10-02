@@ -153,6 +153,11 @@ def build_shell_windows(args):
 
 
 def build_all(args):
+    if args.target == "macos":
+        # macOS 0.1.0 : shell natif d'upstream réempaqueté (voir macos.py) ; pas d'AuxiText ni de lanceur
+        warn("macOS : shell, AuxiText et lanceur non compilés (Xcode et SDK Apple requis) — "
+             "application upstream réempaquetée, voir docs/MACOS.md")
+        return
     if "shell" in args.components:
         if args.target == "linux":
             build_shell_linux(args)

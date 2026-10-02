@@ -108,7 +108,7 @@ def engine_dir(target):
 
 def fetch_engine(target):
     """Download + verify + extract the upstream binary release used as engine."""
-    key = {"linux": "linux_x86_64", "windows": "windows_x64"}[target]
+    key = {"linux": "linux_x86_64", "windows": "windows_x64", "macos": "macos_arm64"}[target]
     spec = lock()["binaries"][key]
     step(f"Moteur upstream précompilé ({target})")
     filename = spec["url"].rsplit("/", 1)[-1]
@@ -125,6 +125,9 @@ def fetch_engine(target):
         extract_deb(archive, tmp)
     elif spec["format"] == "zip":
         extract_zip(archive, tmp)
+    elif spec["format"] == "dmg":
+        from .macos import extract_dmg
+        extract_dmg(archive, tmp)
     else:
         fail(f"format inconnu {spec['format']}")
     root = tmp / spec["root"] if spec["root"] else tmp

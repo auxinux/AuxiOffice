@@ -41,8 +41,12 @@ sont pas fixées : une version sort quand ses critères sont remplis sous Linux 
 
 ## 0.4.x — macOS
 
-- **macOS Apple Silicon** : shell macOS d'upstream (desktop-apps/macos), AuxiText (Qt),
-  paquet `.dmg` signé et notarisé.
+Une version **préliminaire** (application d'upstream réempaquetée, voir
+[docs/MACOS.md](docs/MACOS.md)) existe depuis la 0.1.0. La 0.4.x apportera :
+
+- **macOS Apple Silicon** complet : shell macOS d'upstream compilé dans Xcode avec les patches
+  AuxiNux (`Assets.car` aux couleurs d'AuxiNux, réglages du moteur, routage), AuxiText (Qt),
+  paquet `.dmg` signé (Developer ID) et notarisé.
 
 ## Plus tard
 

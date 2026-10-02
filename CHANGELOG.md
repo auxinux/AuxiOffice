@@ -56,6 +56,13 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
 - Réglages dans `%APPDATA%\AuxiNux\AuxiOffice`, données et cache dans
   `%LOCALAPPDATA%\AuxiNux\AuxiOffice`.
 
+### macOS (préliminaire)
+
+- `AuxiNuxOffice-0.1.0-arm64.zip` : application macOS Apple Silicon d'upstream réempaquetée
+  depuis Linux (accueil et éditeurs AuxiNux, identité, textes et menus, icônes, mentions
+  légales, mises à jour Sparkle désactivées, signature ad hoc). Sans AuxiText ; shell
+  d'upstream non modifié. Non testée sur un Mac à ce jour ([docs/MACOS.md](docs/MACOS.md)).
+
 ### Corrections par rapport à ONLYOFFICE 9.4.0
 
 - Linux : la fermeture de session (SIGTERM) provoquait une erreur de segmentation et un core

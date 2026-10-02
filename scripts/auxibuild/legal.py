@@ -71,7 +71,10 @@ def _li(href, label, desc):
 def index_html(target, extra_components):
     p = product()
     up = lock()["upstream"]
-    qt = "5.9.9" if target == "linux" else "5.15.2"
+    qt = {"linux": "5.9.9", "windows": "5.15.2"}.get(target)
+    qt_par = (f"<p>Qt {qt} est utilisé sous licence GNU LGPL v3 (bibliothèques partagées remplaçables, texte dans\n"
+              f"<code>3DPARTY-desktop.txt</code>). Sources : <a href=\"https://download.qt.io/archive/qt/\">"
+              f"download.qt.io/archive/qt</a>.</p>\n") if qt else ""
     tp = "\n".join(_li(name, name, fr) for _, name, fr, _ in THIRD_PARTY_FILES)
     tp_en = "\n".join(_li(name, name, en) for _, name, _, en in THIRD_PARTY_FILES)
     extra = "\n".join(_li(href, label, desc) for href, label, desc in extra_components)
@@ -108,9 +111,7 @@ d'Ascensio System SIA. ONLYOFFICE est une marque d'Ascensio System SIA ; aucun d
 {_li('ICU-LICENSE.txt', 'ICU-LICENSE.txt', 'International Components for Unicode (licence Unicode)')}
 {extra}
 </ul>
-<p>Qt {qt} est utilisé sous licence GNU LGPL v3 (bibliothèques partagées remplaçables, texte dans
-<code>3DPARTY-desktop.txt</code>). Sources : <a href="https://download.qt.io/archive/qt/">download.qt.io/archive/qt</a>.</p>
-<p>Les éléments non logiciels d'origine ONLYOFFICE (illustrations, jeux d'icônes, rédaction technique) sont sous licence
+{qt_par}<p>Les éléments non logiciels d'origine ONLYOFFICE (illustrations, jeux d'icônes, rédaction technique) sont sous licence
 <a href="https://creativecommons.org/licenses/by-sa/4.0/legalcode">CC BY-SA 4.0</a>.
 L'identité visuelle AuxiNux est sous CC BY-SA 4.0 ; ses lettres dérivent de la police Carlito
 (<a href="OFL-1.1-Carlito.txt">SIL OFL 1.1</a>).</p>

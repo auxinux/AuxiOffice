@@ -41,6 +41,9 @@ Résumé honnête de ce qui a été vérifié (détails : [CHANGELOG.md](CHANGEL
   un vrai Windows 10/11** : conformément au cahier des charges, la version 0.1.0 ne sera
   déclarée terminée qu'après la validation de [docs/TESTING-WINDOWS.md](docs/TESTING-WINDOWS.md)
   sur Windows.
+- **macOS Apple Silicon (préliminaire)** : application d'upstream réempaquetée depuis Linux
+  (accueil, éditeurs, identité, mentions légales, Sparkle désactivé, signature ad hoc) ; pas
+  d'AuxiText ; pas encore testée sur un Mac. Voir [docs/MACOS.md](docs/MACOS.md).
 
 ## Installation
 
@@ -77,6 +80,17 @@ avec » et dans Paramètres > Applications > Applications par défaut, où vous 
 
 Fichiers : `C:\Program Files\AuxiNux Office\`, réglages dans `%APPDATA%\AuxiNux\AuxiOffice\`,
 données et cache dans `%LOCALAPPDATA%\AuxiNux\AuxiOffice\`.
+
+### macOS 11+ (Apple Silicon) — préliminaire
+
+Décompressez `AuxiNuxOffice-0.1.0-arm64.zip`, placez `AuxiNux Office.app` dans Applications,
+puis autorisez-la (application non notarisée) :
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/AuxiNux Office.app"
+```
+
+Détails et limites : [docs/MACOS.md](docs/MACOS.md).
 
 ## Utilisation
 
@@ -139,6 +153,7 @@ dist/                                 paquets produits
 | [docs/AUXIMAIL.md](docs/AUXIMAIL.md) | étude technique d'AuxiMail |
 | [docs/TESTING-LINUX.md](docs/TESTING-LINUX.md) | scénarios de test Linux |
 | [docs/TESTING-WINDOWS.md](docs/TESTING-WINDOWS.md) | scénarios de test Windows |
+| [docs/MACOS.md](docs/MACOS.md) | version macOS préliminaire : installation, limites, tests |
 | [branding/README.md](branding/README.md) | identité visuelle et génération des ressources |
 
 ## Licence

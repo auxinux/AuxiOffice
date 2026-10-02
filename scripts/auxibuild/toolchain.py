@@ -150,6 +150,7 @@ LOCAL_TOOL_PACKAGES = {
     "file": ["file", "libmagic1t64", "libmagic-mgc"],
     "desktop-file-validate": ["desktop-file-utils"],
     "makensis": ["nsis", "nsis-common"],
+    "7z": ["7zip"],
     "wixl": ["wixl", "wixl-data", "libmsi-1.0-0", "libgcab-1.0-0", "libgsf-1-114", "libgsf-1-common"],
 }
 

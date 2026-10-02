@@ -36,6 +36,7 @@ avis juridique ; en cas de doute, le texte des licences fait foi.
 | libvlc (Windows, lecture audio/vidéo) | VideoLAN et autres | LGPL-2.1+ | DLL livrées par upstream |
 | Microsoft Visual C++ Redistributable 2015-2022 x64 (installateur .exe) | Microsoft | termes de licence Microsoft (redistribuable) | installé s'il est absent |
 | Runtime AppImage (type 2) | AppImage project | MIT (inclut squashfuse, BSD-2 ; libfuse, LGPL-2.1) | en-tête de l'AppImage |
+| Sparkle (application macOS, mises à jour désactivées) | Sparkle Project | MIT | `Sparkle.framework` livré par upstream |
 | Stub de l'installateur NSIS | contributeurs NSIS | zlib/libpng (+ LZMA, domaine public/CPL) | `AuxiNuxOffice-<version>-x64.exe` |
 
 Les listes détaillées des composants tiers d'upstream sont installées dans `licenses/`

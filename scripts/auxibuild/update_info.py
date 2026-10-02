@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from .common import DIST_DIR, build_number, fail, ok, product, source_date_epoch, version, write_text
 
 SCHEMA = 1
-FORMATS = {".deb": "deb", ".AppImage": "appimage", ".exe": "nsis", ".msi": "msi"}
+FORMATS = {".deb": "deb", ".AppImage": "appimage", ".exe": "nsis", ".msi": "msi", ".zip": "zip"}
 
 
 def channel():
@@ -38,7 +38,7 @@ def _sha256(path):
     return h.hexdigest()
 
 
-def write(target, files):
+def write(target, files, arch="x86_64"):
     """files : artefacts produits par l'étape package pour cette cible."""
     p = product()
     artifacts = []
@@ -55,7 +55,7 @@ def write(target, files):
         "build": build_number(),
         "channel": channel(),
         "os": target,
-        "arch": "x86_64",
+        "arch": arch,
         "date": datetime.fromtimestamp(source_date_epoch(), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "built_on": f"{platform.system()} {platform.machine()}",
         "artifacts": artifacts,

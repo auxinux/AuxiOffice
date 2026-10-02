@@ -28,7 +28,7 @@ def parse_args(argv):
     p = argparse.ArgumentParser(prog="auxibuild", description="Build d'AuxiNux Office")
     p.add_argument("command", choices=STAGES + ["all", "clean", "patches"], help="étape à exécuter")
     p.add_argument("extra", nargs="*", help="patches : checkout <dépôt> | export <dépôt> | status")
-    p.add_argument("--target", choices=["linux", "windows"], default="linux")
+    p.add_argument("--target", choices=["linux", "windows", "macos"], default="linux")
     p.add_argument("--mode", choices=["release", "debug"], default="release")
     p.add_argument("--clean", action="store_true", help="repartir de sources et d'arbres de build propres")
     p.add_argument("--jobs", "-j", type=int, default=os.cpu_count() or 4)

@@ -110,8 +110,11 @@
         formatLabel: { value: label, gradientColorStart: color[0], gradientColorEnd: color[1], bgColorWinXP: color[1] },
     });
 
+    // macOS : shell natif d'upstream (pas de commandes AuxiNux, pas d'AuxiText en 0.1.0).
+    const upstreamShell = /Mac/.test(navigator.platform);
+
     function documentTypes() {
-        return [
+        const tiles = [
             tile('word', 'newDoc', 'DOCX', colors.writer || ['#4C86E8', '#2F6FDE'], '#docx-big'),
             tile('cell', 'newXlsx', 'XLSX', colors.sheet || ['#34B46D', '#1F9D55'], '#xlsx-big'),
             tile('slide', 'newPptx', 'PPTX', colors.present || ['#EA7351', '#E4572E'], '#pptx-big'),
@@ -119,12 +122,16 @@
             tile('auxinux-new-text', 'auxNewText', 'TXT', colors.text || ['#7A8594', '#5F6B7A'], '#txt-big'),
             tile('auxinux-open', 'auxOpenFile', '…', colors.open || ['#F2B713', '#F26F00'], '#folder-big'),
         ];
+        return upstreamShell ? tiles.filter(t => t.id !== 'auxinux-new-text') : tiles;
     }
 
     // Renvoie true si l'action a été prise en charge ici.
     function onDocumentSelect(id) {
         switch (id) {
-        case 'auxinux-open-pdf':  window.sdk.command('auxinux:open-pdf', ''); return true;
+        case 'auxinux-open-pdf':
+            if (upstreamShell) openFile(OPEN_FILE_FOLDER, '');
+            else window.sdk.command('auxinux:open-pdf', '');
+            return true;
         case 'auxinux-new-text':  window.sdk.command('create:new', 'text'); return true;
         case 'auxinux-open':      openFile(OPEN_FILE_FOLDER, ''); return true;
         default:                  return false;
@@ -137,7 +144,14 @@
     const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c]));
 
     function aboutLegalHtml(opts) {
-        const legal = (opts && opts.auxinux) || {};
+        const legal = Object.assign({}, config.legal || {}, (opts && opts.auxinux) || {});
+        if (!legal.license_file) {
+            // shell d'upstream (macOS) : fichiers légaux à côté de la page d'accueil, dans le bundle
+            const rel = f => new URL('../' + f, location.href).href;
+            legal.license_file = rel('LICENSE.txt');
+            legal.notice_file = rel('NOTICE.txt');
+            legal.thirdparty_file = rel('licenses/index.html');
+        }
         const L = utils.Lang;
         const link = (url, key) => url ? `<a class="link" draggable="false" href="#" onclick="window.open('${esc(url)}')" l10n>${esc(L[key])}</a>` : '';
         const basedOn = esc(L.auxLegalBasedOn)
@@ -179,6 +193,17 @@
     style.setAttribute('data-auxinux', '');
     style.textContent = css;
     document.head.appendChild(style);
+
+    // macOS : sans le module AuxiNux du shell, l'assistant IA serait actif par défaut ; il est
+    // désactivé une seule fois, au premier lancement (le choix ultérieur de l'utilisateur est respecté).
+    if (upstreamShell && !localStorage.getItem('auxinux-ai-default')) {
+        window.addEventListener('load', () => {
+            if (window.sdk && typeof window.sdk.command === 'function') {
+                window.sdk.command('settings:apply', JSON.stringify({useai: false}));
+                localStorage.setItem('auxinux-ai-default', 'off');
+            }
+        });
+    }
 
     window.auxinux = {
         product,

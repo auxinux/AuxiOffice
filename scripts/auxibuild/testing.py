@@ -106,13 +106,14 @@ def test_static(r, stage, target):
     notice = (stage / "NOTICE.txt").read_text(encoding="utf-8")
     r.add("NOTICE : attribution et date de modification",
           "Ascensio System SIA" in notice and "2026-10-01" in notice and "n'est pas un produit officiel" in notice)
-    home = (stage / "index.html").read_text(encoding="utf-8", errors="ignore")
+    home_page = stage / "login" / "index.html" if target == "macos" else stage / "index.html"
+    home = home_page.read_text(encoding="utf-8", errors="ignore")
     r.add("page d'accueil : module AuxiNux", "AUXINUX_BRANDING" in home and "Bienvenue dans" in home)
     if target == "linux":
         r.add("service de mise à jour upstream absent", not (stage / "DesktopEditors").exists())
-    else:
+    elif target == "windows":
         r.add("service de mise à jour upstream absent", not (stage / "updatesvc.exe").exists())
-    test_no_upstream_logo(r, stage)
+    test_no_upstream_logo(r, stage, home_page)
 
 
 # Débuts des tracés des logos ONLYOFFICE (en-tête 85×20 et À propos 245×45), tels qu'écrits dans
@@ -120,12 +121,12 @@ def test_static(r, stage, target):
 UPSTREAM_LOGO_SIGNATURES = ("M20.211 7.003", "M64.7249 13.8022", "M64.725 13.802")
 
 
-def test_no_upstream_logo(r, stage):
+def test_no_upstream_logo(r, stage, home_page=None):
     """Identité visuelle : aucun logo ONLYOFFICE dans l'interface livrée (SVG, CSS dont les
     images intégrées encodées, HTML, JS) ; icônes d'onglet des éditeurs aux couleurs AuxiNux."""
     signatures = UPSTREAM_LOGO_SIGNATURES + tuple(sig.replace(" ", "%20") for sig in UPSTREAM_LOGO_SIGNATURES)
     found = []
-    files = [stage / "index.html", *(stage / "editors" / "web-apps").rglob("*")]
+    files = [home_page or stage / "index.html", *(stage / "editors" / "web-apps").rglob("*")]
     for f in files:
         if f.is_file() and f.suffix in (".svg", ".css", ".html", ".js"):
             text = f.read_text(encoding="utf-8", errors="ignore")
@@ -316,6 +317,19 @@ def test_windows_wine(r, stage):
 
 def run_all(args):
     step(f"Tests ({args.target})")
+    if args.target == "macos":
+        from . import macos
+        app = macos.stage_app()
+        if not app.exists():
+            fail("application macOS absente : lancer l'étape assemble")
+        r = Report("macos")
+        test_static(r, app / "Contents" / "Resources", "macos")
+        macos.test_static(r, app)
+        r.write()
+        if r.failures:
+            fail(f"{len(r.failures)} test(s) en échec — voir {REPORTS / 'macos' / 'report.md'}")
+        ok("tous les tests exécutés ont réussi")
+        return
     stage = stage_dir(args.target)
     if not stage.exists():
         fail("arbre d'installation absent : lancer l'étape assemble")
