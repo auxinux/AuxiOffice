@@ -71,6 +71,12 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
   descriptions des paquets, page d'accueil de l'installateur, adresses d'aide du shell macOS.
 - Panneau « Clouds » de l'accueil masqué (offres cloud d'ONLYOFFICE).
 
+### Copyright
+
+- Les composants contenant le code d'origine (application, shell, application macOS,
+  installateurs) affichent les deux titulaires : « © 2026 Projet AuxiNux — © 2009-2026 Ascensio
+  System SIA ». AuxiText et le lanceur, écrits entièrement par AuxiNux : « © 2026 Projet AuxiNux ».
+
 ### Corrections par rapport à ONLYOFFICE 9.4.0
 
 - Linux : la fermeture de session (SIGTERM) provoquait une erreur de segmentation et un core

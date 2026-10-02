@@ -26,7 +26,7 @@ import struct
 import zipfile
 from pathlib import Path
 
-from .common import (BUILD_DIR, DIST_DIR, IS_MACOS_HOST, ROOT, TOOLCHAINS_DIR, download, extract_tar, fail, info, lock, ok,
+from .common import (BUILD_DIR, copyright_notice, DIST_DIR, IS_MACOS_HOST, ROOT, TOOLCHAINS_DIR, download, extract_tar, fail, info, lock, ok,
                      product, rmtree, run, step, version, warn, which, write_text)
 
 GEN = ROOT / "branding" / "generated"
@@ -179,8 +179,8 @@ def localize_about(resources, p):
     « Community version » remplacé par « Version » ; messages anglais nommant le produit."""
     prod = p["product"]
     # Les mentions d'origine exigées par la licence sont accessibles par « Accord de licence ».
-    copyright_fr = f"© {prod['copyright_first_year']} {prod['copyright_holder']}. Logiciel libre (AGPL v3)."
-    copyright_en = f"© {prod['copyright_first_year']} {prod['copyright_holder']}. Free software (AGPL v3)."
+    copyright_fr = f"{copyright_notice()}. Logiciel libre (AGPL v3)."
+    copyright_en = f"{copyright_notice()}. Free software (AGPL v3)."
 
     count = 0
     for lproj in sorted(resources.glob("*.lproj")):
@@ -289,8 +289,7 @@ def brand_info_plist(contents, p):
         "CFBundleShortVersionString": version(),
         "CFBundleVersion": version(),
         "CFBundleIconFile": "AppIcon",
-        "NSHumanReadableCopyright": f"© {prod['copyright_first_year']} {prod['copyright_holder']}. "
-                                    f"Logiciel libre (AGPL v3).",
+        "NSHumanReadableCopyright": f"{copyright_notice()}. Logiciel libre (AGPL v3).",
         # Sparkle : aucune vérification ni installation automatique de mise à jour
         "SUEnableAutomaticChecks": False,
         "SUAutomaticallyUpdate": False,
@@ -513,9 +512,11 @@ def test_static(r, stage_app_dir):
                 break
     r.add("textes de l'interface : nom AuxiNux", not leftovers, ", ".join(leftovers[:4]) or "aucun « ONLYOFFICE »")
     rights = [f.parent.name for f in (contents / "Resources").glob("*.lproj/InfoPlist.strings")
-              if any(m.group(1) == '"NSHumanReadableCopyright"' and "AuxiNux" not in m.group(3)
+              if any(m.group(1) == '"NSHumanReadableCopyright"'
+                     and not ("AuxiNux" in m.group(3) and "Ascensio System SIA" in m.group(3))
                      for m in _STRINGS_PAIR.finditer(_read_strings(f)[0]))]
-    r.add("copyright AuxiNux dans toutes les langues", not rights, ", ".join(rights[:4]) or "Projet AuxiNux")
+    r.add("copyright (Projet AuxiNux et Ascensio System SIA) dans toutes les langues", not rights,
+          ", ".join(rights[:4]) or copyright_notice())
     car = (contents / "Resources" / "Assets.car").read_bytes()
     r.add("onglet d'accueil : logo ONLYOFFICE du catalogue neutralisé",
           b"logo-tab-dark" not in car and b"logo-tab-light" not in car

@@ -95,6 +95,13 @@ def lock():
     return json.loads((ROOT / "upstream" / "upstream.lock.json").read_text(encoding="utf-8"))
 
 
+def copyright_notice():
+    """Mention de copyright des composants contenant le code d'origine : les deux titulaires
+    (Projet AuxiNux pour les modifications et ajouts, Ascensio System SIA pour le programme d'origine)."""
+    p = product()
+    return f"© {p['product']['copyright_first_year']} {p['product']['copyright_holder']} — {p['upstream']['copyright']}"
+
+
 def build_number():
     """Optional CI build counter (AUXI_BUILD_NUMBER), 0 for local builds."""
     value = os.environ.get("AUXI_BUILD_NUMBER", "0")

@@ -16,7 +16,7 @@ import uuid
 from pathlib import Path
 
 from .assemble import stage_dir
-from .common import (BUILD_DIR, DIST_DIR, ROOT, TOOLCHAINS_DIR, build_number, download, fail, info, lock, ok,
+from .common import (BUILD_DIR, copyright_notice, DIST_DIR, ROOT, TOOLCHAINS_DIR, build_number, download, fail, info, lock, ok,
                      product, rmtree, run, step, version, version_tuple4, which, write_text)
 
 NSIS_DIR = ROOT / "packaging" / "windows" / "nsis"
@@ -96,7 +96,7 @@ def generated_nsh(p, stage, license_file, vc, out_file):
         "VERSION_MAJOR": str(v4[0]),
         "VERSION_MINOR": str(v4[1]),
         "PRODUCT_PUBLISHER": prod["vendor"],
-        "PRODUCT_COPYRIGHT": f"© {prod['copyright_first_year']} {prod['copyright_holder']} — AGPL-3.0",
+        "PRODUCT_COPYRIGHT": f"{copyright_notice()} — AGPL-3.0",
         "PRODUCT_WEBSITE": prod["website"],
         "PRODUCT_SUPPORT_URL": prod["support_url"],
         "INSTALL_DIR_NAME": win["install_dir_name"],

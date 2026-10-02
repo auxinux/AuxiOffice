@@ -20,7 +20,8 @@
     "developer": "Ascensio System SIA",
     "url": "https://github.com/ONLYOFFICE/DesktopEditors",
     "trademark_notice_en": "ONLYOFFICE is a trademark of Ascensio System SIA.",
-    "trademark_notice_fr": "ONLYOFFICE est une marque d'Ascensio System SIA."
+    "trademark_notice_fr": "ONLYOFFICE est une marque d'Ascensio System SIA.",
+    "copyright": "© 2009-2026 Ascensio System SIA"
   },
   "apps": {
     "writer": {
