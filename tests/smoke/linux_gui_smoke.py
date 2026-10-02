@@ -275,13 +275,20 @@ class Session:
         self.xdo("key", "Return")
         time.sleep(2)
         after = self.shot("05-pdf-recherche")
-        # la recherche fait défiler la vue jusqu'à la page 3 : une part importante de l'écran change
+        # l'occurrence trouvée est surlignée (couleur de surlignage des éditeurs, thème clair) :
+        # absente avant la recherche, présente après
+        lit_before, lit_after = self.highlighted(before), self.highlighted(after)
+        self.record("PDF ouvrir/rechercher", opened and lit_before < 50 and lit_after > 500,
+                    f"documents récents : {'oui' if opened else 'non'}, surlignage de « Page 3 » : "
+                    f"{lit_before} -> {lit_after} pixels (captures 05-pdf*.png)")
+
+    @staticmethod
+    def highlighted(image, rgb=(214, 201, 142), tolerance=16):
+        """Nombre de pixels de la couleur de surlignage des résultats de recherche."""
         from PIL import ImageChops
-        diff = ImageChops.difference(before, after).convert("L").point(lambda v: 255 if v > 24 else 0)
-        changed = sum(diff.histogram()[255:]) / (diff.width * diff.height)
-        self.record("PDF ouvrir/rechercher", opened and changed > 0.05,
-                    f"documents récents : {'oui' if opened else 'non'}, vue modifiée par la recherche : "
-                    f"{changed:.0%} de l'écran (captures 05-pdf*.png)")
+        masks = [band.point(lambda v, c=c: 255 if abs(v - c) <= tolerance else 0)
+                 for band, c in zip(image.split(), rgb)]
+        return ImageChops.multiply(ImageChops.multiply(masks[0], masks[1]), masks[2]).histogram()[255]
 
     def test_text(self):
         doc = self.docs / "notes-crlf.txt"

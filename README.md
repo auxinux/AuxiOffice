@@ -69,7 +69,7 @@ msiexec /i AuxiNuxOffice-0.1.0-x64.msi /qn
 ```
 
 Toutes les options (dossier, raccourci Bureau, types de fichiers, langue, redistribuable
-Visual C++) sont décrites dans [BUILD.md](BUILD.md#installateurs-windows). L'installateur ne
+Visual C++) sont décrites dans [BUILD.md](BUILD.md#53-installateurs-windows). L'installateur ne
 définit **jamais** AuxiNux Office comme application par défaut : il le propose dans « Ouvrir
 avec » et dans Paramètres > Applications > Applications par défaut, où vous choisissez.
 
