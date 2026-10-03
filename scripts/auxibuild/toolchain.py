@@ -99,6 +99,8 @@ def ensure_qt(key):
 # ---------------------------------------------------------------------------
 
 def _pkgconfig_ok(module, env):
+    if not which("pkg-config"):
+        return False    # outil manquant, déjà signalé par doctor()
     return subprocess.run(["pkg-config", "--exists", module], env=env).returncode == 0
 
 

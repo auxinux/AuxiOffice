@@ -8,7 +8,8 @@
 #
 #   git clone git@git.auxinux.ca:Auxinux/AuxiNux_Office.git
 #   cd AuxiNux_Office
-#   ./build.sh                 # build complet (rien n'est installé sur la machine)
+#   ./build.sh                 # build complet (Linux : paquets manquants installés avec apt ;
+#                              #  macOS : outils installés avec Homebrew)
 #   ./build.sh --clean         # repartir de zéro
 #
 # Durée : 30 à 60 minutes la première fois (téléchargements, compilation), moins ensuite.
@@ -33,10 +34,34 @@ case "$(uname -s)" in
 # ---------------------------------------------------------------------------
 Linux)
     [ "$(uname -m)" = "x86_64" ] || die "Linux : seule l'architecture x86_64 est prise en charge en 0.1.0"
-    command -v python3 >/dev/null || die "python3 est requis (sudo apt install python3)"
     EXTRA=()
-    # Debian/Ubuntu sans droits root : paquets de développement extraits localement
-    if command -v apt-get >/dev/null && [ "$(id -u)" -ne 0 ]; then EXTRA+=(--local-deps); fi
+    if command -v apt-get >/dev/null; then
+        # Paquets nécessaires au build (compilation, page d'accueil et éditeurs, paquets .deb et
+        # AppImage, tests graphiques sans écran) : installés avec apt s'ils manquent.
+        REQ=(build-essential pkg-config git curl ca-certificates python3 python3-venv nodejs npm
+             fakeroot dpkg-dev desktop-file-utils file xz-utils
+             libgtk-3-dev libglib2.0-dev libnotify-dev libcups2-dev libx11-dev libx11-xcb-dev
+             libxcb1-dev libxext-dev libdbus-1-dev libpulse-dev libgl-dev libatk1.0-dev
+             xvfb xdotool strace)
+        NEED=()
+        for p in "${REQ[@]}"; do
+            dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "install ok installed" || NEED+=("$p")
+        done
+        if [ ${#NEED[@]} -gt 0 ]; then
+            SUDO=()
+            [ "$(id -u)" -ne 0 ] && SUDO=(sudo)
+            if [ "$(id -u)" -eq 0 ] || command -v sudo >/dev/null; then
+                say "Installation des paquets nécessaires avec apt : ${NEED[*]}"
+                ${SUDO[@]+"${SUDO[@]}"} apt-get update
+                ${SUDO[@]+"${SUDO[@]}"} apt-get install -y "${NEED[@]}"
+            else
+                # Sans sudo : paquets de développement extraits localement (outils de base requis)
+                say "sudo indisponible : paquets de développement extraits localement (--local-deps)"
+                EXTRA+=(--local-deps)
+            fi
+        fi
+    fi
+    command -v python3 >/dev/null || die "python3 est requis (sudo apt install python3)"
     say "Build Linux (AuxiNux Office + AuxiText)"
     ./scripts/build-linux.sh --release ${EXTRA[@]+"${EXTRA[@]}"} ${ARGS[@]+"${ARGS[@]}"}
     say "Terminé. Paquets :"
