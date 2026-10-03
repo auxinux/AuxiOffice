@@ -80,6 +80,10 @@ public:
         panel->cef()->load(L"about:blank");
         panel->view()->hide();
         editor->setParent(panel);
+        // Fenêtre native propre, comme les vues du moteur web voisines : sinon, selon le système
+        // de fenêtres (compositeur, Windows), l'éditeur dessiné dans la fenêtre native du panneau
+        // n'était pas affiché (l'écran d'accueil restait visible dans l'onglet).
+        editor->setAttribute(Qt::WA_NativeWindow);
         panel->layout()->addWidget(editor);
 
         CAscTabData* data = new CAscTabData(editor->displayName(), cvwtEditor);
@@ -107,6 +111,7 @@ public:
                     return;
                 panel->layout()->activate();
                 guard->setGeometry(panel->contentsRect());
+                guard->raise();
                 guard->update();
             });
         return true;
