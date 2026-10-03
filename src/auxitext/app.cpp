@@ -7,6 +7,7 @@
 #include "app.h"
 
 #include <QApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -287,6 +288,26 @@ QStringList writerArguments(const QString& path)
 #else
     return {QStringLiteral("--writer"), path};
 #endif
+}
+
+QString writerMarkName(const QString& path)
+{
+    // FNV-1a 32 bits sur le chemin en UTF-8 (même calcul que auxinux-mac-text.js)
+    quint32 h = 0x811c9dc5u;
+    for (const char c : path.toUtf8()) {
+        h ^= quint32(quint8(c));
+        h *= 0x01000193u;
+    }
+    return QStringLiteral("%1").arg(h, 8, 16, QLatin1Char('0'));
+}
+
+void markOpenInWriter(const QString& path)
+{
+    const QString dir = QStringLiteral("/tmp/auxinux-writer");
+    QDir().mkpath(dir);
+    QFile mark(dir + QLatin1Char('/') + writerMarkName(path));
+    if (mark.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        mark.write(QByteArray::number(QDateTime::currentMSecsSinceEpoch() / 1000));
 }
 
 QString licensesIndex()

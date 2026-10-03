@@ -668,6 +668,11 @@ void MainWindow::openInWriter()
             || !save())
             return;
     }
+#ifdef Q_OS_MACOS
+    // L'éditeur AuxiWriter de macOS renvoie les fichiers texte à AuxiText ; cette marque
+    // (empreinte du chemin, heure) lui indique que l'utilisateur veut AuxiWriter pour ce fichier.
+    App::markOpenInWriter(m_path);
+#endif
     const QString writer = App::writerExecutable();
     if (!QFileInfo::exists(writer)
         || !QProcess::startDetached(writer, App::writerArguments(m_path))) {

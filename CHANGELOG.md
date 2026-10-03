@@ -91,8 +91,11 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
 
 ### macOS (préliminaire)
 
-- Bundle `AuxiNuxOffice.app` (affiché « AuxiNux Office ») : avec une espace dans le chemin,
-  Aide > Remerciements et Aide > Accord de licence ne s'ouvraient pas.
+- Fichiers texte (TXT, MD, JSON…) ouverts depuis AuxiNux Office : renvoyés à AuxiText au lieu
+  de rester dans AuxiWriter (le shell d'upstream les y envoie) ; « Ouvrir dans AuxiWriter »
+  d'AuxiText garde le fichier dans AuxiWriter.
+- Aide > Remerciements et Aide > Accord de licence sans effet : défaut du shell d'upstream
+  (ONLYOFFICE a le même), à corriger avec le shell compilé dans Xcode.
 
 - `AuxiNuxOffice-0.1.0-arm64.zip` : application macOS Apple Silicon d'upstream réempaquetée
   depuis Linux (accueil et éditeurs AuxiNux, identité, textes et menus, icônes, mentions

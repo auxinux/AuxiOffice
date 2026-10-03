@@ -22,6 +22,7 @@
 #include <QTimer>
 #include <QStyleFactory>
 #include <QUrl>
+#include <QUrlQuery>
 
 static const char* kHelp =
     "Usage: auxitext [options] [fichier...]\n"
@@ -74,6 +75,9 @@ public:
         const QUrl url = static_cast<QFileOpenEvent*>(event)->url();
         if (url.isLocalFile())
             MainWindow::openInNewWindow(url.toLocalFile());
+        else if (url.host() == QLatin1String("open") && QUrlQuery(url).hasQueryItem(QStringLiteral("path")))
+            // auxitext://open?path=… : fichier texte renvoyé par l'éditeur AuxiWriter d'AuxiNux Office
+            MainWindow::openInNewWindow(QUrlQuery(url).queryItemValue(QStringLiteral("path"), QUrl::FullyDecoded));
         else
             MainWindow::openInNewWindow();      // auxitext://new
         ++handled;

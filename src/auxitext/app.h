@@ -43,6 +43,11 @@ QString writerExecutable();     // lanceur AuxiNux Office (ouverture dans AuxiWr
 QStringList writerArguments(const QString& path);  // arguments de writerExecutable() pour ce fichier
 QString licensesIndex();        // page des licences livrée avec AuxiNux Office
 
+// macOS : marque /tmp/auxinux-writer/<empreinte FNV-1a du chemin> (heure Unix) lue par l'éditeur
+// AuxiWriter, qui garde alors ce fichier texte au lieu de le renvoyer à AuxiText.
+QString writerMarkName(const QString& path);
+void markOpenInWriter(const QString& path);
+
 }
 
 #endif // AUXITEXT_APP_H

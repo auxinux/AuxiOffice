@@ -488,8 +488,28 @@ def integrate_auxitext(app):
     if text.count(marker) != 1:
         fail(f"page d'accueil : {marker!r} introuvable ou ambigu")
     home.write_text(text.replace(marker, marker + "macTextEditor:!0,"), encoding="utf-8")
+    install_text_redirect(app)
     ok("AuxiText intégré (Contents/Applications/AuxiText.app)")
     return True
+
+
+def install_text_redirect(app):
+    """Éditeur de documents : un fichier texte brut ouvert par le shell d'upstream (qui l'envoie à
+    AuxiWriter) est renvoyé à AuxiText (src/macos/auxinux-mac-text.js)."""
+    from .build_auxitext import text_extensions
+    main = app / "Contents" / "Resources" / "editors" / "web-apps" / "apps" / "documenteditor" / "main"
+    page = main / "index.html"
+    shutil.copy2(ROOT / "src" / "macos" / "auxinux-mac-text.js", main / "auxinux-mac-text.js")
+    exts = json.dumps([e for e in text_extensions().split(";") if e])
+    tag = (f"<script>window.AUXINUX_TEXT_EXTENSIONS={exts};</script>"
+           '<script src="auxinux-mac-text.js"></script>')
+    text = page.read_text(encoding="utf-8")
+    if "auxinux-mac-text.js" in text:
+        return
+    if text.count("</head>") != 1:
+        fail(f"{page} : balise </head> introuvable ou ambiguë")
+    page.write_text(text.replace("</head>", tag + "</head>"), encoding="utf-8")
+    info("fichiers texte ouverts dans AuxiWriter : renvoyés à AuxiText")
 
 
 def sign(app, args):
