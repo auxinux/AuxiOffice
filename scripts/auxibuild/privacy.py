@@ -23,8 +23,10 @@ from pathlib import Path
 from .common import fail, info, ok, product
 
 # Origines autorisées : fichiers locaux de l'application et des documents, ressources du moteur
-# (ascdesktop://fonts, plugins), données en mémoire. Aucune adresse http(s), ws(s) ou ftp.
-LOCAL = "'self' file: ascdesktop: data: blob:"
+# (ascdesktop://fonts ; onlyoffice://plugin/… : fichiers des modules servis par le moteur, par
+# exemple le panneau Agent IA de l'accueil), données en mémoire. Aucune adresse http(s), ws(s)
+# ou ftp.
+LOCAL = "'self' file: ascdesktop: onlyoffice: data: blob:"
 CSP = "; ".join([
     f"default-src {LOCAL} 'unsafe-inline' 'unsafe-eval'",
     f"script-src {LOCAL} 'unsafe-inline' 'unsafe-eval'",
