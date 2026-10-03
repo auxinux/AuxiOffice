@@ -30,7 +30,7 @@ AuxiNux Office est conçu pour fonctionner **entièrement en local et hors ligne
 | Vérification et téléchargement des mises à jour | serveurs ONLYOFFICE (service `updatesvc`) | périodiquement | **absent** (module de mise à jour non compilé, service retiré) ; voir [docs/UPDATES.md](docs/UPDATES.md) |
 | Inscription / création de portail | onlyoffice.com | bouton de l'accueil | **désactivée** (aucune URL d'inscription) |
 | Modules réseau : DeepL, LanguageTool, Zotero, Thésaurus (API words.bighugelabs.com), OCR (données de langue téléchargées) | services tiers | à l'utilisation | **retirés** de la distribution (`privacy.removed_plugins` de `branding/product.json`) |
-| Assistant IA (modules « AI » et « Agent IA ») | fournisseurs d'IA configurés par l'utilisateur | à l'utilisation | **désactivé par défaut** (`disable-ai=1`, écrit avant l'initialisation du moteur) ; l'utilisateur peut l'activer dans les paramètres et doit alors choisir et configurer lui-même un fournisseur |
+| Assistant IA (module « AI ») | fournisseurs d'IA configurés par l'utilisateur | à l'utilisation | **désactivé par défaut** (`disable-ai=1`, écrit avant l'initialisation du moteur) ; l'utilisateur peut l'activer dans les paramètres et doit alors choisir et configurer lui-même un fournisseur. Le module « Agent IA » (panneau de l'accueil) est retiré |
 | Gestionnaire de modules (catalogue) | onlyoffice.github.io | **à l'ouverture** du gestionnaire par l'utilisateur | conservé (action volontaire) |
 | Clouds (DocSpace, Nextcloud, ownCloud, kDrive, Seafile…) | serveur saisi par l'utilisateur | après connexion par l'utilisateur | **masqué** en 0.1.0 (panneau « Clouds » de l'accueil) |
 | Liens (site office.auxinux.ca, licences) | navigateur de l'utilisateur | au clic | conservés |

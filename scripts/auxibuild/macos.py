@@ -53,8 +53,15 @@ FILE_ICON_KIND = {
 _UPSTREAM_SERVICES = r"(?!\s?(?:Docs|DocSpace|Workspace|Cloud|Personal|Groups|Mail)\b)"
 
 
+# Dossier du bundle sans espace : le shell d'upstream construit certaines adresses de fichiers
+# par NSURLComponents à partir du chemin (menu Aide > Remerciements, Accord de licence), ce qui
+# échoue si le chemin contient une espace. Le Finder et le Dock affichent quand même
+# « AuxiNux Office » (CFBundleDisplayName localisé, LSHasLocalizedDisplayName).
+BUNDLE_DIR = "AuxiNuxOffice.app"
+
+
 def stage_app():
-    return BUILD_DIR / "stage" / "macos" / f"{APP_NAME}.app"
+    return BUILD_DIR / "stage" / "macos" / BUNDLE_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -349,6 +356,7 @@ def brand_info_plist(contents, p):
         "CFBundleShortVersionString": version(),
         "CFBundleVersion": version(),
         "CFBundleIconFile": "AppIcon",
+        "LSHasLocalizedDisplayName": True,
         "NSHumanReadableCopyright": f"{copyright_notice()}. Logiciel libre (AGPL v3).",
         # Sparkle : aucune vérification ni installation automatique de mise à jour
         "SUEnableAutomaticChecks": False,
@@ -465,7 +473,7 @@ def assemble(args):
 
 
 def integrate_auxitext(app):
-    """AuxiText.app (compilé sur un Mac) dans AuxiNux Office.app/Contents/Applications/ ;
+    """AuxiText.app (compilé sur un Mac) dans AuxiNuxOffice.app/Contents/Applications/ ;
     la page d'accueil affiche alors la tuile « Nouveau fichier texte » (auxitext://new)."""
     built = BUILD_DIR / "native" / "macos" / "AuxiText.app"
     if not built.exists():

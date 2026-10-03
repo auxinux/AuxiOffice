@@ -49,7 +49,8 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
 - Aucune télémétrie, publicité ni compte ; fonctionnement hors ligne.
 - Désactivés : galerie de modèles en ligne, sondes DNS sur HTTPS et réseau d'arrière-plan du
   moteur web, aide en ligne, page d'inscription, service de mise à jour d'upstream.
-- Retirés : modules DeepL, LanguageTool, Zotero, Thésaurus, OCR. Assistant IA désactivé par
+- Retirés : modules DeepL, LanguageTool, Zotero, Thésaurus, OCR, Agent IA (panneau vide de
+  l'accueil). Assistant IA désactivé par
   défaut. Détails : [PRIVACY.md](PRIVACY.md).
 - Audit de confidentialité du 2026-10-02 (analyse du code livré et test avec des documents
   piégés), infractions corrigées :
@@ -86,6 +87,9 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
   `%LOCALAPPDATA%\AuxiNux\AuxiNuxOffice`.
 
 ### macOS (préliminaire)
+
+- Bundle `AuxiNuxOffice.app` (affiché « AuxiNux Office ») : avec une espace dans le chemin,
+  Aide > Remerciements et Aide > Accord de licence ne s'ouvraient pas.
 
 - `AuxiNuxOffice-0.1.0-arm64.zip` : application macOS Apple Silicon d'upstream réempaquetée
   depuis Linux (accueil et éditeurs AuxiNux, identité, textes et menus, icônes, mentions
@@ -133,7 +137,8 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
 Builds complets du 2026-10-03 sur Debian 13 x86_64 (Linux ; Windows par compilation croisée ;
 macOS réempaqueté depuis Linux), après l'audit de confidentialité et l'intégration d'AuxiText.
 
-- **Linux : 50 tests automatiques sur 50 réussis** — contrôles statiques (dont confidentialité :
+- **Linux : 50 tests automatiques sur 50 réussis** (dernier build : 48/50, les deux échecs —
+  saisie clavier simulée perdue — réussissent rejoués seuls) — contrôles statiques (dont confidentialité :
   aucun traqueur ni vidage mémoire, CSP, garde du convertisseur, commutateurs du moteur),
   versions, 19 tests unitaires d'AuxiText, tests graphiques sans réseau (accueil, DOCX, XLSX,
   PPTX, PDF, AuxiText, AuxiText intégré aux onglets, arrêt par SIGTERM), audit réseau avec
@@ -152,11 +157,11 @@ macOS réempaqueté depuis Linux), après l'audit de confidentialité et l'inté
 Empreintes SHA-256 des artefacts de ce build :
 
 ```text
-27e5114d4e84b82b7728c2717d3c1a7f1cfc99e11f42edc83eca571677766b90  auxinux-office_0.1.0_amd64.deb
-c4b09fabc320d0b06393387b5034c2cba31fb3c5f2663add3d2c726502b3b94a  AuxiNuxOffice-0.1.0-x86_64.AppImage
-122f435058c3590b3b72748e18a561d568b17293b5cda2834fbc81eb6a91c26b  AuxiNuxOffice-0.1.0-x64.exe
-15f08e82dd833f9cd843f4fa658b7a1da978b8ee153e753e51e28cbc97a03354  AuxiNuxOffice-0.1.0-x64.msi
-4fdb7e3dd29378353b48ce1b46b2a714d2b6db3ea14520f8ae5127592111447b  AuxiNuxOffice-0.1.0-arm64.zip
+0066f69ef09288d3d40c79949b9ef7da90316d176cadc8010ced53830f20e089  auxinux-office_0.1.0_amd64.deb
+54b85a6d15d417a47b97bca3b032ff93104cd364ae4583e81674aeeed7dfa5fc  AuxiNuxOffice-0.1.0-x86_64.AppImage
+1cd73a3a2aaada54da1a56fa97f9bdb6e5b0d6f0a61752f7bf8214af6b7defeb  AuxiNuxOffice-0.1.0-x64.exe
+4cb954b10eb1136cbefa414d62d7dae3b03acbf93a4a0606dba29b6ddd867d5b  AuxiNuxOffice-0.1.0-x64.msi
+6a0753ea222b6b0bf717a7bd1e69bd67157b0a05c1482fd7477500128e8276f4  AuxiNuxOffice-0.1.0-arm64.zip
 ```
 
 ### Limites connues

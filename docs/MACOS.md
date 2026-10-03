@@ -1,6 +1,6 @@
 # AuxiNux Office sous macOS (Apple Silicon) — version préliminaire
 
-Artefact : `dist/macos/AuxiNuxOffice-0.1.0-arm64.zip` (application `AuxiNux Office.app`,
+Artefact : `dist/macos/AuxiNuxOffice-0.1.0-arm64.zip` (application `AuxiNuxOffice.app`,
 macOS 11 Big Sur ou plus récent, processeurs Apple M1 et suivants).
 
 La feuille de route prévoyait macOS en 0.4.x ; cette version **préliminaire** permet déjà de
@@ -9,14 +9,14 @@ lisez les limites (§3) avant de la diffuser.
 
 ## 1. Installation
 
-1. Décompressez `AuxiNuxOffice-0.1.0-arm64.zip` (double-clic) et placez `AuxiNux Office.app`
+1. Décompressez `AuxiNuxOffice-0.1.0-arm64.zip` (double-clic) et placez `AuxiNuxOffice.app`
    dans **Applications**.
 2. L'application n'est pas signée par un certificat Apple Developer ni notarisée : macOS la
    bloque au premier lancement (« ne peut pas être ouverte… » ou « est endommagée »). Deux
    possibilités :
    - Terminal :
      ```sh
-     xattr -dr com.apple.quarantine "/Applications/AuxiNux Office.app"
+     xattr -dr com.apple.quarantine /Applications/AuxiNuxOffice.app
      ```
    - ou : tenter de l'ouvrir une fois, puis **Réglages Système > Confidentialité et sécurité >
      « Ouvrir quand même »**.
@@ -40,9 +40,9 @@ cd AuxiNux_Office
 Le script vérifie les outils de ligne de commande d'Apple et Homebrew, installe Qt 5 et Node.js
 avec Homebrew, construit l'application **avec AuxiText** (compilé sur le Mac, Qt intégré à
 `AuxiText.app`). Rien n'est installé : le résultat est dans `dist/macos/` (archive .zip) et
-`build/stage/macos/AuxiNux Office.app`. Une application construite localement
+`build/stage/macos/AuxiNuxOffice.app`. Une application construite localement
 n'est pas mise en quarantaine : aucune commande `xattr` n'est nécessaire. AuxiText est placé
-dans `AuxiNux Office.app/Contents/Applications/AuxiText.app` ; la tuile « Nouveau fichier
+dans `AuxiNuxOffice.app/Contents/Applications/AuxiText.app` ; la tuile « Nouveau fichier
 texte » de l'accueil le lance (adresse `auxitext://new`), et il apparaît dans « Ouvrir avec »
 pour les fichiers texte.
 
@@ -75,13 +75,14 @@ elle-même (`rcodesign notary-submit`) demande une clé d'API App Store Connect.
 | Sujet | État |
 |---|---|
 | Shell natif (fenêtres, menus, dialogues) | celui d'**upstream, non modifié** : les patches AuxiNux du shell (routage vers AuxiText, « Ouvrir PDF » avec filtre, réglages appliqués avant le moteur, arrêt sur SIGTERM, traductions) ne s'appliquent pas |
-| AuxiText | inclus quand l'application est construite **sur un Mac** (`./build.sh`) ; absent des builds faits depuis Linux (tuile « Nouveau fichier texte » alors masquée) |
+| AuxiText | application séparée (`Contents/Applications/AuxiText.app`), incluse quand l'application est construite **sur un Mac** (`./build.sh`) ; absente des builds faits depuis Linux (tuile « Nouveau fichier texte » alors masquée). **Pas d'intégration aux onglets** (Linux et Windows seulement) : la tuile ouvre l'application AuxiText, et un fichier texte choisi par « Ouvrir un fichier » s'ouvre dans AuxiWriter (comportement du shell d'upstream) |
 | « Ouvrir PDF » | ouvre le dialogue d'ouverture standard (tous types) |
 | Assistant IA | désactivé par l'écran d'accueil au premier lancement (l'option reste dans les paramètres) |
 | Réglages réseau du moteur web (DNS sur HTTPS, réseau d'arrière-plan) | appliqués par un lanceur AuxiNux (exécutable de l'application, `src/launcher/auxioffice_macos.c`) qui démarre le shell d'upstream renommé « AuxiNux Office Engine » ; compilé depuis Linux (clang, ld64.lld), **pas encore exécuté sur un Mac** : à vérifier (§4, M-1 et M-9) |
 | Ressources distantes des documents | convertisseur x2t remplacé par la garde réseau AuxiNux (`x2t` -> `x2t-engine`), pages des éditeurs limitées aux ressources locales (CSP) ; à vérifier (M-11) |
 | Mises à jour (Sparkle) | vérifications automatiques désactivées, flux supprimé ; le menu « Rechercher des mises à jour » affichera une erreur |
-| Menu Aide | ouvre office.auxinux.ca (adresses d'ONLYOFFICE remplacées dans le shell) |
+| Menu Aide | ouvre office.auxinux.ca (adresses d'ONLYOFFICE remplacées dans le shell) ; « Remerciements » et « Accord de licence » ne fonctionnent que si le chemin de l'application ne contient pas d'espace (le shell construit leur adresse à partir du texte du chemin) : le bundle s'appelle donc `AuxiNuxOffice.app` (affiché « AuxiNux Office ») ; l'installer dans `/Applications` |
+| Agent IA | module retiré (son panneau de l'accueil restait vide sans fournisseur d'IA configuré) |
 | Logo de l'onglet d'accueil | entrées du catalogue compilé `Assets.car` neutralisées pour que macOS charge les images AuxiNux : à vérifier (§4) |
 | Signature | ad hoc, non notarisée (§1) |
 

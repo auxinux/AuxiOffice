@@ -4,7 +4,7 @@
 #
 # Construit AuxiNux Office (avec AuxiText) sur la machine courante :
 #   - Linux x86_64 (Debian 13, Ubuntu 24.04…) : paquets .deb et AppImage dans dist/linux/
-#   - macOS Apple Silicon (macOS 11+)         : AuxiNux Office.app (+ AuxiText) dans dist/macos/
+#   - macOS Apple Silicon (macOS 11+)         : AuxiNuxOffice.app (+ AuxiText) dans dist/macos/
 #
 #   git clone git@git.auxinux.ca:Auxinux/AuxiNux_Office.git
 #   cd AuxiNux_Office
@@ -79,14 +79,14 @@ Darwin)
 
     # Fait connaître AuxiText.app à macOS (adresse auxitext:// de la tuile « Nouveau fichier texte »,
     # « Ouvrir avec ») : simple enregistrement, rien n'est copié ni installé.
-    TEXT_APP="build/stage/macos/AuxiNux Office.app/Contents/Applications/AuxiText.app"
+    TEXT_APP="build/stage/macos/AuxiNuxOffice.app/Contents/Applications/AuxiText.app"
     LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
     [ -d "$TEXT_APP" ] && [ -x "$LSREG" ] && "$LSREG" -f "$TEXT_APP" || true
 
     say "Terminé."
     ls -lh dist/macos/
     echo
-    echo "Application : $ROOT/build/stage/macos/AuxiNux Office.app"
+    echo "Application : $ROOT/build/stage/macos/AuxiNuxOffice.app"
     echo "Archive     : $ROOT/dist/macos/AuxiNuxOffice-$(cat VERSION)-arm64.zip"
     ;;
 *)

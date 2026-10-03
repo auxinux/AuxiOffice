@@ -25,6 +25,7 @@
 #include <QIcon>
 #include <QLayout>
 #include <QPointer>
+#include <QTimer>
 #include <QTranslator>
 
 namespace AuxiNux {
@@ -97,6 +98,17 @@ public:
         editor->show();
         editor->focusEditor();
         editorStateChanged(editor);
+        // Windows : le panneau reçoit sa taille définitive après l'insertion de l'onglet ; sans
+        // nouvelle mise en page, l'éditeur restait affiché en petit dans le coin de la fenêtre.
+        QPointer<MainWindow> guard(editor);
+        for ( int delay : {0, 150, 500} )
+            QTimer::singleShot(delay, editor, [guard, panel] {
+                if ( !guard )
+                    return;
+                panel->layout()->activate();
+                guard->setGeometry(panel->contentsRect());
+                guard->update();
+            });
         return true;
     }
 

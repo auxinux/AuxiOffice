@@ -84,11 +84,11 @@ données et cache dans `%LOCALAPPDATA%\AuxiNux\AuxiNuxOffice\`.
 
 ### macOS 11+ (Apple Silicon) — préliminaire
 
-Décompressez `AuxiNuxOffice-0.1.0-arm64.zip`, placez `AuxiNux Office.app` dans Applications,
+Décompressez `AuxiNuxOffice-0.1.0-arm64.zip`, placez `AuxiNuxOffice.app` dans Applications,
 puis autorisez-la (application non notarisée) :
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/AuxiNux Office.app"
+xattr -dr com.apple.quarantine /Applications/AuxiNuxOffice.app
 ```
 
 Détails et limites : [docs/MACOS.md](docs/MACOS.md).
@@ -116,7 +116,7 @@ Un `git clone` puis une seule commande, sur la machine cible :
 git clone git@git.auxinux.ca:Auxinux/AuxiNux_Office.git
 cd AuxiNux_Office
 ./build.sh              # Linux x86_64 : .deb + AppImage dans dist/linux/
-./build.sh              # Mac Apple Silicon : AuxiNux Office.app (avec AuxiText) dans dist/macos/
+./build.sh              # Mac Apple Silicon : AuxiNuxOffice.app (avec AuxiText) dans dist/macos/
 ```
 
 ```powershell
