@@ -251,10 +251,17 @@ UPSTREAM_URLS = [
 UPSTREAM_TRACKERS = ["http://google-analytics.com/collect"]
 
 
+def compiled_shell():
+    from .macos_shell import built_executable
+    return built_executable() is not None
+
+
 def patch_binary_trackers(exe):
     data = bytearray(Path(exe).read_bytes())
     for url in UPSTREAM_TRACKERS:
         old = url.encode() + b"\0"
+        if data.count(old) == 0 and compiled_shell():
+            continue
         if data.count(old) != 1:
             fail(f"adresse de traçage introuvable ou ambiguë dans le shell macOS : {url}")
         new = ("about:blank#" + "x" * len(url))[:len(url)]
@@ -314,6 +321,9 @@ def patch_binary_urls(exe, website):
     base = website.rstrip("/") + "/"
     for url, has_format in UPSTREAM_URLS:
         old = url.encode() + b"\0"
+        if data.count(old) == 0 and compiled_shell():
+            info(f"adresse absente du shell compilé : {url}")
+            continue
         if data.count(old) != 1:
             fail(f"adresse d'upstream introuvable ou ambiguë dans le shell macOS : {url}")
         new = base + ("?langue=%@" if has_format else "")
@@ -394,6 +404,15 @@ def brand_bundle(app, p):
     if not old_exe.exists():
         fail(f"exécutable d'upstream introuvable : {old_exe}")
     engine = contents / "MacOS" / ENGINE_NAME
+    from .macos_shell import built_executable
+    compiled = built_executable()
+    if compiled:
+        # Shell compilé depuis les sources patchées (Xcode, macos_shell.py) à la place de celui d'upstream
+        shutil.copy2(compiled, old_exe)
+        old_exe.chmod(0o755)
+        info("shell macOS : exécutable compilé depuis les sources patchées (desktop-apps 0013)")
+    else:
+        info("shell macOS : exécutable d'upstream (non recompilé)")
     old_exe.rename(engine)
     patch_binary_urls(engine, p["product"]["website"])
     patch_binary_trackers(engine)

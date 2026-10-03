@@ -163,6 +163,9 @@ def build_all(args):
         if IS_MACOS_HOST:
             from . import build_auxitext
             build_auxitext.build(args)
+            if "shell" in args.components:
+                from . import macos_shell
+                macos_shell.build(args)
         else:
             warn("macOS depuis Linux : AuxiText non compilé (à construire sur un Mac avec ./build.sh) — "
                  "application upstream réempaquetée, voir docs/MACOS.md")

@@ -74,7 +74,7 @@ elle-même (`rcodesign notary-submit`) demande une clé d'API App Store Connect.
 
 | Sujet | État |
 |---|---|
-| Shell natif (fenêtres, menus, dialogues) | celui d'**upstream, non modifié** : les patches AuxiNux du shell (routage vers AuxiText, « Ouvrir PDF » avec filtre, réglages appliqués avant le moteur, arrêt sur SIGTERM, traductions) ne s'appliquent pas |
+| Shell natif (fenêtres, menus, dialogues) | **construit sur un Mac avec Xcode** : compilé depuis les sources d'upstream avec le patch AuxiNux 0013 (`scripts/auxibuild/macos_shell.py`, journal `build/native/macos/shell/xcodebuild.log`) : pages du menu Aide (Remerciements, Accord de licence) et fichiers texte ouverts dans AuxiText. Sans Xcode (ou en cas d'échec, build depuis Linux), l'exécutable d'upstream est gardé : ces deux corrections ne s'appliquent pas |
 | AuxiText | application séparée (`Contents/Applications/AuxiText.app`), incluse quand l'application est construite **sur un Mac** (`./build.sh`) ; absente des builds faits depuis Linux (tuile « Nouveau fichier texte » alors masquée). **Pas d'intégration aux onglets** (Linux et Windows seulement) : la tuile ouvre l'application AuxiText ; un fichier texte que le shell d'upstream ouvre dans AuxiWriter (« Ouvrir un fichier », récents, Finder) est aussitôt renvoyé à AuxiText et l'onglet AuxiWriter se ferme (`src/macos/auxinux-mac-text.js`) ; « Ouvrir dans AuxiWriter » d'AuxiText garde le fichier dans AuxiWriter |
 | « Ouvrir PDF » | ouvre le dialogue d'ouverture standard (tous types) |
 | Assistant IA | désactivé par l'écran d'accueil au premier lancement (l'option reste dans les paramètres) |

@@ -76,9 +76,10 @@ additionnelle 2 de la licence d'upstream). Le code AuxiNux appelé par les patch
 | desktop-apps 0010 | `win-linux/src/main.cpp` | Linux : arrêt standard sur SIGTERM (le gestionnaire du moteur plantait) |
 | desktop-apps 0011 | `win-linux/src/main.cpp`, `utils.cpp` | commutateurs de confidentialité du moteur imposés (relance du shell) ; nom d'auteur par défaut neutre |
 | desktop-apps 0012 | `win-linux/defaults.pri`, `src/main.cpp`, `src/cascapplicationmanagerwrapper.cpp`, `src/windows/cmainwindow.cpp` | fichiers texte dans les onglets (AuxiText intégré, `src/auxinux/auxinux.pri`) : routage (ligne de commande, glisser-déposer, `--writer` transmis), enregistrement à la fermeture, pas de détachement |
+| desktop-apps 0013 | `macos/ONLYOFFICE/AppDelegate.mm`, `Code/Controllers/Common/ASCCommonViewController.mm`, `ONLYOFFICE.xcodeproj` | macOS (shell compilé dans Xcode, `-D_AUXINUX`) : pages du menu Aide, fichiers texte ouverts dans AuxiText, scripts de copie d'upstream sautés (`AUXINUX_BUILD`) |
 | web-apps 0001 | `apps/common/main/lib/view/About.js` | mentions AuxiNux dans la fenêtre À propos des éditeurs |
 
-Total : 13 patches, environ 195 lignes ajoutées au code d'upstream.
+Total : 14 patches, environ 265 lignes ajoutées au code d'upstream.
 
 ### Candidats à proposer à upstream
 
