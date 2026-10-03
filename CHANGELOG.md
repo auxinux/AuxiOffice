@@ -49,8 +49,11 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
 - Aucune télémétrie, publicité ni compte ; fonctionnement hors ligne.
 - Désactivés : galerie de modèles en ligne, sondes DNS sur HTTPS et réseau d'arrière-plan du
   moteur web, aide en ligne, page d'inscription, service de mise à jour d'upstream.
-- Retirés : modules DeepL, LanguageTool, Zotero, Thésaurus, OCR, Agent IA (panneau vide de
-  l'accueil). Assistant IA désactivé par
+- Retirés : modules DeepL, LanguageTool, Zotero, Thésaurus, OCR.
+- IA et cloud au choix de l'utilisateur : panneau « Agent IA » de l'accueil affiché seulement
+  si l'IA est activée dans les paramètres ; fournisseurs d'IA locaux (Ollama, LM Studio,
+  GPT4All) en tête de liste, avec un avertissement à l'activation ; panneau « Clouds » limité
+  aux services auto-hébergeables (Nextcloud, ownCloud, Seafile). Assistant IA désactivé par
   défaut. Détails : [PRIVACY.md](PRIVACY.md).
 - Audit de confidentialité du 2026-10-02 (analyse du code livré et test avec des documents
   piégés), infractions corrigées :

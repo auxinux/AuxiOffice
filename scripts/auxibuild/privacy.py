@@ -10,7 +10,8 @@ the assembled tree of every platform (Linux, Windows, macOS). See PRIVACY.md.
   - Photo Editor plugin (TOAST UI Image Editor): its Google Analytics statistics are disabled
     (the plugin's opt-out was ineffective) and the collection URL is removed from the libraries;
   - Analytics component of the editors (dead code upstream): replaced by an inert version;
-  - AI plugin: providers relayed by an ONLYOFFICE proxy server are removed.
+  - AI plugin: providers relayed by an ONLYOFFICE proxy server are removed; local providers
+    (Ollama, LM Studio, GPT4All) are listed first.
 
 Every change checks that the expected upstream text is present: an upstream update that moves it
 stops the build instead of silently shipping an unprotected page."""
@@ -173,6 +174,9 @@ def remove_proxied_ai_providers(editors):
         return
     providers = json.loads(config.read_text(encoding="utf-8"))
     kept = [p for p in providers if p not in removed]
+    # Fournisseurs locaux en tête de liste : avec eux, aucune donnée ne quitte l'ordinateur.
+    local = [p for p in product()["privacy"].get("local_ai_providers_first", []) if p in kept]
+    kept = local + [p for p in kept if p not in local]
     config.write_text(json.dumps(kept, indent="\t") + "\n", encoding="utf-8")
     for name in removed:
         f = plugin / "scripts" / "engine" / "providers" / "internal" / f"{name}.js"

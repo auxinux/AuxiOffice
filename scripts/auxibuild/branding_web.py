@@ -54,6 +54,7 @@ def startpage_config(p):
         "version": version(),
         "website": p["product"]["website"],
         "websiteLabel": p["product"]["website"].split("://", 1)[-1],
+        "cloudProviders": p["privacy"]["cloud_providers"],
         "colors": colors,
         # Mentions légales par défaut (le shell AuxiNux de Linux/Windows les fournit aussi ; sous
         # macOS, shell d'upstream, ces valeurs et des liens relatifs au bundle sont utilisés).

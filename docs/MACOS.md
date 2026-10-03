@@ -82,7 +82,7 @@ elle-même (`rcodesign notary-submit`) demande une clé d'API App Store Connect.
 | Ressources distantes des documents | convertisseur x2t remplacé par la garde réseau AuxiNux (`x2t` -> `x2t-engine`), pages des éditeurs limitées aux ressources locales (CSP) ; à vérifier (M-11) |
 | Mises à jour (Sparkle) | vérifications automatiques désactivées, flux supprimé ; le menu « Rechercher des mises à jour » affichera une erreur |
 | Menu Aide | ouvre office.auxinux.ca (adresses d'ONLYOFFICE remplacées dans le shell) ; « Remerciements » et « Accord de licence » ne fonctionnent que si le chemin de l'application ne contient pas d'espace (le shell construit leur adresse à partir du texte du chemin) : le bundle s'appelle donc `AuxiNuxOffice.app` (affiché « AuxiNux Office ») ; l'installer dans `/Applications` |
-| Agent IA | module retiré (son panneau de l'accueil restait vide sans fournisseur d'IA configuré) |
+| Agent IA | panneau de l'accueil affiché seulement si l'IA est activée dans les paramètres |
 | Logo de l'onglet d'accueil | entrées du catalogue compilé `Assets.car` neutralisées pour que macOS charge les images AuxiNux : à vérifier (§4) |
 | Signature | ad hoc, non notarisée (§1) |
 

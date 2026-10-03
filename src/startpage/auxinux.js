@@ -22,7 +22,7 @@
         en: {
             welWelcome: `Welcome to ${product}!`,
             welDescr: 'Create and edit your documents offline, privately: no account, no telemetry, no advertising.',
-            welNeedHelp: 'Learn more about the AuxiNux project on $1.',
+            welNeedHelp: `Learn more about ${product} on $1.`,
             textHelpCenter: config.websiteLabel || 'office.auxinux.ca',
             newDoc: 'New document',
             newXlsx: 'New spreadsheet',
@@ -32,6 +32,7 @@
             auxOpenFile: 'Open a file',
             portalEmptyAdv1: '',
             emptySlide3Text: 'Store your documents in the cloud of your choice and access them any time, from anywhere.',
+            auxAiNotice: 'When enabled, the text you send to the AI assistant is transmitted to the provider you configure. With a local provider (Ollama, LM Studio, GPT4All), nothing leaves your computer.',
             auxLegalTitle: 'Free software and licenses',
             auxLegalBasedOn: `${product} is free software developed by the AuxiNux project. It uses and modifies components from $1 $2, originally developed by $3.`,
             auxLegalIndependent: `${product} is an independent project and is not an official product of ONLYOFFICE or Ascensio System SIA.`,
@@ -50,7 +51,7 @@
         fr: {
             welWelcome: `Bienvenue dans ${product} !`,
             welDescr: 'Créez et modifiez vos documents hors ligne, en toute confidentialité : aucun compte, aucune télémétrie, aucune publicité.',
-            welNeedHelp: 'Pour en savoir plus sur le projet AuxiNux : $1.',
+            welNeedHelp: `Pour en savoir plus sur ${product} : $1.`,
             textHelpCenter: config.websiteLabel || 'office.auxinux.ca',
             newDoc: 'Nouveau document',
             newXlsx: 'Nouvelle feuille de calcul',
@@ -60,6 +61,7 @@
             auxOpenFile: 'Ouvrir un fichier',
             portalEmptyAdv1: '',
             emptySlide3Text: 'Stockez vos documents dans le cloud de votre choix et accédez-y partout, à tout moment.',
+            auxAiNotice: 'Une fois activé, le texte que vous envoyez à l\'assistant IA est transmis au fournisseur que vous configurez. Avec un fournisseur local (Ollama, LM Studio, GPT4All), rien ne quitte votre ordinateur.',
             auxLegalTitle: 'Logiciels libres et licences',
             auxLegalBasedOn: `${product} est un logiciel libre développé dans le cadre du projet AuxiNux. ${product} utilise et modifie des composants provenant de $1 $2, développé à l'origine par $3.`,
             auxLegalIndependent: `${product} est un projet indépendant et n'est pas un produit officiel de ONLYOFFICE ou d'Ascensio System SIA.`,
@@ -192,8 +194,7 @@
     /* ------------------------------------------------------------------ */
     const css = `
         .newportal, #link-create { display: none !important; }
-        /* Pas de connexion aux clouds proposés par upstream (offres ONLYOFFICE) en 0.1.0 */
-        #idx-sidebar-portals { display: none !important; }
+        .auxinux-ai-notice { margin: 4px 0 8px 26px; max-width: 520px; font-size: 11px; line-height: 1.4; opacity: .75; }
         .auxinux-legal { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border-divider, rgba(128,128,128,.3)); max-width: 560px; }
         .auxinux-legal h4 { margin: 0 0 8px; font-weight: bold; }
         .auxinux-legal p { margin: 0 0 6px; line-height: 1.45; opacity: .9; }
@@ -217,6 +218,90 @@
             }
         });
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Clouds : seulement les services que l'on peut héberger soi-même    */
+    /* ------------------------------------------------------------------ */
+    // Liste privacy.cloud_providers de branding/product.json. Aucune connexion n'est établie
+    // tant que l'utilisateur n'a pas saisi l'adresse de son propre serveur.
+    const cloudProviders = (config.cloudProviders || ['nextcloud', 'owncloud', 'seafile']).map(c => c.toLowerCase());
+    const desktop = window.AscDesktopEditor;
+    if (desktop && typeof desktop.GetExternalClouds === 'function') {
+        const nativeClouds = desktop.GetExternalClouds.bind(desktop);
+        desktop.GetExternalClouds = function () {
+            const clouds = nativeClouds() || [];
+            return clouds.filter(c => cloudProviders.includes(String(c.provider || c.id || '').toLowerCase()));
+        };
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Assistant IA : panneaux visibles seulement si l'IA est activée     */
+    /* ------------------------------------------------------------------ */
+    // Panneaux ajoutés à l'accueil par les modules IA (Agent IA) : cachés tant que le réglage
+    // « Utiliser l'IA » est désactivé, affichés dès qu'il est activé (après « Appliquer »).
+    const AI_PANELS = ['9DC93CDB-B576-4F0C-B55E-FCC9C48DD777', 'F2402876-659F-47FB-A646-67B49F2B5AAA'];
+    let aiEnabled = false;
+
+    function applyAiVisibility() {
+        document.querySelectorAll('.action-panel iframe').forEach(frame => {
+            if (!AI_PANELS.some(id => (frame.id || '').toUpperCase().includes(id)))
+                return;
+            const panel = frame.closest('.action-panel');
+            const action = panel && Array.from(panel.classList).find(c => c.startsWith('external-panel-'));
+            const link = action && document.querySelector(`.tool-menu a[action="${action}"]`);
+            const item = link && link.closest('.menu-item');
+            if (!item)
+                return;
+            item.style.display = aiEnabled ? '' : 'none';
+            if (!aiEnabled && item.classList.contains('selected')) {   // panneau IA ouvert : retour à l'accueil
+                const home = document.querySelector('.tool-menu a[action="recents"]');
+                home && home.click();
+            }
+        });
+        const box = document.getElementById('sett-box-use-ai');
+        if (box && !document.querySelector('.auxinux-ai-notice')) {
+            const note = document.createElement('div');
+            note.className = 'auxinux-ai-notice';
+            note.textContent = utils.Lang.auxAiNotice || strings.fr.auxAiNotice;
+            box.insertAdjacentElement('afterend', note);
+        }
+    }
+
+    let pending = false;
+    new MutationObserver(() => {
+        if (!pending) {
+            pending = true;
+            setTimeout(() => { pending = false; applyAiVisibility(); }, 50);
+        }
+    }).observe(document.documentElement, {childList: true, subtree: true});
+
+    window.addEventListener('load', () => {
+        if (window.sdk && typeof window.sdk.on === 'function') {
+            window.sdk.on('on_native_message', (cmd, param) => {
+                if (/settings:init$/.test(cmd)) {
+                    try {
+                        const holder = document.createElement('div');
+                        holder.innerHTML = param;
+                        const settings = JSON.parse(holder.textContent);
+                        if (settings && settings.useai !== undefined)
+                            aiEnabled = !!settings.useai;
+                    } catch (e) { /* réglages illisibles : panneaux IA cachés */ }
+                    applyAiVisibility();
+                }
+            });
+        }
+        // « Appliquer » dans les paramètres : la visibilité suit immédiatement le nouveau choix.
+        document.addEventListener('click', e => {
+            if (e.target.closest && e.target.closest('.sett-btn--apply')) {
+                const box = document.getElementById('sett-use-ai');
+                if (box) {
+                    aiEnabled = box.checked;
+                    applyAiVisibility();
+                }
+            }
+        }, true);
+        applyAiVisibility();
+    });
 
     window.auxinux = {
         product,

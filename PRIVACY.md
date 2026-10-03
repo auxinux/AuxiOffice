@@ -14,7 +14,7 @@ AuxiNux Office est conçu pour fonctionner **entièrement en local et hors ligne
 | Aucun envoi de documents ou de contenu local | les documents ne quittent la machine que si l'utilisateur le demande (cloud qu'il a lui-même connecté, envoi par courriel, module qu'il installe) |
 | Aucun nom réel imposé | l'auteur écrit par défaut dans les documents, commentaires et modifications suivies est « Utilisateur » (« User »), pas le nom du compte du système ; chacun choisit son nom dans les paramètres de l'accueil |
 | Fonctionnement hors ligne | ouverture, édition, conversion, export PDF, impression, correcteur orthographique, polices : tout est local ; testé automatiquement sans réseau |
-| Cloud facultatif | aucun cloud n'est configuré ; le panneau « Clouds » ne se connecte qu'à un serveur saisi par l'utilisateur |
+| Cloud facultatif | aucun cloud n'est configuré ; le panneau « Clouds » ne propose que des services auto-hébergeables et ne se connecte qu'à un serveur saisi par l'utilisateur |
 
 ## 2. Communications héritées d'ONLYOFFICE : audit et décisions
 
@@ -30,9 +30,9 @@ AuxiNux Office est conçu pour fonctionner **entièrement en local et hors ligne
 | Vérification et téléchargement des mises à jour | serveurs ONLYOFFICE (service `updatesvc`) | périodiquement | **absent** (module de mise à jour non compilé, service retiré) ; voir [docs/UPDATES.md](docs/UPDATES.md) |
 | Inscription / création de portail | onlyoffice.com | bouton de l'accueil | **désactivée** (aucune URL d'inscription) |
 | Modules réseau : DeepL, LanguageTool, Zotero, Thésaurus (API words.bighugelabs.com), OCR (données de langue téléchargées) | services tiers | à l'utilisation | **retirés** de la distribution (`privacy.removed_plugins` de `branding/product.json`) |
-| Assistant IA (module « AI ») | fournisseurs d'IA configurés par l'utilisateur | à l'utilisation | **désactivé par défaut** (`disable-ai=1`, écrit avant l'initialisation du moteur) ; l'utilisateur peut l'activer dans les paramètres et doit alors choisir et configurer lui-même un fournisseur. Le module « Agent IA » (panneau de l'accueil) est retiré |
+| Assistant IA (module « AI ») | fournisseurs d'IA configurés par l'utilisateur | à l'utilisation | **désactivé par défaut** (`disable-ai=1`, écrit avant l'initialisation du moteur) ; l'utilisateur peut l'activer dans les paramètres et doit alors choisir et configurer lui-même un fournisseur. Les fournisseurs locaux (Ollama, LM Studio, GPT4All : rien ne quitte l'ordinateur) sont en tête de liste ; un avertissement accompagne le réglage. Le panneau « Agent IA » de l'accueil n'apparaît que si l'IA est activée |
 | Gestionnaire de modules (catalogue) | onlyoffice.github.io | **à l'ouverture** du gestionnaire par l'utilisateur | conservé (action volontaire) |
-| Clouds (DocSpace, Nextcloud, ownCloud, kDrive, Seafile…) | serveur saisi par l'utilisateur | après connexion par l'utilisateur | **masqué** en 0.1.0 (panneau « Clouds » de l'accueil) |
+| Clouds | serveur saisi par l'utilisateur | après connexion par l'utilisateur | panneau « Clouds » de l'accueil limité aux services que l'on peut héberger soi-même (Nextcloud, ownCloud, Seafile ; `privacy.cloud_providers`) ; aucune connexion avant que l'utilisateur saisisse l'adresse de son serveur ; offres commerciales d'upstream (DocSpace…) non proposées |
 | Liens (site office.auxinux.ca, licences) | navigateur de l'utilisateur | au clic | conservés |
 | Module « Envoyer » | client de messagerie du système | à l'utilisation | conservé (local) |
 | Instance unique (Linux) | 127.<uid>.1:13012 (UDP, adresse de boucle locale propre à chaque compte) | au lancement | interface locale uniquement |

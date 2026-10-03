@@ -184,8 +184,7 @@
       "{7CDB02C9-A0BF-4B56-9A1A-71C860B8498F}": "LanguageTool (correction grammaticale en ligne)",
       "{BFC5D5C6-89DE-4168-9565-ABD8D1E48711}": "Zotero (bibliographie en ligne)",
       "{BE5CBF95-C0AD-4842-B157-AC40FEDD9840}": "Thesaurus (API words.bighugelabs.com)",
-      "{440EBF13-9B19-4BD8-8621-05200E58140B}": "OCR (données de langue téléchargées en ligne)",
-      "{9DC93CDB-B576-4F0C-B55E-FCC9C48DD777}": "Agent IA (panneau de l'accueil, inutilisable sans fournisseur d'IA)"
+      "{440EBF13-9B19-4BD8-8621-05200E58140B}": "OCR (données de langue téléchargées en ligne)"
     },
     "engine_switches_comment": "Commutateurs Chromium/CEF imposés à chaque démarrage du moteur (lanceur, shell, application macOS) : aucune communication d'arrière-plan. Voir PRIVACY.md.",
     "engine_switches": [
@@ -197,6 +196,17 @@
     ],
     "removed_ai_providers": [
       "together.ai"
+    ],
+    "local_ai_providers_first": [
+      "ollama",
+      "lmstudio",
+      "gpt4all"
+    ],
+    "cloud_providers_comment": "Clouds proposés par l'accueil : services que l'utilisateur peut héberger lui-même. Aucune connexion avant qu'il saisisse l'adresse de son serveur.",
+    "cloud_providers": [
+      "nextcloud",
+      "owncloud",
+      "seafile"
     ],
     "ai_disabled_by_default": true,
     "default_user_name": {
