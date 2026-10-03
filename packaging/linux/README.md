@@ -7,10 +7,10 @@ fichiers déclarés :
 
 | Fichier généré | Contenu |
 |---|---|
-| `ca.auxinux.AuxiOffice.desktop` | entrée principale (`auxioffice %F`), types Office et PDF, actions « Nouveau document/feuille de calcul/présentation/fichier texte » |
-| `ca.auxinux.AuxiOffice.{Writer,Sheet,Present,PDF}.desktop` | une entrée par application (`auxioffice --app=… %F`) |
-| `ca.auxinux.AuxiOffice.Text.desktop` | AuxiText (catégories Utility, TextEditor) |
-| `ca.auxinux.AuxiOffice.metainfo.xml` | métadonnées AppStream |
+| `ca.auxinux.AuxiNuxOffice.desktop` | entrée principale (`auxioffice %F`), types Office et PDF, actions « Nouveau document/feuille de calcul/présentation/fichier texte » |
+| `ca.auxinux.AuxiNuxOffice.{Writer,Sheet,Present,PDF}.desktop` | une entrée par application (`auxioffice --app=… %F`) |
+| `ca.auxinux.AuxiNuxOffice.Text.desktop` | AuxiText (catégories Utility, TextEditor) |
+| `ca.auxinux.AuxiNuxOffice.metainfo.xml` | métadonnées AppStream |
 | `DEBIAN/control`, `copyright`, `changelog.gz`, `md5sums` | paquet `.deb` (dépendances calculées par `dpkg-shlibdeps`) |
 | `AppRun`, `.desktop` et icône de l'AppDir | AppImage |
 

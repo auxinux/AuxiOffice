@@ -22,7 +22,7 @@ Prérequis : `xvfb`, `xdotool`, `strace` (voir [BUILD.md](../BUILD.md)). Rapport
 | Versions | `auxioffice --version`, `auxitext --version`, `auxioffice-editors --version` affichent `AuxiNux Office 0.1.0` / `AuxiText 0.1.0` |
 | AuxiText (unitaires) | 19 tests : décodage/encodage, BOM, UTF-16, Latin-1, fins de ligne CRLF/LF/CR, détection, conversions sans perte |
 | Statiques | identité de la page d'accueil, mentions légales installées, NOTICE, modules réseau retirés, service de mise à jour absent |
-| Graphiques (Xvfb, sans réseau) | accueil et répertoires XDG, IA désactivée par défaut ; DOCX ouvrir/modifier/enregistrer + métadonnée « AuxiNux Office » ; XLSX modification + formules recalculées ; PPTX titre modifié + nouvelle diapositive ; PDF ouvert + recherche ; AuxiText (CRLF et UTF-8 conservés, Markdown, fichier sans extension) ; arrêt par SIGTERM sans plantage |
+| Graphiques (Xvfb, sans réseau) | accueil et répertoires XDG, IA désactivée par défaut ; DOCX ouvrir/modifier/enregistrer + métadonnée « AuxiNux Office » ; XLSX modification + formules recalculées ; PPTX titre modifié + nouvelle diapositive ; PDF ouvert + recherche ; AuxiText (CRLF et UTF-8 conservés, Markdown, fichier sans extension) ; AuxiText intégré (fichier texte transmis à l'instance ouverte et tuile « Nouveau fichier texte » dans un onglet, enregistrement) ; arrêt par SIGTERM sans plantage ; audit réseau avec documents piégés |
 | Réseau | session complète sous `strace` : aucune connexion sortante (hors 127.0.0.0/8 et ::1) |
 | Conversions (x2t) | DOCX/XLSX/PPTX → PDF (texte vérifié), → ODT/ODS/ODP, CSV → XLSX, DOCX → RTF/TXT, ODT → DOCX aller-retour |
 
@@ -33,9 +33,9 @@ Prérequis : `xvfb`, `xdotool`, `strace` (voir [BUILD.md](../BUILD.md)). Rapport
 | L-INS-1 | `sudo apt install ./auxinux-office_0.1.0_amd64.deb` sur un système à jour | dépendances résolues par APT, aucune erreur ; `dpkg -s auxinux-office` : version 0.1.0 |
 | L-INS-2 | `auxioffice --version` ; `auxitext --version` | `AuxiNux Office 0.1.0` ; `AuxiText 0.1.0 (AuxiNux Office)` |
 | L-INS-3 | Menu des applications | entrées AuxiNux Office, AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF, AuxiText avec leurs icônes ; « Nouveau document/feuille/présentation/fichier texte » dans le menu contextuel de l'entrée principale |
-| L-INS-4 | `ls /usr/lib/auxioffice` ; `ls -l /usr/bin/auxioffice /usr/bin/auxitext` | arborescence décrite dans ARCHITECTURE.md ; liens vers `/usr/lib/auxioffice` |
+| L-INS-4 | `ls /usr/lib/auxinux-office` ; `ls -l /usr/bin/auxioffice /usr/bin/auxitext` | arborescence décrite dans ARCHITECTURE.md ; liens vers `/usr/lib/auxinux-office` |
 | L-INS-5 | AppImage : `chmod +x` puis lancement, et `./AuxiNuxOffice-0.1.0-x86_64.AppImage --version` | écran d'accueil ; `AuxiNux Office 0.1.0` |
-| L-INS-6 | `sudo apt remove auxinux-office` puis `sudo apt purge auxinux-office` | fichiers de `/usr/lib/auxioffice`, menus et icônes supprimés ; `~/.config/auxioffice` et `~/.local/share/auxioffice` conservés |
+| L-INS-6 | `sudo apt remove auxinux-office` puis `sudo apt purge auxinux-office` | fichiers de `/usr/lib/auxinux-office`, menus et icônes supprimés ; `~/.config/auxinux-office` et `~/.local/share/auxinux-office` conservés |
 
 ## 3. Écran d'accueil (O)
 
@@ -43,7 +43,7 @@ Prérequis : `xvfb`, `xdotool`, `strace` (voir [BUILD.md](../BUILD.md)). Rapport
 |---|---|---|
 | L-ACC-1 | Lancer AuxiNux Office (menu ou `auxioffice`) | « Bienvenue dans AuxiNux Office ! », six actions : Nouveau document, Nouvelle feuille de calcul, Nouvelle présentation, Ouvrir PDF, Nouveau fichier texte, Ouvrir un fichier |
 | L-ACC-2 | Chaque action | ouvre respectivement AuxiWriter, AuxiSheet, AuxiPresent, le dialogue « Documents PDF », AuxiText (nouveau fichier), le dialogue d'ouverture |
-| L-ACC-3 | Ouvrir puis fermer trois documents | ils apparaissent dans les documents récents (stockés dans `~/.local/share/auxioffice`) ; « Effacer » vide la liste |
+| L-ACC-3 | Ouvrir puis fermer trois documents | ils apparaissent dans les documents récents (stockés dans `~/.local/share/auxinux-office`) ; « Effacer » vide la liste |
 | L-ACC-4 | À propos | nom, version 0.1.0, section « Logiciels libres et licences » (basé sur ONLYOFFICE Desktop Editors 9.4.0, projet indépendant, version modifiée depuis 2026-10-01, licence, marque) ; liens LICENSE.txt, NOTICE.txt, licences tierces |
 | L-ACC-5 | Paramètres > langue anglais, redémarrer ; revenir au français | interface entièrement en anglais puis en français |
 | L-ACC-6 | Paramètres | pas d'assistant IA actif par défaut ; aucun compte demandé |
@@ -100,6 +100,9 @@ Prérequis : `xvfb`, `xdotool`, `strace` (voir [BUILD.md](../BUILD.md)). Rapport
 | L-TXT-6 | Numéros de ligne, retour à la ligne, zoom, thème clair/sombre | fonctionnel |
 | L-TXT-7 | Modifier le fichier ouvert depuis un autre programme | AuxiText propose de recharger |
 | L-TXT-8 | Fichier > Ouvrir dans AuxiWriter | le fichier s'ouvre dans AuxiWriter |
+| L-TXT-9 | AuxiNux Office ouvert : tuile « Nouveau fichier texte » ; « Ouvrir un fichier » sur un `.txt` ; glisser un `.md` sur la fenêtre | onglet AuxiText dans AuxiNux Office (menus Fichier, Édition, Affichage, Document, Aide ; barre d'état), pas de fenêtre séparée ; un fichier déjà ouvert active son onglet |
+| L-TXT-10 | Onglet texte modifié : Ctrl+S ; puis modifier et fermer l'onglet (Oui / Non / Annuler) ; fermer la fenêtre avec un onglet texte modifié | enregistré ; le message « Enregistrer les modifications ? » d'AuxiNux Office enregistre, abandonne ou annule ; aucune perte |
+| L-TXT-11 | Thème sombre d'AuxiNux Office (Paramètres), puis afficher un onglet texte ; tenter de détacher l'onglet (glisser hors de la barre) | l'onglet suit le thème ; l'onglet reste dans la fenêtre principale |
 
 ## 9. Intégration au bureau (O)
 
@@ -117,7 +120,7 @@ Prérequis : `xvfb`, `xdotool`, `strace` (voir [BUILD.md](../BUILD.md)). Rapport
 |---|---|---|
 | L-PRI-1 | Sans réseau (`unshare -Un auxioffice` ou réseau coupé) : scénarios 3 à 8 | tout fonctionne |
 | L-PRI-2 | `strace -f -e trace=connect -o net.log auxioffice`, ouvrir un document de chaque type | aucune connexion hors 127.0.0.1/::1 (voir PRIVACY.md) |
-| L-PRI-3 | Vérifier `~/.config/auxioffice`, `~/.local/share/auxioffice`, `~/.cache/auxioffice` | seuls ces répertoires sont créés |
+| L-PRI-3 | Vérifier `~/.config/auxinux-office`, `~/.local/share/auxinux-office`, `~/.cache/auxinux-office` | seuls ces répertoires sont créés |
 
 ## 11. Robustesse (recommandé)
 

@@ -34,12 +34,15 @@ sources est inscrit à la [feuille de route](ROADMAP.md).
    ├─ éditeurs web-apps : AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF
    │    └─ sdkjs (moteur JavaScript des documents)
    ├─ ascdocumentscore + qtascdocumentscore (desktop-sdk, CEF/Chromium)
-   └─ converter/x2t (conversions DOCX/XLSX/PPTX/ODF/PDF…), polices, dictionnaires
+   └─ converter/x2t : garde réseau AuxiNux -> x2t-engine (conversions DOCX/XLSX/PPTX/ODF/PDF…),
+      polices, dictionnaires
 ```
 
 | Composant | Origine | Emplacement dans le dépôt |
 |---|---|---|
-| Lanceur `auxioffice` | AuxiNux | `src/launcher/auxioffice.c` (+ ressources Windows `auxioffice.rc.in`) |
+| Lanceur `auxioffice` | AuxiNux | `src/launcher/auxioffice.c` (+ ressources Windows `auxioffice.rc.in`) ; macOS : `src/launcher/auxioffice_macos.c` |
+| Garde réseau du convertisseur (`x2t`) | AuxiNux | `src/x2tguard/x2t_guard.c` |
+| Durcissement des pages web livrées (CSP, modules) | AuxiNux | `scripts/auxibuild/privacy.py` |
 | Shell `auxioffice-editors` | desktop-apps (compilé) + patches + module AuxiNux | `patches/desktop-apps/`, `src/shell/auxinux/` |
 | Écran d'accueil | desktop-apps/common/loginpage (compilé) + patch + module AuxiNux | `patches/desktop-apps/0006…`, `src/startpage/auxinux.js` |
 | Éditeurs (interface) | web-apps (compilé) + patch + textes AuxiNux | `patches/web-apps/`, `scripts/auxibuild/branding_editors.py` |
@@ -63,12 +66,26 @@ pour « Ouvrir dans AuxiWriter »). Il :
 4. prépare l'environnement du moteur : `LD_LIBRARY_PATH` sous Linux, `converter\` en tête du
    `PATH` sous Windows (les bibliothèques du moteur y sont, comme dans le lanceur upstream) ;
 5. ajoute au shell les options du moteur web qui suppriment les communications automatiques
-   (`--disable-features=DnsOverHttps --disable-background-networking
-   --disable-domain-reliability --no-pings`, voir [PRIVACY.md](PRIVACY.md)).
+   (`privacy.engine_switches` de `branding/product.json` : `--disable-features=DnsOverHttps
+   --disable-background-networking --disable-domain-reliability --no-pings
+   --disable-spell-checking`, voir [PRIVACY.md](PRIVACY.md)) ; un `--disable-features` de
+   l'appelant est fusionné avec celui d'AuxiNux (Chromium ne retient que la dernière
+   occurrence). Le shell vérifie lui-même ces options au démarrage et se relance avec elles
+   s'il a été démarré sans le lanceur.
 
 Sous Linux, il remplace son image par celle du shell (`execv`) ; sous Windows, il crée le
 processus (sous-système GUI ; `--version` écrit dans la console parente ou la sortie
 redirigée).
+
+### 2.1 bis Garde réseau du convertisseur
+
+Le convertisseur d'upstream (`x2t`) télécharge de lui-même les ressources distantes d'un
+document pendant sa conversion (image liée par URL, ressources d'une page HTML). L'assemblage
+le renomme `x2t-engine` et installe à sa place la garde AuxiNux (`src/x2tguard/x2t_guard.c`,
+même code sous Linux, Windows et macOS) : elle ajoute l'option
+`<options><allowNetworkRequest>false</allowNetworkRequest></options>` au fichier de paramètres
+reçu du moteur, puis exécute `x2t-engine` avec les mêmes arguments. Si l'option ne peut pas
+être ajoutée, la conversion est refusée.
 
 ### 2.2 Shell `auxioffice-editors`
 
@@ -81,14 +98,15 @@ build). Le module regroupe le code AuxiNux appelé par les patches :
 - `--version`, emplacements de configuration et de cache, nom d'application écrit dans les
   documents (`AuxiNux Office`) ;
 - réglages par défaut respectueux de la vie privée (assistant IA désactivé tant que
-  l'utilisateur ne l'active pas, pas de galerie de modèles en ligne) ;
+  l'utilisateur ne l'active pas, pas de galerie de modèles en ligne, nom d'auteur neutre,
+  commutateurs du moteur imposés, copies de travail d'une session interrompue supprimées) ;
 - routage des fichiers texte vers AuxiText, commande « Ouvrir PDF », nouveau fichier texte ;
 - section « Logiciels libres et licences » de la fenêtre À propos ;
 - traductions françaises des messages ajoutés par AuxiNux ;
 - sous Linux, arrêt standard sur SIGTERM (le gestionnaire du moteur plantait).
 
 Instance unique : un second lancement transmet ses fichiers à l'instance active (mutex
-`AuxiNux.AuxiOffice.Editors` sous Windows ; sous Linux, socket d'upstream limité à l'interface
+`AuxiNux.AuxiNuxOffice.Editors` sous Windows ; sous Linux, socket d'upstream limité à l'interface
 locale 127.0.0.1, port 13012 par défaut).
 
 ### 2.3 Écran d'accueil et éditeurs
@@ -113,29 +131,48 @@ Markdown, INI), fichiers récents, impression, glisser-déposer, surveillance de
 externes, « Ouvrir dans AuxiWriter ». Il utilise les bibliothèques Qt livrées avec le moteur
 (aucune dépendance supplémentaire).
 
+AuxiText existe sous deux formes, avec le même code :
+
+- **l'application AuxiText** (programme `auxitext`, entrée de menu, association des fichiers
+  texte, `auxioffice notes.txt`) ;
+- **AuxiText intégré** aux onglets d'AuxiNux Office : un fichier texte ouvert depuis AuxiNux
+  Office (« Ouvrir un fichier », documents récents, glisser-déposer, fichier transmis à
+  l'instance déjà ouverte) ou créé par la tuile « Nouveau fichier texte » s'affiche dans un
+  onglet, comme un document. Les sources de `src/auxitext` (sauf `main.cpp`) sont compilées
+  dans le shell (`src/shell/auxinux/auxinux.pri`, `texttabs.cpp`, patch desktop-apps 0012).
+  L'onglet garde une vue vide et cachée du moteur web, exigée par la gestion des onglets
+  d'upstream (identifiant, fermeture) ; l'éditeur Qt la recouvre. À la fermeture d'un onglet
+  modifié, le message « Enregistrer les modifications ? » du shell enregistre par l'éditeur.
+  En mode intégré, AuxiText suit le thème et la langue d'AuxiNux Office (menus Thème, Langue
+  et Quitter masqués) et « Nouvel onglet » remplace « Nouvelle fenêtre » ; l'onglet ne peut pas
+  être détaché dans une fenêtre séparée. « Ouvrir dans AuxiWriter » (`--writer`) ouvre bien le
+  fichier dans AuxiWriter. Sans fenêtre principale (premier lancement avec un fichier texte),
+  le fichier va à l'application AuxiText. macOS : application AuxiText séparée (shell macOS
+  d'upstream non recompilé).
+
 ## 3. Arborescences installées
 
 ### Linux
 
 ```text
-/usr/bin/auxioffice -> ../lib/auxioffice/auxioffice
-/usr/bin/auxitext   -> ../lib/auxioffice/auxitext
-/usr/lib/auxioffice/            auxioffice, auxioffice-editors, auxitext, bibliothèques du moteur,
+/usr/bin/auxioffice -> ../lib/auxinux-office/auxioffice
+/usr/bin/auxitext   -> ../lib/auxinux-office/auxitext
+/usr/lib/auxinux-office/            auxioffice, auxioffice-editors, auxitext, bibliothèques du moteur,
                                 converter/ (x2t), editors/ (web-apps, sdkjs), fonts/, dictionaries/,
                                 LICENSE.txt, NOTICE.txt, licenses/
-/usr/share/applications/ca.auxinux.AuxiOffice{,.Writer,.Sheet,.Present,.PDF,.Text}.desktop
-/usr/share/icons/hicolor/*/apps/ca.auxinux.AuxiOffice*.png|svg
-/usr/share/metainfo/ca.auxinux.AuxiOffice.metainfo.xml
+/usr/share/applications/ca.auxinux.AuxiNuxOffice{,.Writer,.Sheet,.Present,.PDF,.Text}.desktop
+/usr/share/icons/hicolor/*/apps/ca.auxinux.AuxiNuxOffice*.png|svg
+/usr/share/metainfo/ca.auxinux.AuxiNuxOffice.metainfo.xml
 ```
 
 Données de l'utilisateur (XDG) :
 
 ```text
-~/.config/auxioffice/AuxiOffice.conf      réglages du shell (langue, fenêtres…)
-~/.config/auxioffice/auxitext.ini         réglages d'AuxiText
-~/.local/share/auxioffice/                données du moteur : data/settings.xml, polices
+~/.config/auxinux-office/AuxiNuxOffice.conf      réglages du shell (langue, fenêtres…)
+~/.config/auxinux-office/auxitext.ini         réglages d'AuxiText
+~/.local/share/auxinux-office/                données du moteur : data/settings.xml, polices
                                           analysées, fichiers récents, récupération, modules
-~/.cache/auxioffice/cef                   cache du moteur web
+~/.cache/auxinux-office/cef                   cache du moteur web
 ```
 
 ### Windows
@@ -143,11 +180,11 @@ Données de l'utilisateur (XDG) :
 ```text
 C:\Program Files\AuxiNux Office\           auxioffice.exe, auxioffice-editors.exe, auxitext.exe,
                                            DLL du moteur, converter\, editors\, …, uninstall.exe
-%APPDATA%\AuxiNux\AuxiOffice\settings.ini  réglages du shell (fichier INI au lieu du registre)
-%APPDATA%\AuxiNux\AuxiOffice\auxitext.ini  réglages d'AuxiText
-%LOCALAPPDATA%\AuxiNux\AuxiOffice\data\    données du moteur (settings.xml, polices, récents…)
-%LOCALAPPDATA%\AuxiNux\AuxiOffice\cache\   cache du moteur web
-HKLM\Software\AuxiNux\AuxiOffice           emplacement, version, langue choisie à l'installation,
+%APPDATA%\AuxiNux\AuxiNuxOffice\settings.ini  réglages du shell (fichier INI au lieu du registre)
+%APPDATA%\AuxiNux\AuxiNuxOffice\auxitext.ini  réglages d'AuxiText
+%LOCALAPPDATA%\AuxiNux\AuxiNuxOffice\data\    données du moteur (settings.xml, polices, récents…)
+%LOCALAPPDATA%\AuxiNux\AuxiNuxOffice\cache\   cache du moteur web
+HKLM\Software\AuxiNux\AuxiNuxOffice           emplacement, version, langue choisie à l'installation,
                                            Capabilities (types de fichiers proposés)
 ```
 

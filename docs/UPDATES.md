@@ -33,7 +33,7 @@ L'étape `package` écrit `dist/<cible>/update-info.json` (`scripts/auxibuild/up
 {
   "schema": 1,
   "product": "AuxiNux Office",
-  "app_id": "ca.auxinux.AuxiOffice",
+  "app_id": "ca.auxinux.AuxiNuxOffice",
   "version": "0.1.0",
   "build": 0,
   "channel": "stable",

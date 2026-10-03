@@ -17,6 +17,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import zipfile
 from datetime import datetime, timezone
@@ -114,6 +115,42 @@ def test_static(r, stage, target):
     elif target == "windows":
         r.add("service de mise à jour upstream absent", not (stage / "updatesvc.exe").exists())
     test_no_upstream_logo(r, stage, home_page)
+    test_privacy_static(r, stage, target, home_page)
+    if target in ("linux", "windows"):
+        # AuxiText code en dur l'emplacement des réglages (src/auxitext/app.cpp) : il doit suivre
+        # branding/product.json (QStringLiteral : chaînes UTF-16 dans le binaire).
+        exe = ".exe" if target == "windows" else ""
+        data = (stage / f"auxitext{exe}").read_bytes()
+        names = [product()["linux"]["xdg_name"]] if target == "linux" else [product()["windows"]["app_dir"]]
+        missing = [n for n in names if n.encode("utf-16-le") not in data]
+        r.add("AuxiText : dossier de réglages conforme à product.json", not missing, ", ".join(missing) or names[0])
+
+
+def test_privacy_static(r, stage, target, home_page):
+    """Protections de confidentialité présentes dans l'arbre livré (voir PRIVACY.md)."""
+    from .assemble import shippable_problems
+    from .privacy import CSP, EDITOR_PAGES
+    problems = shippable_problems(stage)
+    r.add("aucun vidage mémoire ni traqueur connu (Google Analytics…)", not problems,
+          problems[0] if problems else f"{stage}")
+    apps = stage / "editors" / "web-apps" / "apps"
+    pages = [home_page] + [apps / rel for rel in EDITOR_PAGES]
+    unprotected = [str(p.relative_to(stage)) for p in pages
+                   if not p.exists() or CSP not in p.read_text(encoding="utf-8", errors="ignore")]
+    r.add("Content-Security-Policy : accueil et éditeurs limités aux ressources locales", not unprotected,
+          ", ".join(unprotected[:3]) or f"{len(pages)} pages")
+    exe = ".exe" if target == "windows" else ""
+    guard = stage / "converter" / f"x2t{exe}"
+    r.add("convertisseur : garde réseau AuxiNux (x2t -> x2t-engine)",
+          guard.exists() and b"allowNetworkRequest" in guard.read_bytes()
+          and (stage / "converter" / f"x2t-engine{exe}").exists())
+    if target in ("linux", "windows"):
+        from .build_auxitext import engine_switches
+        missing = [s for s in engine_switches().split(";")
+                   if s.encode() not in (stage / f"auxioffice{exe}").read_bytes()
+                   or s.encode() not in (stage / f"auxioffice-editors{exe}").read_bytes()]
+        r.add("commutateurs de confidentialité du moteur (lanceur et shell)", not missing,
+              ", ".join(missing) or engine_switches())
 
 
 # Débuts des tracés des logos ONLYOFFICE (en-tête 85×20 et À propos 245×45), tels qu'écrits dans
@@ -172,7 +209,7 @@ def _no_core_dumps():
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
 
-def _x2t(stage, src, dst, fmt, fonts, tmp):
+def _x2t(stage, src, dst, fmt, fonts, tmp, trace=None):
     # CSV : encodage UTF-8 (46) et séparateur point-virgule (2), choisis dans l'application par un dialogue
     csv = "<m_nCsvTxtEncoding>46</m_nCsvTxtEncoding><m_nCsvDelimiter>2</m_nCsvDelimiter>" \
         if str(src).endswith(".csv") else ""
@@ -185,7 +222,10 @@ def _x2t(stage, src, dst, fmt, fonts, tmp):
     write_text(xml, params)
     env = dict(os.environ, LD_LIBRARY_PATH=str(stage / "converter"), APPLICATION_NAME="AuxiNux Office", COMPANY_NAME="")
     # Répertoire courant temporaire et vidages mémoire désactivés : rien n'est écrit dans l'arbre testé.
-    res = subprocess.run([stage / "converter" / "x2t", xml], cwd=tmp, env=env, capture_output=True, text=True,
+    cmd = [stage / "converter" / "x2t", xml]
+    if trace:   # (strace, journal) : programmes lancés par le convertisseur
+        cmd = [trace[0], "-f", "-qq", "-e", "trace=execve", "-o", trace[1], *cmd]
+    res = subprocess.run(cmd, cwd=tmp, env=env, capture_output=True, text=True,
                          timeout=300, preexec_fn=_no_core_dumps)
     return res.returncode, (res.stdout + res.stderr)[-300:]
 
@@ -199,7 +239,7 @@ def _pdf_text(py, pdf):
 
 def test_engine(r, stage, py):
     """Conversions réelles par le moteur livré (x2t), avec le cache de polices de la session GUI."""
-    fonts = REPORTS / "linux" / "gui" / "home" / ".local/share/auxioffice/data/fonts"
+    fonts = REPORTS / "linux" / "gui" / "home" / ".local/share/auxinux-office/data/fonts"
     if not (fonts / "AllFonts.js").exists():
         r.add("conversions x2t", False, "cache des polices absent (tests graphiques non exécutés)", skipped=True)
         return
@@ -229,6 +269,24 @@ def test_engine(r, stage, py):
         if good and fmt == "txt" and marker:
             good = marker in dst.read_text(encoding="utf-8", errors="ignore")
         r.add(f"x2t {Path(name).suffix[1:].upper()} -> {fmt.upper()}", good, detail if good else f"code {rc} {log}")
+    # Documents piégés : la garde AuxiNux interdit au convertisseur de télécharger leurs ressources
+    strace = _tool("AUXI_STRACE", "strace")
+    traps = sorted((FIXTURES / "pieges").glob("piege-*"))
+    if strace and traps:
+        launched, converted = [], 0
+        for trap in traps:
+            log = out / f"x2t-{trap.name}.strace"
+            fmt = "odp" if trap.suffix == ".pptx" else "docx"   # conversion dans la même famille
+            dst = out / f"{trap.stem}-piege.{fmt}"
+            rc, _ = _x2t(stage, trap, dst, FMT[fmt], fonts, tmp, trace=(strace, log))
+            converted += rc == 0 and dst.exists()
+            launched += [l.split(",")[0] for l in log.read_text(errors="replace").splitlines()
+                         if "execve(" in l and ("/curl\"" in l or "/wget\"" in l)]
+        r.add("x2t : aucune ressource distante téléchargée (documents piégés)", not launched and converted == len(traps),
+              f"{converted}/{len(traps)} convertis, {len(launched)} lancement(s) de curl/wget"
+              + (f" : {launched[0]}" if launched else ""))
+    else:
+        r.add("x2t : documents piégés", False, "strace absent (AUXI_STRACE)", skipped=True)
     # Aller-retour ODT -> DOCX : le format OpenDocument est relu
     odt = out / "rapport-docx.odt"
     if odt.exists():
@@ -280,18 +338,22 @@ def test_windows_wine(r, stage):
               skipped=True)
         return
     env = dict(os.environ, WINEDEBUG="err+module")
+    # Répertoire courant temporaire et vidages mémoire désactivés : un plantage de Wine ne doit
+    # rien écrire dans l'arbre testé (un vidage contient l'environnement de la machine de build).
+    cwd = Path(tempfile.mkdtemp(prefix="auxi-wine-"))
+    quiet = dict(cwd=cwd, preexec_fn=_no_core_dumps)
     expected = f"{product()['product']['name']} {version()}"
     res = subprocess.run([wine, stage / "auxioffice.exe", "--version"], capture_output=True, text=True,
-                         env=env, timeout=120)
+                         env=env, timeout=120, **quiet)
     r.add("Wine : auxioffice.exe --version", res.stdout.strip() == expected, res.stdout.strip()[:80])
     res = subprocess.run([wine, stage / "auxitext.exe", "--version"], capture_output=True, text=True,
-                         env=env, timeout=120)
+                         env=env, timeout=120, **quiet)
     r.add("Wine : auxitext.exe --version", res.stdout.startswith(f"AuxiText {version()}"), res.stdout.strip()[:80])
 
     log = REPORTS / "windows" / "wine-shell.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     with open(log, "w", encoding="utf-8", errors="replace") as fh:
-        proc = subprocess.Popen([wine, stage / "auxioffice.exe"], stdout=fh, stderr=subprocess.STDOUT, env=env)
+        proc = subprocess.Popen([wine, stage / "auxioffice.exe"], stdout=fh, stderr=subprocess.STDOUT, env=env, **quiet)
         running = False
         for _ in range(60):
             time.sleep(2)
@@ -300,10 +362,10 @@ def test_windows_wine(r, stage):
                 running = True
                 time.sleep(10)
                 break
-        subprocess.run([wine, "wineboot", "--end-session"], capture_output=True, env=env, timeout=120)
+        subprocess.run([wine, "wineboot", "--end-session"], capture_output=True, env=env, timeout=120, **quiet)
         server = os.environ.get("AUXI_WINESERVER") or shutil.which("wineserver")
         if server:
-            subprocess.run([server, "-k"], capture_output=True, timeout=60)
+            subprocess.run([server, "-k"], capture_output=True, timeout=60, **quiet)
         try:
             proc.wait(timeout=60)
         except subprocess.TimeoutExpired:
@@ -313,6 +375,7 @@ def test_windows_wine(r, stage):
                       if "import_dll" in l and "Library " in l})
     r.add("Wine : shell lancé via auxioffice.exe (DLL du moteur et processus CEF)", running and not missing,
           ("DLL introuvables : " + ", ".join(missing)) if missing else ("démarré" if running else "non démarré"))
+    shutil.rmtree(cwd, ignore_errors=True)
 
 
 def run_all(args):

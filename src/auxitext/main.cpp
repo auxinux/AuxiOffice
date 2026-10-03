@@ -109,7 +109,7 @@ int main(int argc, char* argv[])
     QApplication::setApplicationName(QStringLiteral("AuxiText"));
     QApplication::setApplicationVersion(App::version());
 #if QT_VERSION >= QT_VERSION_CHECK(5, 7, 0)
-    QApplication::setDesktopFileName(QStringLiteral("ca.auxinux.AuxiOffice.Text"));
+    QApplication::setDesktopFileName(QStringLiteral("ca.auxinux.AuxiNuxOffice.Text"));
 #endif
     QApplication::setWindowIcon(QIcon(QStringLiteral(":/icons/auxitext.png")));
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));

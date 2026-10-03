@@ -2,14 +2,14 @@
   "_comment": "Source unique de l'identité AuxiNux Office. La version vient du fichier VERSION à la racine (ne pas la dupliquer ici). Consommé par scripts/auxibuild (branding, packaging, génération d'en-têtes).",
   "product": {
     "name": "AuxiNux Office",
-    "short_name": "AuxiOffice",
+    "short_name": "AuxiNuxOffice",
     "vendor": "Projet AuxiNux",
     "vendor_en": "AuxiNux Project",
     "copyright_holder": "Projet AuxiNux",
     "copyright_first_year": 2026,
-    "website": "https://auxinux.ca",
+    "website": "https://office.auxinux.ca",
     "source_url": "https://git.auxinux.ca",
-    "support_url": "https://auxinux.ca",
+    "support_url": "https://office.auxinux.ca",
     "license_spdx": "AGPL-3.0-only",
     "modification_start_date": "2026-10-01",
     "description_fr": "Suite bureautique libre de l'écosystème AuxiNux",
@@ -127,12 +127,12 @@
   "linux": {
     "executable": "auxioffice",
     "package": "auxinux-office",
-    "app_id": "ca.auxinux.AuxiOffice",
-    "install_dir": "/usr/lib/auxioffice",
-    "xdg_name": "auxioffice",
+    "app_id": "ca.auxinux.AuxiNuxOffice",
+    "install_dir": "/usr/lib/auxinux-office",
+    "xdg_name": "auxinux-office",
     "shell_binary": "auxioffice-editors",
     "text_binary": "auxitext",
-    "single_instance_key": "auxioffice:editors",
+    "single_instance_key": "auxinux-office:editors",
     "maintainer": "AuxiNux <repo@auxinux.ca>"
   },
   "windows": {
@@ -141,15 +141,15 @@
     "text_binary": "auxitext.exe",
     "install_dir_name": "AuxiNux Office",
     "vendor_dir": "AuxiNux",
-    "app_dir": "AuxiOffice",
+    "app_dir": "AuxiNuxOffice",
     "registry_vendor": "AuxiNux",
-    "registry_app": "AuxiOffice",
+    "registry_app": "AuxiNuxOffice",
     "uninstall_key": "AuxiNux Office",
-    "app_user_model_id": "AuxiNux.AuxiOffice",
-    "progid_prefix": "AuxiOffice",
-    "single_instance_key": "AuxiNux.AuxiOffice.Editors",
+    "app_user_model_id": "AuxiNux.AuxiNuxOffice",
+    "progid_prefix": "AuxiNuxOffice",
+    "single_instance_key": "AuxiNux.AuxiNuxOffice.Editors",
     "msi_upgrade_code": "{6C1B6F3E-3B53-4E2F-9E0B-4A8F2E7C5D11}",
-    "url_protocol": "auxioffice"
+    "url_protocol": "auxinux-office"
   },
   "colors": {
     "primary": "#F26F00",
@@ -186,6 +186,21 @@
       "{BE5CBF95-C0AD-4842-B157-AC40FEDD9840}": "Thesaurus (API words.bighugelabs.com)",
       "{440EBF13-9B19-4BD8-8621-05200E58140B}": "OCR (données de langue téléchargées en ligne)"
     },
-    "ai_disabled_by_default": true
+    "engine_switches_comment": "Commutateurs Chromium/CEF imposés à chaque démarrage du moteur (lanceur, shell, application macOS) : aucune communication d'arrière-plan. Voir PRIVACY.md.",
+    "engine_switches": [
+      "--disable-features=DnsOverHttps",
+      "--disable-background-networking",
+      "--disable-domain-reliability",
+      "--no-pings",
+      "--disable-spell-checking"
+    ],
+    "removed_ai_providers": [
+      "together.ai"
+    ],
+    "ai_disabled_by_default": true,
+    "default_user_name": {
+      "fr": "Utilisateur",
+      "en": "User"
+    }
   }
 }

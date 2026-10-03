@@ -15,7 +15,7 @@ import re
 import uuid
 from pathlib import Path
 
-from .assemble import stage_dir
+from .assemble import check_shippable, stage_dir
 from .common import (BUILD_DIR, copyright_notice, DIST_DIR, ROOT, TOOLCHAINS_DIR, build_number, download, fail, info, lock, ok,
                      product, rmtree, run, step, version, version_tuple4, which, write_text)
 
@@ -346,6 +346,7 @@ def package(args):
     for exe in ("auxioffice.exe", "auxioffice-editors.exe", "auxitext.exe", "NOTICE.txt", "LICENSE.txt"):
         if not (stage / exe).exists():
             fail(f"{stage / exe} absent : lancer l'étape assemble (cible windows)")
+    check_shippable(stage)
     formats = [f.strip() for f in (args.formats or "exe,msi").split(",") if f.strip()]
     vc = ensure_vc_redist()
     if "exe" in formats:

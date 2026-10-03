@@ -21,15 +21,38 @@ class QFileSystemWatcher;
 class QLabel;
 class QMenu;
 
+class MainWindow;
+
+// Programme qui intègre AuxiText dans sa propre interface (onglets d'AuxiNux Office) :
+// l'éditeur devient un widget enfant, sans fenêtre ni réglages de fenêtre propres.
+class TextHost
+{
+public:
+    virtual ~TextHost() = default;
+    virtual void openInNewEditor(const QString& path) = 0;   // nouvel éditeur (vide si path est vide)
+    virtual void closeEditor(MainWindow* editor) = 0;        // l'utilisateur ferme cet éditeur
+    virtual void editorStateChanged(MainWindow* editor) = 0; // nom, chemin ou état « modifié »
+};
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(QWidget* parent = nullptr, TextHost* host = nullptr);
+    ~MainWindow() override;
 
     bool openFile(const QString& path);
     bool isUntitledAndEmpty() const;
     static MainWindow* openInNewWindow(const QString& path = QString());
+
+    // Pour le programme hôte
+    QString filePath() const { return m_path; }
+    QString displayName() const;    // nom du fichier, ou « Sans titre »
+    bool isModified() const;
+    bool save();
+    bool maybeSave();
+    void setDarkTheme(bool dark);   // thème imposé par l'hôte (palette de ce widget seulement)
+    void focusEditor();
 
 protected:
     void closeEvent(QCloseEvent* event) override;
@@ -47,7 +70,7 @@ private:
 
     void newFile();
     void open();
-    bool save();
+    void openElsewhere(const QString& path);
     bool saveAs();
     bool saveTo(const QString& path);
     void reload();
@@ -57,7 +80,6 @@ private:
     void about();
     void showLicenses();
 
-    bool maybeSave();
     void setCurrentFile(const QString& path);
     void updateTitle();
     void updateStatus();
@@ -69,6 +91,9 @@ private:
     void setLanguage(int language);  // -1 = automatique
     void onFileChangedOnDisk(const QString& path);
 
+    static QList<MainWindow*>& instances();
+
+    TextHost* m_host;
     CodeEditor* m_editor;
     Highlighter* m_highlighter;
     QPointer<FindDialog> m_find;

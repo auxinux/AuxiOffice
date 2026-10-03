@@ -101,6 +101,8 @@ def build_shell_linux(args):
     sysdeps_lib = env.get("AUXI_SYSDEPS_LIBDIR")
     out = NATIVE_DIR / "linux" / "shell"
     out.mkdir(parents=True, exist_ok=True)
+    from .build_auxitext import prepare_shell_translations
+    prepare_shell_translations(qt / "bin", shell_src() / "src" / "auxinux" / "auxitext")
     config = "release" if args.mode == "release" else "debug"
     qmake_args = [qt / "bin" / "qmake", shell_src() / "ASCDocumentEditor.pro", f"CONFIG+={config}",
                   # same link behaviour as upstream packages: only really used libraries
@@ -133,6 +135,8 @@ def build_shell_windows(args):
     _link_engine_for_qmake("windows")
     out = NATIVE_DIR / "windows" / "shell"
     out.mkdir(parents=True, exist_ok=True)
+    from .build_auxitext import prepare_shell_translations
+    prepare_shell_translations(qt_host / "bin", shell_src() / "src" / "auxinux" / "auxitext")
     conf = qt_cross_conf(qt_win, qt_host, out / "qt-cross.conf")
     env = {"PATH": f"{wrappers}:{os.environ['PATH']}"}
     config = "release" if args.mode == "release" else "debug"

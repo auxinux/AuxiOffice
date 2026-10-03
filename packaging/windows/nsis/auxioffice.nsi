@@ -378,7 +378,7 @@ FunctionEnd
 
 ; ---------------------------------------------------------------------------
 ; Désinstallation : retire l'application et ses déclarations ; conserve les documents et les
-; paramètres personnels (%APPDATA%\AuxiNux\AuxiOffice, %LOCALAPPDATA%\AuxiNux\AuxiOffice).
+; paramètres personnels (%APPDATA%\AuxiNux\AuxiNuxOffice, %LOCALAPPDATA%\AuxiNux\AuxiNuxOffice).
 ; ---------------------------------------------------------------------------
 Function un.onInit
   SetShellVarContext all

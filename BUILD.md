@@ -119,9 +119,9 @@ dist/linux/update-info.json        métadonnées pour un futur service de mises 
 dist/linux/SHA256SUMS
 ```
 
-Le paquet `.deb` installe l'application dans `/usr/lib/auxioffice/`, les commandes
+Le paquet `.deb` installe l'application dans `/usr/lib/auxinux-office/`, les commandes
 `/usr/bin/auxioffice` et `/usr/bin/auxitext`, six fichiers `.desktop`
-(`ca.auxinux.AuxiOffice*.desktop`), les icônes hicolor, les métadonnées AppStream et la
+(`ca.auxinux.AuxiNuxOffice*.desktop`), les icônes hicolor, les métadonnées AppStream et la
 documentation (`/usr/share/doc/auxinux-office/`). Ses dépendances sont calculées par
 `dpkg-shlibdeps` à partir des bibliothèques réellement utilisées (notamment
 `libc6 (>= 2.38)` : Debian 13 et Ubuntu 24.04 conviennent, pas Debian 12). Pendant le build,
@@ -206,7 +206,7 @@ les raccourcis du MSI n'ont pas l'AppUserModelID (notifications Windows remplac�
 boîtes de dialogue) ; l'installateur `.exe` est recommandé pour les postes individuels.
 
 Dans les deux cas, AuxiNux Office est **déclaré** pour ses types de fichiers (ProgID
-`AuxiOffice.<ext>`, `OpenWithProgids`, `Capabilities`, `RegisteredApplications`) mais
+`AuxiNuxOffice.<ext>`, `OpenWithProgids`, `Capabilities`, `RegisteredApplications`) mais
 **jamais imposé** : les applications par défaut existantes ne sont pas modifiées.
 
 ### 5.4 macOS Apple Silicon (préliminaire)

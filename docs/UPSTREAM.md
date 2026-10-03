@@ -74,9 +74,11 @@ additionnelle 2 de la licence d'upstream). Le code AuxiNux appelé par les patch
 | desktop-apps 0008 | `platform_win/association.cpp` | « application par défaut » : ouvre les Paramètres Windows au lieu d'écrire `UserChoice` |
 | desktop-apps 0009 | `win-linux/src/main.cpp` | traductions françaises des messages AuxiNux |
 | desktop-apps 0010 | `win-linux/src/main.cpp` | Linux : arrêt standard sur SIGTERM (le gestionnaire du moteur plantait) |
+| desktop-apps 0011 | `win-linux/src/main.cpp`, `utils.cpp` | commutateurs de confidentialité du moteur imposés (relance du shell) ; nom d'auteur par défaut neutre |
+| desktop-apps 0012 | `win-linux/defaults.pri`, `src/main.cpp`, `src/cascapplicationmanagerwrapper.cpp`, `src/windows/cmainwindow.cpp` | fichiers texte dans les onglets (AuxiText intégré, `src/auxinux/auxinux.pri`) : routage (ligne de commande, glisser-déposer, `--writer` transmis), enregistrement à la fermeture, pas de détachement |
 | web-apps 0001 | `apps/common/main/lib/view/About.js` | mentions AuxiNux dans la fenêtre À propos des éditeurs |
 
-Total : 11 patches, environ 140 lignes ajoutées au code d'upstream.
+Total : 13 patches, environ 195 lignes ajoutées au code d'upstream.
 
 ### Candidats à proposer à upstream
 

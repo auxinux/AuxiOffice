@@ -113,6 +113,9 @@ def main():
     (out / "tableau.csv").write_text("nom;valeur\nalpha;1\nbeta;2\n", encoding="utf-8")
     (out / "LISEZMOI").write_text(f"Fichier sans extension {MARK}\n", encoding="utf-8")
     (out / "latin1.txt").write_bytes("Texte Latin-1 : éàü\n".encode("latin-1"))
+    # Documents piégés (ressources distantes) pour l'audit réseau
+    from trap_documents import make_trap_documents
+    make_trap_documents(out / "pieges")
     print(f"fixtures générées dans {out}")
 
 

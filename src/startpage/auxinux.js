@@ -23,7 +23,7 @@
             welWelcome: `Welcome to ${product}!`,
             welDescr: 'Create and edit your documents offline, privately: no account, no telemetry, no advertising.',
             welNeedHelp: 'Learn more about the AuxiNux project on $1.',
-            textHelpCenter: config.websiteLabel || 'auxinux.ca',
+            textHelpCenter: config.websiteLabel || 'office.auxinux.ca',
             newDoc: 'New document',
             newXlsx: 'New spreadsheet',
             newPptx: 'New presentation',
@@ -51,7 +51,7 @@
             welWelcome: `Bienvenue dans ${product} !`,
             welDescr: 'Créez et modifiez vos documents hors ligne, en toute confidentialité : aucun compte, aucune télémétrie, aucune publicité.',
             welNeedHelp: 'Pour en savoir plus sur le projet AuxiNux : $1.',
-            textHelpCenter: config.websiteLabel || 'auxinux.ca',
+            textHelpCenter: config.websiteLabel || 'office.auxinux.ca',
             newDoc: 'Nouveau document',
             newXlsx: 'Nouvelle feuille de calcul',
             newPptx: 'Nouvelle présentation',
@@ -220,7 +220,7 @@
 
     window.auxinux = {
         product,
-        website: config.website || 'https://auxinux.ca',
+        website: config.website || 'https://office.auxinux.ca',
         onlineTemplates: false,   // aucune requête automatique vers une galerie de modèles en ligne
         documentTypes,
         onDocumentSelect,

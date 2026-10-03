@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Projet AuxiNux
-"""Build AuxiText (Qt) and the auxioffice launcher (C) for Linux, Windows or macOS.
-Both use the same sources on every platform (macOS: AuxiText only, built on a Mac)."""
+"""Build AuxiText (Qt), the auxioffice launcher (C) and the x2t guard (C) for Linux, Windows
+or macOS. They use the same sources on every platform (macOS: AuxiText only, built on a Mac;
+the macOS launcher and x2t guard are built by macos.py, from Linux or a Mac)."""
 
 import os
 import shutil
@@ -13,6 +14,7 @@ from .toolchain import ensure_qt, linux_build_env
 NATIVE_DIR = ROOT / "build" / "native"
 AUXITEXT_SRC = ROOT / "src" / "auxitext"
 LAUNCHER_SRC = ROOT / "src" / "launcher"
+X2T_GUARD_SRC = ROOT / "src" / "x2tguard" / "x2t_guard.c"
 
 
 def text_extensions():
@@ -33,6 +35,22 @@ def _prepare_translations(qt_tools_bin, qt_translations, out):
         entries.append("        <file>qtbase_fr.qm</file>")
     write_text(i18n / "i18n.qrc", "<!DOCTYPE RCC>\n<RCC version=\"1.0\">\n    <qresource prefix=\"/i18n\">\n"
                + "\n".join(entries) + "\n    </qresource>\n</RCC>\n")
+
+
+def prepare_shell_translations(qt_tools_bin, text_dir):
+    """Traductions et icône d'AuxiText intégré au shell (onglets texte) : :/auxinux/i18n, :/auxinux/icons."""
+    if not (text_dir / "mainwindow.cpp").exists():
+        return
+    i18n = text_dir / "i18n"
+    rmtree(i18n)
+    i18n.mkdir(parents=True)
+    for ts in sorted((AUXITEXT_SRC / "i18n").glob("*.ts")):
+        run([qt_tools_bin / "lrelease", "-silent", ts, "-qm", i18n / (ts.stem + ".qm")], quiet=True)
+    entries = [f"        <file>{qm.name}</file>" for qm in sorted(i18n.glob("auxitext_*.qm"))]
+    shutil.copy2(ROOT / "branding" / "generated" / "svg" / "auxitext.svg", i18n / "auxitext.svg")
+    write_text(i18n / "auxitext-i18n.qrc", "<!DOCTYPE RCC>\n<RCC version=\"1.0\">\n"
+               "    <qresource prefix=\"/auxinux/i18n\">\n" + "\n".join(entries) + "\n    </qresource>\n"
+               "    <qresource prefix=\"/auxinux/icons\">\n        <file>auxitext.svg</file>\n    </qresource>\n</RCC>\n")
 
 
 def build_auxitext_linux(args):
@@ -95,7 +113,13 @@ def build_auxitext_windows(args):
 
 def _launcher_defines():
     return [f'-DAUXI_PRODUCT_NAME="{product()["product"]["name"]}"', f'-DAUXI_VERSION="{version()}"',
-            f'-DAUXI_TEXT_EXTENSIONS="{text_extensions()}"']
+            f'-DAUXI_TEXT_EXTENSIONS="{text_extensions()}"',
+            f'-DAUXI_ENGINE_SWITCHES="{engine_switches()}"']
+
+
+def engine_switches():
+    """Commutateurs du moteur (privacy.engine_switches de product.json), séparés par « ; »."""
+    return ";".join(product()["privacy"]["engine_switches"])
 
 
 def build_launcher_linux(args):
@@ -107,6 +131,32 @@ def build_launcher_linux(args):
          "-fstack-protector-strong", "-D_FORTIFY_SOURCE=2", "-pie", "-fPIE", "-Wl,-z,relro,-z,now",
          *_launcher_defines(), LAUNCHER_SRC / "auxioffice.c", "-o", dest / "auxioffice"])
     ok(f"lanceur : {dest / 'auxioffice'}")
+
+
+def build_x2t_guard_linux(args):
+    step("Garde du convertisseur x2t (Linux)")
+    dest = NATIVE_DIR / "linux" / "bin"
+    dest.mkdir(parents=True, exist_ok=True)
+    opt = ["-O2"] if args.mode == "release" else ["-Og", "-g"]
+    run(["gcc", "-std=c99", "-D_DEFAULT_SOURCE", *opt, "-Wall", "-Wextra", "-Werror",
+         "-fstack-protector-strong", "-D_FORTIFY_SOURCE=2", "-pie", "-fPIE", "-Wl,-z,relro,-z,now",
+         X2T_GUARD_SRC, "-o", dest / "x2t-guard"])
+    ok(f"garde x2t : {dest / 'x2t-guard'}")
+
+
+def build_x2t_guard_windows(args):
+    step("Garde du convertisseur x2t.exe (Windows x64)")
+    from .wincross import ensure_wrappers
+    wrappers = ensure_wrappers(args.local_deps, args.accept_msvc_license)
+    out = NATIVE_DIR / "windows" / "x2tguard"
+    out.mkdir(parents=True, exist_ok=True)
+    dest = NATIVE_DIR / "windows" / "bin"
+    dest.mkdir(parents=True, exist_ok=True)
+    opt = ["/O2"] if args.mode == "release" else ["/Od", "/Z7"]
+    run([wrappers / "clang-cl", "/nologo", *opt, "/W3", "/MD", "/DUNICODE", "/D_UNICODE",
+         "/D_CRT_SECURE_NO_WARNINGS", X2T_GUARD_SRC, f"/Fo{out}/", f"/Fe{dest / 'x2t-guard.exe'}",
+         "/link", "/SUBSYSTEM:CONSOLE"])
+    ok(f"garde x2t : {dest / 'x2t-guard.exe'}")
 
 
 def build_launcher_windows(args):
@@ -215,8 +265,10 @@ def build(args):
             build_auxitext_linux(args)
         if "launcher" in wanted:
             build_launcher_linux(args)
+            build_x2t_guard_linux(args)
     else:
         if "auxitext" in wanted:
             build_auxitext_windows(args)
         if "launcher" in wanted:
             build_launcher_windows(args)
+            build_x2t_guard_windows(args)

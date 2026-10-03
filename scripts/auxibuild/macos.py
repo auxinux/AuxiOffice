@@ -11,7 +11,11 @@ replaces, without recompiling anything:
     Linux and Windows) and the privacy-unfriendly plugins;
   - the identity: Info.plist, names in every localization (.strings), icons of the
     application and of the document types, legal files;
-  - Sparkle automatic updates (disabled) and the online help URL (removed).
+  - Sparkle automatic updates (disabled) and the online help URL (removed);
+  - privacy: the bundle executable becomes a small AuxiNux launcher that starts the upstream
+    shell ("AuxiNux Office Engine") with the Chromium privacy switches; x2t is replaced by the
+    AuxiNux guard (no download of a document's remote resources); the dormant Google Analytics
+    address of the shell is removed; web layers hardened (privacy.py).
 
 The bundle is then re-signed (ad hoc by default, rcodesign) and packed into
 dist/macos/AuxiNuxOffice-<version>-arm64.zip. Limitations: docs/MACOS.md."""
@@ -31,6 +35,10 @@ from .common import (BUILD_DIR, copyright_notice, DIST_DIR, IS_MACOS_HOST, ROOT,
 
 GEN = ROOT / "branding" / "generated"
 APP_NAME = "AuxiNux Office"
+# Shell d'upstream renommé : l'exécutable du bundle (APP_NAME) est le lanceur AuxiNux qui
+# l'exécute avec les commutateurs de confidentialité du moteur web.
+ENGINE_NAME = "AuxiNux Office Engine"
+HELPERS_DIR = BUILD_DIR / "native" / "macos" / "helpers"
 JS = BUILD_DIR / "js"
 
 # Types de documents d'upstream (Resources/file-<ext>.icns) -> icône AuxiNux du type
@@ -231,6 +239,67 @@ UPSTREAM_URLS = [
 ]
 
 
+# Adresse de collecte de Google Analytics du shell macOS (CocoaAnalytics, code inactif chez
+# upstream) : remplacée par une adresse inerte de même longueur.
+UPSTREAM_TRACKERS = ["http://google-analytics.com/collect"]
+
+
+def patch_binary_trackers(exe):
+    data = bytearray(Path(exe).read_bytes())
+    for url in UPSTREAM_TRACKERS:
+        old = url.encode() + b"\0"
+        if data.count(old) != 1:
+            fail(f"adresse de traçage introuvable ou ambiguë dans le shell macOS : {url}")
+        new = ("about:blank#" + "x" * len(url))[:len(url)]
+        i = data.find(old)
+        data[i:i + len(url)] = new.encode()
+    Path(exe).write_bytes(bytes(data))
+
+
+LIBSYSTEM_TBD = """--- !tapi-tbd
+tbd-version:     4
+targets:         [ arm64-macos ]
+install-name:    '/usr/lib/libSystem.B.dylib'
+current-version: 1351
+exports:
+  - targets:         [ arm64-macos ]
+    symbols:         [ ___stderrp, __NSGetExecutablePath, _execv, _fclose, _fopen, _fputs, _fread,
+                       _free, _fwrite, _malloc, _memcpy, _strlen, _strncmp, _strrchr, _strstr,
+                       dyld_stub_binder ]
+...
+"""
+
+
+def build_helpers():
+    """Lanceur du bundle et garde x2t, arm64 (macOS 11+). Depuis Linux : clang et ld64.lld de LLVM,
+    sans SDK Apple (bibliothèque système décrite par un fichier .tbd minimal). Sur un Mac : clang
+    de Xcode."""
+    from .build_auxitext import X2T_GUARD_SRC, engine_switches
+    out = HELPERS_DIR
+    rmtree(out)
+    out.mkdir(parents=True)
+    sources = {"launcher": (ROOT / "src" / "launcher" / "auxioffice_macos.c",
+                            [f'-DAUXI_ENGINE_SWITCHES="{engine_switches()}"', f'-DAUXI_ENGINE_BINARY="{ENGINE_NAME}"']),
+               "x2t-guard": (X2T_GUARD_SRC, ["-DAUXI_MACOS_NO_SDK"])}
+    common = ["-target", "arm64-apple-macos11", "-O2", "-Wall", "-Wextra", "-Werror", "-ffreestanding",
+              "-fno-stack-protector", "-fno-builtin"]
+    if IS_MACOS_HOST:
+        cc, env, link = ["xcrun", "clang"], None, ["-lSystem"]
+    else:
+        from .wincross import _llvm_ld_path, find_llvm
+        llvm = find_llvm()
+        if not llvm or not (llvm / "ld64.lld").exists():
+            fail("clang/ld64.lld (LLVM) introuvables : nécessaires pour le lanceur macOS (--local-deps)")
+        write_text(out / "libSystem.tbd", LIBSYSTEM_TBD)
+        cc, env = [llvm / "clang"], {"LD_LIBRARY_PATH": _llvm_ld_path(llvm)}
+        link = ["-nostdlib", "-fuse-ld=lld", "-Wl,-platform_version,macos,11.0,11.0", "-Wl,-fixup_chains",
+                f"-L{out}", "-lSystem"]
+    for name, (src, defines) in sources.items():
+        run([*cc, *common, *defines, src, *link, "-o", out / name], env=env)
+    ok(f"lanceur et garde x2t macOS : {out}")
+    return out / "launcher", out / "x2t-guard"
+
+
 def patch_binary_urls(exe, website):
     """Remplace sur place (même longueur, binaire re-signé ensuite) les adresses ONLYOFFICE du
     shell par le site AuxiNux. L'adresse d'aide garde son unique « %@ » (code de langue)."""
@@ -288,7 +357,9 @@ def brand_info_plist(contents, p):
         "CFBundleURLTypes": [{"CFBundleTypeRole": "Editor",
                               "CFBundleURLSchemes": [p["windows"]["url_protocol"]]}],
     })
-    for key in ("CFBundleIconName", "SUFeedURL", "SUPublicEDKey", "SUScheduledCheckInterval", "ASCWebappsHelpUrl"):
+    # NSAppTransportSecurity : l'exception d'upstream autorise le HTTP non chiffré ; retirée.
+    for key in ("CFBundleIconName", "SUFeedURL", "SUPublicEDKey", "SUScheduledCheckInterval", "ASCWebappsHelpUrl",
+                "NSAppTransportSecurity"):
         plist.pop(key, None)
     for key, value in list(plist.items()):
         if key.endswith("UsageDescription") and isinstance(value, str):
@@ -314,8 +385,17 @@ def brand_bundle(app, p):
     old_exe = contents / "MacOS" / "ONLYOFFICE"
     if not old_exe.exists():
         fail(f"exécutable d'upstream introuvable : {old_exe}")
-    old_exe.rename(contents / "MacOS" / APP_NAME)
-    patch_binary_urls(contents / "MacOS" / APP_NAME, p["product"]["website"])
+    engine = contents / "MacOS" / ENGINE_NAME
+    old_exe.rename(engine)
+    patch_binary_urls(engine, p["product"]["website"])
+    patch_binary_trackers(engine)
+    launcher, guard = build_helpers()
+    shutil.copy2(launcher, contents / "MacOS" / APP_NAME)
+    (contents / "MacOS" / APP_NAME).chmod(0o755)
+    converter = resources / "converter"
+    (converter / "x2t").rename(converter / "x2t-engine")
+    shutil.copy2(guard, converter / "x2t")
+    (converter / "x2t").chmod(0o755)
     brand_info_plist(contents, p)
     changed = [f for f in resources.glob("*.lproj/*.strings") if rebrand_strings_file(f)]
     overrides = english_storyboard_overrides(resources)
@@ -371,6 +451,8 @@ def assemble(args):
             info(f"plugin retiré (confidentialité) : {label}")
 
     brand_bundle(app, product())
+    from .privacy import harden
+    harden(resources / "login" / "index.html", resources / "editors")
     integrate_auxitext(app)
     # Mentions légales : à côté de la page d'accueil (liens relatifs de l'écran À propos)
     install_legal_files(resources, "macos")
@@ -463,6 +545,8 @@ def package(args):
     app = stage_app()
     if not (app / "Contents" / "MacOS" / APP_NAME).exists():
         fail(f"{app} absent : lancer l'étape assemble (cible macos)")
+    from .assemble import check_shippable
+    check_shippable(app)
     step("Archive macOS")
     dist = DIST_DIR / "macos"
     dist.mkdir(parents=True, exist_ok=True)
@@ -512,9 +596,19 @@ def test_static(r, stage_app_dir):
     r.add("onglet d'accueil : logo ONLYOFFICE du catalogue neutralisé",
           b"logo-tab-dark" not in car and b"logo-tab-light" not in car
           and (contents / "Resources" / "logo-tab-dark.png").exists())
-    exe = (contents / "MacOS" / APP_NAME).read_bytes()
+    exe = (contents / "MacOS" / ENGINE_NAME).read_bytes()
     left = [u for u, _ in UPSTREAM_URLS if u.encode() in exe]
     r.add("shell : adresses ONLYOFFICE remplacées (Aide…)", not left, ", ".join(left) or "site AuxiNux")
+    r.add("shell : adresse Google Analytics retirée", not any(u.encode() in exe for u in UPSTREAM_TRACKERS))
+    launcher = (contents / "MacOS" / APP_NAME).read_bytes()
+    from .build_auxitext import engine_switches
+    r.add("lanceur du bundle : commutateurs de confidentialité du moteur web",
+          launcher[:4] == b"\xcf\xfa\xed\xfe" and engine_switches().encode() in launcher
+          and ENGINE_NAME.encode() in launcher, engine_switches())
+    guard = (contents / "Resources" / "converter" / "x2t").read_bytes()
+    r.add("convertisseur : garde réseau AuxiNux (x2t -> x2t-engine)",
+          b"allowNetworkRequest" in guard and (contents / "Resources" / "converter" / "x2t-engine").is_file())
+    r.add("Info.plist : pas d'exception NSAppTransportSecurity", "NSAppTransportSecurity" not in plist)
     r.add("Info.plist sans mention ONLYOFFICE", "ONLYOFFICE" not in str(plist), "")
     text_app = contents / "Applications" / "AuxiText.app"
     if text_app.exists():

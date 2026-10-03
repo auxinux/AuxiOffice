@@ -409,8 +409,8 @@ Le recharger et perdre vos modifications ?</translation>
             <translation>À propos d'AuxiText</translation>
         </message>
         <message>
-            <source>&lt;h3&gt;AuxiText %1&lt;/h3&gt;&lt;p&gt;Lightweight plain text editor of &lt;b&gt;AuxiNux Office&lt;/b&gt;.&lt;/p&gt;&lt;p&gt;Free software developed by the AuxiNux project, licensed under the GNU Affero General Public License v3.&lt;/p&gt;&lt;p&gt;No telemetry, no account, works offline.&lt;/p&gt;&lt;p&gt;&lt;a href="https://auxinux.ca"&gt;auxinux.ca&lt;/a&gt;&lt;/p&gt;</source>
-            <translation>&lt;h3&gt;AuxiText %1&lt;/h3&gt;&lt;p&gt;Éditeur de texte brut léger d'&lt;b&gt;AuxiNux Office&lt;/b&gt;.&lt;/p&gt;&lt;p&gt;Logiciel libre développé par le projet AuxiNux, sous licence GNU Affero General Public License v3.&lt;/p&gt;&lt;p&gt;Aucune télémétrie, aucun compte, fonctionne hors ligne.&lt;/p&gt;&lt;p&gt;&lt;a href="https://auxinux.ca"&gt;auxinux.ca&lt;/a&gt;&lt;/p&gt;</translation>
+            <source>&lt;h3&gt;AuxiText %1&lt;/h3&gt;&lt;p&gt;Lightweight plain text editor of &lt;b&gt;AuxiNux Office&lt;/b&gt;.&lt;/p&gt;&lt;p&gt;Free software developed by the AuxiNux project, licensed under the GNU Affero General Public License v3.&lt;/p&gt;&lt;p&gt;No telemetry, no account, works offline.&lt;/p&gt;&lt;p&gt;&lt;a href="https://office.auxinux.ca"&gt;office.auxinux.ca&lt;/a&gt;&lt;/p&gt;</source>
+            <translation>&lt;h3&gt;AuxiText %1&lt;/h3&gt;&lt;p&gt;Éditeur de texte brut léger d'&lt;b&gt;AuxiNux Office&lt;/b&gt;.&lt;/p&gt;&lt;p&gt;Logiciel libre développé par le projet AuxiNux, sous licence GNU Affero General Public License v3.&lt;/p&gt;&lt;p&gt;Aucune télémétrie, aucun compte, fonctionne hors ligne.&lt;/p&gt;&lt;p&gt;&lt;a href="https://office.auxinux.ca"&gt;office.auxinux.ca&lt;/a&gt;&lt;/p&gt;</translation>
         </message>
         <message>
             <source>Free Software and Licenses</source>

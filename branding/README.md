@@ -15,10 +15,10 @@ branding/
 
 | Section | Contenu |
 |---|---|
-| `product` | nom (« AuxiNux Office »), nom court (« AuxiOffice »), éditeur, titulaire du copyright, site, dépôt source, licence, date de début des modifications, descriptions FR/EN |
+| `product` | nom (« AuxiNux Office »), nom court technique (identifiant interne, jamais affiché), éditeur, titulaire du copyright, site, dépôt source, licence, date de début des modifications, descriptions FR/EN |
 | `upstream` | programme d'origine, développeur, mentions de marque FR/EN (affichées dans l'application et les paquets) |
 | `apps` | AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF, AuxiText (et AuxiMail, « study ») : nom, couleur, lettre, extensions |
-| `linux` | exécutable, nom du paquet, identifiant d'application (`ca.auxinux.AuxiOffice`), dossiers, mainteneur |
+| `linux` | exécutable, nom du paquet, identifiant d'application (`ca.auxinux.AuxiNuxOffice`), dossiers, mainteneur |
 | `windows` | exécutables, dossier d'installation, clés de registre, identifiant d'application (AppUserModelID), préfixe des ProgID, code de mise à niveau MSI |
 | `colors` | orange AuxiNux `#F26F00`, ambre `#F2B713`, graphite `#23252A`, argent `#B7B9BA`, fonds clair et sombre |
 | `i18n` | langue par défaut (français) et langues livrées |

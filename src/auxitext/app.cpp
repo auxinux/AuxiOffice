@@ -16,6 +16,7 @@
 #include <QStandardPaths>
 #include <QStyle>
 #include <QTranslator>
+#include <QWidget>
 #include <cstdio>
 
 #ifdef Q_OS_WIN
@@ -68,7 +69,7 @@ static QString windowsConfigDir()
     QString roaming = QString::fromLocal8Bit(qgetenv("APPDATA"));
     if (roaming.isEmpty())
         roaming = QDir::homePath() + QStringLiteral("/AppData/Roaming");
-    return QDir::fromNativeSeparators(roaming) + QStringLiteral("/AuxiNux/AuxiOffice");
+    return QDir::fromNativeSeparators(roaming) + QStringLiteral("/AuxiNux/AuxiNuxOffice");
 }
 #endif
 
@@ -77,9 +78,19 @@ QSettings& settings()
 #ifdef Q_OS_WIN
     static QSettings s(windowsConfigDir() + QStringLiteral("/auxitext.ini"), QSettings::IniFormat);
 #else
-    // ~/.config/auxioffice/auxitext.conf (respecte XDG_CONFIG_HOME)
-    static QSettings s(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("auxioffice"),
+    // ~/.config/auxinux-office/auxitext.ini (respecte XDG_CONFIG_HOME)
+    static QSettings s(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("auxinux-office"),
                        QStringLiteral("auxitext"));
+    static const bool privateFile = [] {
+        // Fichiers récents et dossiers : lisibles par l'utilisateur seul. QSettings réécrit le
+        // fichier en conservant ses droits ; il est donc créé d'avance avec les droits 0600.
+        QFile f(s.fileName());
+        QDir().mkpath(QFileInfo(f).absolutePath());
+        if (!f.exists() && f.open(QIODevice::WriteOnly))
+            f.close();
+        return f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    }();
+    (void)privateFile;
 #endif
     return s;
 }
@@ -91,13 +102,13 @@ static QString shellLocale()
     const QString user = shell.value(QStringLiteral("locale")).toString();
     if (!user.isEmpty())
         return user;
-    // Comme le shell : langue choisie à l'installation (HKLM\Software\AuxiNux\AuxiOffice).
+    // Comme le shell : langue choisie à l'installation (HKLM\Software\AuxiNux\AuxiNuxOffice).
     QSettings machine(QSettings::NativeFormat, QSettings::SystemScope, QStringLiteral("AuxiNux"),
-                      QStringLiteral("AuxiOffice"));
+                      QStringLiteral("AuxiNuxOffice"));
     return machine.value(QStringLiteral("locale")).toString();
 #else
-    QSettings shell(QSettings::NativeFormat, QSettings::UserScope, QStringLiteral("auxioffice"),
-                    QStringLiteral("AuxiOffice"));
+    QSettings shell(QSettings::NativeFormat, QSettings::UserScope, QStringLiteral("auxinux-office"),
+                    QStringLiteral("AuxiNuxOffice"));
     return shell.value(QStringLiteral("locale")).toString();
 #endif
 }
@@ -214,7 +225,7 @@ bool isDark()
     return systemPrefersDark();
 }
 
-void applyPalette(bool dark)
+void applyPalette(bool dark, QWidget* target)
 {
     QPalette p = qApp->style()->standardPalette();
     if (dark) {
@@ -244,7 +255,10 @@ void applyPalette(bool dark)
         p.setColor(QPalette::HighlightedText, QColor("#FFFFFF"));
         p.setColor(QPalette::Link, QColor("#C85A00"));
     }
-    qApp->setPalette(p);
+    if (target)
+        target->setPalette(p);
+    else
+        qApp->setPalette(p);
 }
 
 QString installDir()
@@ -269,7 +283,7 @@ QString writerExecutable()
 QStringList writerArguments(const QString& path)
 {
 #ifdef Q_OS_MACOS
-    return {QStringLiteral("-b"), QStringLiteral("ca.auxinux.AuxiOffice"), path};
+    return {QStringLiteral("-b"), QStringLiteral("ca.auxinux.AuxiNuxOffice"), path};
 #else
     return {QStringLiteral("--writer"), path};
 #endif

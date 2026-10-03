@@ -25,7 +25,7 @@ RESOURCES += resources/auxitext.qrc
 exists($$OUT_PWD/i18n/i18n.qrc): RESOURCES += $$OUT_PWD/i18n/i18n.qrc
 
 unix:!macx {
-    # Les bibliothèques Qt sont livrées à côté du binaire (/usr/lib/auxioffice)
+    # Les bibliothèques Qt sont livrées à côté du binaire (/usr/lib/auxinux-office)
     QMAKE_LFLAGS += "-Wl,-rpath,\'\$$ORIGIN\'" -Wl,--disable-new-dtags -Wl,--as-needed -static-libstdc++ -static-libgcc
     QMAKE_LFLAGS_RPATH =
 }

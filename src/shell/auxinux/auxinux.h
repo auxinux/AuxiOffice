@@ -29,15 +29,26 @@ QString versionLine();
 void printVersion();
 
 // Répertoires XDG / Windows propres à AuxiNux Office.
-QString cacheDir();     // ~/.cache/auxioffice  |  %LOCALAPPDATA%\AuxiNux\AuxiOffice\cache
-QString configFile();   // fichier INI (Windows uniquement) : %APPDATA%\AuxiNux\AuxiOffice\settings.ini
+QString cacheDir();     // ~/.cache/auxinux-office  |  %LOCALAPPDATA%\AuxiNux\AuxiNuxOffice\cache
+QString configFile();   // fichier INI (Windows uniquement) : %APPDATA%\AuxiNux\AuxiNuxOffice\settings.ini
+
+// Tout début de main() : si le moteur web n'a pas reçu les commutateurs de confidentialité
+// (binaire du shell lancé directement, raccourci épinglé à la barre des tâches, autre
+// --disable-features), relance le shell avec ces commutateurs. Renvoie true si le processus
+// courant doit se terminer (Windows : nouveau processus créé ; Linux : execv ne revient pas).
+bool relaunchWithEngineSwitches(int argc, char* argv[]);
+
+// Nom d'auteur par défaut des documents, commentaires et modifications suivies tant que
+// l'utilisateur n'en a pas choisi un (au lieu du nom du compte du système).
+std::wstring defaultUserName();
 
 // Ajuste les réglages du moteur après setup_paths() : cache CEF dans le cache XDG,
 // nom d'application écrit dans les métadonnées des documents produits.
 void adjustSettings(CAscApplicationSettings& settings);
 
 // Réglages par défaut respectueux de la vie privée, appliqués avant l'initialisation
-// du moteur (assistants IA désactivés tant que l'utilisateur ne les active pas).
+// du moteur (assistants IA désactivés tant que l'utilisateur ne les active pas) ; supprime
+// les copies de travail des documents laissées par une session interrompue.
 void applyPrivacyDefaults();
 
 // Traductions des messages propres à AuxiNux dans le shell (français, anglais), selon la
@@ -53,11 +64,18 @@ void restoreDefaultSignals();
 // Fichiers texte brut gérés par AuxiText (extensions de branding/product.json, sauf CSV).
 bool isTextDocument(const QString& path);
 
-// Lance AuxiText (processus séparé, léger) avec les fichiers donnés.
+// Ouvre les fichiers texte (ou un nouveau fichier si la liste est vide) dans AuxiText, intégré
+// dans un onglet d'AuxiNux Office (texttabs.h) ; à défaut, dans l'application AuxiText.
 bool launchTextEditor(const QStringList& files);
+
+// Lance l'application AuxiText (processus séparé) avec les fichiers donnés.
+bool startTextEditor(const QStringList& files);
 
 // Si opts désigne un fichier local de texte brut, l'ouvre dans AuxiText et renvoie true.
 bool routeToTextEditor(const COpenOptions& opts);
+
+// Même chose pour un chemin (ou une adresse file://) : ligne de commande, glisser-déposer.
+bool openIfTextFile(QString path);
 
 // Boîte de dialogue « Ouvrir un PDF » (filtre PDF), chemin vide si annulé.
 QString selectPdfFile(int parentViewId);

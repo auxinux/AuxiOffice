@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .common import (BUILD_DIR, DIST_DIR, ROOT, TOOLCHAINS_DIR, download, fail, info, lock, ok, product,
                      rmtree, run, source_date_epoch, step, version, warn, write_text)
-from .assemble import stage_dir
+from .assemble import check_shippable, stage_dir
 
 GEN = ROOT / "branding" / "generated"
 FILETYPES = json.loads((ROOT / "packaging" / "common" / "filetypes.json").read_text(encoding="utf-8"))
@@ -219,8 +219,8 @@ Upstream-Contact: {p['linux']['maintainer']}
 Source: {prod['source_url']}
 Comment: AuxiNux Office est un projet indépendant basé sur ONLYOFFICE Desktop Editors
  (https://github.com/ONLYOFFICE/DesktopEditors). ONLYOFFICE est une marque d'Ascensio
- System SIA. Mentions complètes : /usr/lib/auxioffice/NOTICE.txt et
- /usr/lib/auxioffice/licenses/index.html
+ System SIA. Mentions complètes : /usr/lib/auxinux-office/NOTICE.txt et
+ /usr/lib/auxinux-office/licenses/index.html
 
 Files: *
 Copyright: 2026 Projet AuxiNux
@@ -228,16 +228,16 @@ Copyright: 2026 Projet AuxiNux
 License: AGPL-3.0-only-with-additional-terms
  Ce programme est distribué sous la GNU Affero General Public License version 3
  avec les conditions additionnelles du programme d'origine (section 7) : voir
- /usr/lib/auxioffice/LICENSE.txt. Le code propre à AuxiNux est aussi disponible
+ /usr/lib/auxinux-office/LICENSE.txt. Le code propre à AuxiNux est aussi disponible
  sous AGPL-3.0-or-later.
 
-Files: usr/lib/auxioffice/lib*.so* usr/lib/auxioffice/converter/*
-       usr/lib/auxioffice/editors/* usr/lib/auxioffice/fonts/* usr/lib/auxioffice/dictionaries/*
-Copyright: voir /usr/lib/auxioffice/licenses/
+Files: usr/lib/auxinux-office/lib*.so* usr/lib/auxinux-office/converter/*
+       usr/lib/auxinux-office/editors/* usr/lib/auxinux-office/fonts/* usr/lib/auxinux-office/dictionaries/*
+Copyright: voir /usr/lib/auxinux-office/licenses/
 License: various
  Chromium Embedded Framework (BSD-3-Clause), Qt 5 (LGPL-3.0), ICU (Unicode-3.0),
  V8 (BSD-3-Clause), polices (Apache-2.0, OFL-1.1…), dictionnaires (GPL, LGPL, MPL…).
- Le détail figure dans /usr/lib/auxioffice/licenses/ et dans chaque répertoire.
+ Le détail figure dans /usr/lib/auxinux-office/licenses/ et dans chaque répertoire.
 """
 
 
@@ -323,7 +323,7 @@ def build_appimage(p):
                        sha256=tools["appimage_runtime"]["sha256"])
     appdir = BUILD_DIR / "package" / "appimage" / "AuxiNuxOffice.AppDir"
     rmtree(appdir.parent)
-    libdir = appdir / "usr" / "lib" / "auxioffice"
+    libdir = appdir / p["linux"]["install_dir"].lstrip("/")
     libdir.parent.mkdir(parents=True)
     shutil.copytree(stage, libdir, symlinks=True)
     write_text(libdir / "converter" / "package.config", "package = appimage\n")
@@ -336,8 +336,8 @@ def build_appimage(p):
 # AuxiNux Office — point d'entrée de l'AppImage
 HERE="$(dirname "$(readlink -f "$0")")"
 export AUXI_PACKAGE=appimage
-exec "$HERE/usr/lib/auxioffice/auxioffice" "$@"
-""")
+exec "$HERE%s/auxioffice" "$@"
+""" % p["linux"]["install_dir"])
     (appdir / "AppRun").chmod(0o755)
     out = DIST_DIR / "linux" / f"AuxiNuxOffice-{version()}-x86_64.AppImage"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -362,6 +362,7 @@ class _Product(dict):
 def package(args):
     p = _Product(product())
     p.local_deps = args.local_deps
+    check_shippable(stage_dir("linux"))
     formats = [f.strip() for f in (args.formats or "deb,appimage").split(",") if f.strip()]
     produced = []
     if "deb" in formats:

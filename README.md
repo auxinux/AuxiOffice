@@ -1,6 +1,6 @@
 # AuxiNux Office
 
-**AuxiNux Office** (AuxiOffice) est la suite bureautique libre de l'écosystème
+**AuxiNux Office** ([office.auxinux.ca](https://office.auxinux.ca)) est la suite bureautique libre de l'écosystème
 [AuxiNux](https://auxinux.ca) : traitement de texte, tableur, présentations, lecteur PDF et
 éditeur de texte brut, utilisables **hors ligne, sans compte, sans publicité et sans
 télémétrie**, sous Linux et Windows.
@@ -13,7 +13,7 @@ Version : **0.1.0** (fichier [`VERSION`](VERSION), source unique de la version).
 | **AuxiSheet** | tableur | XLSX (prioritaire), XLS, ODS, CSV |
 | **AuxiPresent** | présentations | PPTX, PPT, ODP ; export PDF |
 | **AuxiPDF** | lecteur PDF | PDF (aussi DjVu, XPS) |
-| **AuxiText** | éditeur de texte brut léger | TXT, LOG, MD, CSV, JSON, XML, YAML, INI, CONF, sans extension |
+| **AuxiText** | éditeur de texte brut léger : application à part, et intégré aux onglets d'AuxiNux Office | TXT, LOG, MD, CSV, JSON, XML, YAML, INI, CONF, sans extension |
 | AuxiMail | *étude technique* ([docs/AUXIMAIL.md](docs/AUXIMAIL.md)) | — |
 
 AuxiNux Office est un **fork maintenable d'[ONLYOFFICE Desktop Editors](https://github.com/ONLYOFFICE/DesktopEditors)**
@@ -30,9 +30,10 @@ propres paquets. Voir [ARCHITECTURE.md](ARCHITECTURE.md).
 Résumé honnête de ce qui a été vérifié (détails : [CHANGELOG.md](CHANGELOG.md),
 [docs/TESTING-LINUX.md](docs/TESTING-LINUX.md), [docs/TESTING-WINDOWS.md](docs/TESTING-WINDOWS.md)) :
 
-- **Linux x86_64** : compilé depuis zéro et testé automatiquement — **40 tests sur 40
-  réussis** (versions, tests unitaires d'AuxiText, contrôles statiques, conversions du moteur,
-  tests graphiques des cinq applications sous Xvfb sans réseau, audit réseau : 0 connexion).
+- **Linux x86_64** : compilé depuis zéro et testé automatiquement — **50 tests sur 50
+  réussis** (versions, tests unitaires d'AuxiText, contrôles statiques et de confidentialité,
+  conversions du moteur, tests graphiques des cinq applications et d'AuxiText intégré sous Xvfb
+  sans réseau, audit réseau avec documents piégés : 0 connexion, aucun téléchargement).
   Paquets `.deb` (installation simulée par APT sur Debian 13) et AppImage produits ; pas encore
   essayés dans une vraie session de bureau.
 - **Windows 10/11 x64** : compilé (compilation croisée), installateur `.exe` et paquet `.msi`
@@ -60,9 +61,9 @@ chmod +x AuxiNuxOffice-0.1.0-x86_64.AppImage
 ./AuxiNuxOffice-0.1.0-x86_64.AppImage
 ```
 
-Fichiers : programme dans `/usr/lib/auxioffice/`, commandes `/usr/bin/auxioffice` et
-`/usr/bin/auxitext`, réglages dans `~/.config/auxioffice/`, données dans
-`~/.local/share/auxioffice/`, cache dans `~/.cache/auxioffice/`.
+Fichiers : programme dans `/usr/lib/auxinux-office/`, commandes `/usr/bin/auxioffice` et
+`/usr/bin/auxitext`, réglages dans `~/.config/auxinux-office/`, données dans
+`~/.local/share/auxinux-office/`, cache dans `~/.cache/auxinux-office/`.
 
 ### Windows 10 22H2 / Windows 11 (x64)
 
@@ -78,8 +79,8 @@ Visual C++) sont décrites dans [BUILD.md](BUILD.md#53-installateurs-windows). L
 définit **jamais** AuxiNux Office comme application par défaut : il le propose dans « Ouvrir
 avec » et dans Paramètres > Applications > Applications par défaut, où vous choisissez.
 
-Fichiers : `C:\Program Files\AuxiNux Office\`, réglages dans `%APPDATA%\AuxiNux\AuxiOffice\`,
-données et cache dans `%LOCALAPPDATA%\AuxiNux\AuxiOffice\`.
+Fichiers : `C:\Program Files\AuxiNux Office\`, réglages dans `%APPDATA%\AuxiNux\AuxiNuxOffice\`,
+données et cache dans `%LOCALAPPDATA%\AuxiNux\AuxiNuxOffice\`.
 
 ### macOS 11+ (Apple Silicon) — préliminaire
 

@@ -177,14 +177,51 @@ static int is_text_document(const char *path)
 
 /* Commutateurs Chromium/CEF ajoutés à chaque lancement du moteur d'édition :
  * aucune communication réseau d'arrière-plan (sondes DNS-over-HTTPS vers Google et
- * Cloudflare observées au démarrage, services d'arrière-plan, pings). Voir PRIVACY.md. */
-#define ENGINE_SWITCH_COUNT 4
-static const char *ENGINE_SWITCHES[ENGINE_SWITCH_COUNT] = {
-    "--disable-features=DnsOverHttps",
-    "--disable-background-networking",
-    "--disable-domain-reliability",
-    "--no-pings",
-};
+ * Cloudflare observées au démarrage, services d'arrière-plan, pings, dictionnaires
+ * téléchargés). Liste « privacy.engine_switches » de branding/product.json, séparée par « ; ».
+ * Voir PRIVACY.md. */
+#ifndef AUXI_ENGINE_SWITCHES
+# define AUXI_ENGINE_SWITCHES "--disable-features=DnsOverHttps;--disable-background-networking;" \
+    "--disable-domain-reliability;--no-pings;--disable-spell-checking"
+#endif
+#define ENGINE_SWITCH_MAX 16
+#define DISABLE_FEATURES "--disable-features="
+
+/* Remplit out avec les commutateurs du moteur ; extra_features (valeurs de --disable-features
+ * données par l'appelant, ou NULL) est fusionné avec celles d'AuxiNux : Chromium ne retient que
+ * la dernière occurrence d'un commutateur, un --disable-features de l'appelant annulerait sinon
+ * la désactivation du DNS sur HTTPS. Renvoie le nombre de commutateurs. */
+static int engine_switches(const char *extra_features, char **out)
+{
+    static char buffer[1024];
+    static char merged[2048];
+    char *item, *next;
+    int n = 0;
+    snprintf(buffer, sizeof(buffer), "%s", AUXI_ENGINE_SWITCHES);
+    for (item = buffer; item && *item && n < ENGINE_SWITCH_MAX; item = next) {
+        next = strchr(item, ';');
+        if (next)
+            *next++ = '\0';
+        if (!*item)
+            continue;
+        if (extra_features && *extra_features && !strncmp(item, DISABLE_FEATURES, strlen(DISABLE_FEATURES))) {
+            snprintf(merged, sizeof(merged), "%s,%s", item, extra_features);
+            out[n++] = merged;
+        } else {
+            out[n++] = item;
+        }
+    }
+    return n;
+}
+
+/* Ajoute la valeur d'un --disable-features de l'appelant à la liste accumulée. */
+static void add_feature(char *acc, size_t size, const char *value)
+{
+    size_t len = strlen(acc);
+    if (!*value)
+        return;
+    snprintf(acc + len, size - len, "%s%s", len ? "," : "", value);
+}
 
 /* --app=... : application demandée par une entrée de menu / association. */
 enum target_app { APP_AUTO, APP_WRITER, APP_SHEET, APP_PRESENT, APP_PDF, APP_TEXT };
@@ -307,6 +344,7 @@ static void prepend_converter_to_path(const wchar_t *dir)
 int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmdline, int show)
 {
     int argc = 0, i, ntext = 0, nshell = 0, rc = 0, force_writer = 0;
+    char features[1024] = "";
     enum target_app app = APP_AUTO;
     wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     wchar_t dir[MAX_PATH * 2], *slash;
@@ -348,7 +386,18 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmdline, int show)
         if (!wcscmp(a, L"--new-document")) { shell_args[nshell++] = (wchar_t *)L"--new:word"; continue; }
         if (!wcscmp(a, L"--new-spreadsheet")) { shell_args[nshell++] = (wchar_t *)L"--new:cell"; continue; }
         if (!wcscmp(a, L"--new-presentation")) { shell_args[nshell++] = (wchar_t *)L"--new:slide"; continue; }
-        if (!wcscmp(a, L"--writer")) { force_writer = 1; continue; }
+        if (!wcscmp(a, L"--writer")) {
+            /* transmis au shell : il n'envoie pas ces fichiers texte à AuxiText */
+            force_writer = 1;
+            shell_args[nshell++] = argv[i];
+            continue;
+        }
+        if (!wcsncmp(a, L"" DISABLE_FEATURES, wcslen(L"" DISABLE_FEATURES))) {
+            char value[512];
+            WideCharToMultiByte(CP_UTF8, 0, a + wcslen(L"" DISABLE_FEATURES), -1, value, sizeof(value), NULL, NULL);
+            add_feature(features, sizeof(features), value);
+            continue;
+        }
         if (a[0] == L'-' && a[1] == L'-') { shell_args[nshell++] = argv[i]; continue; }
         if (app == APP_TEXT || (app == APP_AUTO && !force_writer && is_text_document(a)))
             text_args[ntext++] = argv[i];
@@ -368,13 +417,15 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmdline, int show)
     if (ntext > 0)
         rc |= spawn(dir, TEXT_BINARY, text_args, ntext);
     if (nshell > 0 || ntext == 0) {
-        wchar_t **full = (wchar_t **)calloc((size_t)nshell + ENGINE_SWITCH_COUNT + 1, sizeof(wchar_t *));
-        static wchar_t switches[ENGINE_SWITCH_COUNT][64];
+        wchar_t **full = (wchar_t **)calloc((size_t)nshell + ENGINE_SWITCH_MAX + 1, sizeof(wchar_t *));
+        static wchar_t switches[ENGINE_SWITCH_MAX][2048];
+        char *engine[ENGINE_SWITCH_MAX];
+        int count = engine_switches(features, engine);
         int n = 0;
         if (!full)
             return 1;
-        for (i = 0; i < ENGINE_SWITCH_COUNT; ++i) {
-            MultiByteToWideChar(CP_UTF8, 0, ENGINE_SWITCHES[i], -1, switches[i], 64);
+        for (i = 0; i < count; ++i) {
+            MultiByteToWideChar(CP_UTF8, 0, engine[i], -1, switches[i], 2048);
             full[n++] = switches[i];
         }
         for (i = 0; i < nshell; ++i)
@@ -457,6 +508,7 @@ int main(int argc, char **argv)
     char dir[PATH_MAX];
     char **text_args, **shell_args;
     int i, ntext = 0, nshell = 0, rc = 0, force_writer = 0;
+    char features[1024] = "";
     enum target_app app = APP_AUTO;
 
     for (i = 1; i < argc; ++i) {
@@ -487,7 +539,16 @@ int main(int argc, char **argv)
         if (!strcmp(a, "--new-document")) { shell_args[nshell++] = (char *)"--new:word"; continue; }
         if (!strcmp(a, "--new-spreadsheet")) { shell_args[nshell++] = (char *)"--new:cell"; continue; }
         if (!strcmp(a, "--new-presentation")) { shell_args[nshell++] = (char *)"--new:slide"; continue; }
-        if (!strcmp(a, "--writer")) { force_writer = 1; continue; }
+        if (!strcmp(a, "--writer")) {
+            /* transmis au shell : il n'envoie pas ces fichiers texte à AuxiText */
+            force_writer = 1;
+            shell_args[nshell++] = a;
+            continue;
+        }
+        if (!strncmp(a, DISABLE_FEATURES, strlen(DISABLE_FEATURES))) {
+            add_feature(features, sizeof(features), a + strlen(DISABLE_FEATURES));
+            continue;
+        }
         if (a[0] == '-' && a[1] == '-') { shell_args[nshell++] = a; continue; }
         if (!strncmp(a, "file://", 7)) {
             /* URI locale transmise par certains gestionnaires de fichiers */
@@ -514,12 +575,11 @@ int main(int argc, char **argv)
     if (ntext > 0)
         rc |= launch(dir, TEXT_BINARY, text_args, ntext, 0);
     {
-        char **full = (char **)calloc((size_t)nshell + ENGINE_SWITCH_COUNT + 1, sizeof(char *));
+        char **full = (char **)calloc((size_t)nshell + ENGINE_SWITCH_MAX + 1, sizeof(char *));
         int n = 0;
         if (!full)
             return 1;
-        for (i = 0; i < ENGINE_SWITCH_COUNT; ++i)
-            full[n++] = (char *)ENGINE_SWITCHES[i];
+        n = engine_switches(features, full);
         for (i = 0; i < nshell; ++i)
             full[n++] = shell_args[i];
         return rc | launch(dir, SHELL_BINARY, full, n, 1);

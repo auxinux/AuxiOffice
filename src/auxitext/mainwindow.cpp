@@ -24,6 +24,7 @@
 #include <QFileSystemWatcher>
 #include <QInputDialog>
 #include <QLabel>
+#include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
@@ -44,13 +45,18 @@ const int kMaxRecent = 10;
 const qint64 kLargeFile = 64LL * 1024 * 1024;
 }
 
-MainWindow::MainWindow(QWidget* parent)
+MainWindow::MainWindow(QWidget* parent, TextHost* host)
     : QMainWindow(parent)
+    , m_host(host)
     , m_editor(new CodeEditor(this))
     , m_highlighter(new Highlighter(m_editor->document()))
     , m_watcher(new QFileSystemWatcher(this))
 {
-    setAttribute(Qt::WA_DeleteOnClose);
+    instances().append(this);
+    if (m_host)
+        setWindowFlags(Qt::Widget);     // widget enfant de l'hôte (onglet)
+    else
+        setAttribute(Qt::WA_DeleteOnClose);
     setAcceptDrops(true);
     m_editor->setAcceptDrops(false);
     setCentralWidget(m_editor);
@@ -60,13 +66,57 @@ MainWindow::MainWindow(QWidget* parent)
     createStatusBar();
     retranslate();
     readSettings();
-    applyTheme();
+    if (!m_host)
+        applyTheme();
 
     connect(m_editor->document(), &QTextDocument::modificationChanged, this, [this](bool) { updateTitle(); });
     connect(m_editor, &QPlainTextEdit::cursorPositionChanged, this, &MainWindow::updateStatus);
     connect(m_watcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::onFileChangedOnDisk);
 
     setCurrentFile(QString());
+}
+
+MainWindow::~MainWindow()
+{
+    instances().removeAll(this);
+}
+
+QList<MainWindow*>& MainWindow::instances()
+{
+    static QList<MainWindow*> list;
+    return list;
+}
+
+QString MainWindow::displayName() const
+{
+    return m_path.isEmpty() ? tr("Untitled") : QFileInfo(m_path).fileName();
+}
+
+bool MainWindow::isModified() const
+{
+    return m_editor->document()->isModified();
+}
+
+void MainWindow::focusEditor()
+{
+    m_editor->setFocus();
+}
+
+void MainWindow::setDarkTheme(bool dark)
+{
+    // Palette du widget seulement : l'hôte garde la sienne.
+    App::applyPalette(dark, this);
+    m_editor->setDark(dark);
+    m_highlighter->setDarkPalette(dark);
+}
+
+// Fichier ouvert ailleurs que dans cet éditeur : nouvel onglet de l'hôte ou nouvelle fenêtre.
+void MainWindow::openElsewhere(const QString& path)
+{
+    if (m_host)
+        m_host->openInNewEditor(path);
+    else
+        MainWindow::openInNewWindow(path);
 }
 
 MainWindow* MainWindow::openInNewWindow(const QString& path)
@@ -103,7 +153,7 @@ void MainWindow::createActions()
     m_newAct = act(QKeySequence::New, &MainWindow::newFile);
     m_newWindowAct = new QAction(this);
     m_newWindowAct->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+N")));
-    connect(m_newWindowAct, &QAction::triggered, this, [] { MainWindow::openInNewWindow(); });
+    connect(m_newWindowAct, &QAction::triggered, this, [this] { openElsewhere(QString()); });
     m_openAct = act(QKeySequence::Open, &MainWindow::open);
     m_saveAct = new QAction(this);
     m_saveAct->setShortcut(QKeySequence::Save);
@@ -116,7 +166,12 @@ void MainWindow::createActions()
     m_openWriterAct = act(QKeySequence(), &MainWindow::openInWriter);
     m_closeAct = new QAction(this);
     m_closeAct->setShortcut(QKeySequence::Close);
-    connect(m_closeAct, &QAction::triggered, this, &QWidget::close);
+    connect(m_closeAct, &QAction::triggered, this, [this] {
+        if (m_host)
+            m_host->closeEditor(this);
+        else
+            close();
+    });
     m_quitAct = new QAction(this);
     m_quitAct->setShortcut(QKeySequence::Quit);
     connect(m_quitAct, &QAction::triggered, qApp, &QApplication::closeAllWindows);
@@ -191,8 +246,8 @@ void MainWindow::createActions()
     connect(m_themeGroup, &QActionGroup::triggered, this, [this](QAction* a) {
         App::setThemeMode(a == m_themeLightAct ? App::ThemeMode::Light
                           : a == m_themeDarkAct ? App::ThemeMode::Dark : App::ThemeMode::System);
-        for (QWidget* w : QApplication::topLevelWidgets())
-            if (auto* mw = qobject_cast<MainWindow*>(w))
+        for (MainWindow* mw : instances())
+            if (!mw->m_host)
                 mw->applyTheme();
     });
 
@@ -261,7 +316,8 @@ void MainWindow::createMenus()
     m_fileMenu->addAction(m_openWriterAct);
     m_fileMenu->addSeparator();
     m_fileMenu->addAction(m_closeAct);
-    m_fileMenu->addAction(m_quitAct);
+    if (!m_host)    // intégré : l'hôte (AuxiNux Office) gère la fermeture de l'application
+        m_fileMenu->addAction(m_quitAct);
 
     m_editMenu = menuBar()->addMenu(QString());
     m_editMenu->addAction(m_undoAct);
@@ -287,11 +343,15 @@ void MainWindow::createMenus()
     m_viewMenu->addAction(m_zoomInAct);
     m_viewMenu->addAction(m_zoomOutAct);
     m_viewMenu->addAction(m_zoomResetAct);
-    m_viewMenu->addSeparator();
-    m_themeMenu = m_viewMenu->addMenu(QString());
+    m_themeMenu = new QMenu(this);
     m_themeMenu->addActions(m_themeGroup->actions());
-    m_uiLangMenu = m_viewMenu->addMenu(QString());
+    m_uiLangMenu = new QMenu(this);
     m_uiLangMenu->addActions(m_uiLangGroup->actions());
+    if (!m_host) {  // intégré : thème et langue d'AuxiNux Office
+        m_viewMenu->addSeparator();
+        m_viewMenu->addMenu(m_themeMenu);
+        m_viewMenu->addMenu(m_uiLangMenu);
+    }
 
     m_documentMenu = menuBar()->addMenu(QString());
     m_eolMenu = m_documentMenu->addMenu(QString());
@@ -320,7 +380,7 @@ void MainWindow::retranslate()
 {
     m_fileMenu->setTitle(tr("&File"));
     m_newAct->setText(tr("&New"));
-    m_newWindowAct->setText(tr("New &Window"));
+    m_newWindowAct->setText(m_host ? tr("New &Tab") : tr("New &Window"));
     m_openAct->setText(tr("&Open…"));
     m_recentMenu->setTitle(tr("Recent &Files"));
     m_saveAct->setText(tr("&Save"));
@@ -397,9 +457,11 @@ void MainWindow::readSettings()
     m_editor->setWordWrap(wrap);
     m_lineNumbersAct->setChecked(numbers);
     m_editor->setLineNumbersVisible(numbers);
-    const QByteArray geometry = s.value(QStringLiteral("window/geometry")).toByteArray();
-    if (geometry.isEmpty() || !restoreGeometry(geometry))
-        resize(980, 700);
+    if (!m_host) {
+        const QByteArray geometry = s.value(QStringLiteral("window/geometry")).toByteArray();
+        if (geometry.isEmpty() || !restoreGeometry(geometry))
+            resize(980, 700);
+    }
 
     switch (App::themeMode()) {
     case App::ThemeMode::Light: m_themeLightAct->setChecked(true); break;
@@ -413,7 +475,8 @@ void MainWindow::readSettings()
 
 void MainWindow::writeSettings()
 {
-    App::settings().setValue(QStringLiteral("window/geometry"), saveGeometry());
+    if (!m_host)
+        App::settings().setValue(QStringLiteral("window/geometry"), saveGeometry());
 }
 
 void MainWindow::applyTheme()
@@ -451,7 +514,7 @@ void MainWindow::open()
         if (isUntitledAndEmpty())
             openFile(f);
         else
-            MainWindow::openInNewWindow(f);
+            openElsewhere(f);
     }
 }
 
@@ -655,6 +718,8 @@ void MainWindow::updateTitle()
     const QString name = m_path.isEmpty() ? tr("Untitled") : QFileInfo(m_path).fileName();
     setWindowTitle(QStringLiteral("%1%2 — AuxiText").arg(m_editor->document()->isModified() ? QStringLiteral("*") : QString(), name));
     setWindowFilePath(m_path);
+    if (m_host)
+        m_host->editorStateChanged(this);
 }
 
 void MainWindow::updateStatus()
@@ -742,9 +807,8 @@ void MainWindow::addRecent(const QString& path)
     while (recent.size() > kMaxRecent)
         recent.removeLast();
     App::settings().setValue(QStringLiteral("files/recent"), recent);
-    for (QWidget* w : QApplication::topLevelWidgets())
-        if (auto* mw = qobject_cast<MainWindow*>(w))
-            mw->updateRecentMenu();
+    for (MainWindow* mw : instances())
+        mw->updateRecentMenu();
 }
 
 void MainWindow::updateRecentMenu()
@@ -757,7 +821,7 @@ void MainWindow::updateRecentMenu()
             if (isUntitledAndEmpty())
                 openFile(path);
             else
-                MainWindow::openInNewWindow(path);
+                openElsewhere(path);
         });
     }
     if (!recent.isEmpty()) {
@@ -782,7 +846,7 @@ void MainWindow::about()
                    "<p>Free software developed by the AuxiNux project, licensed under the "
                    "GNU Affero General Public License v3.</p>"
                    "<p>No telemetry, no account, works offline.</p>"
-                   "<p><a href=\"https://auxinux.ca\">auxinux.ca</a></p>").arg(App::version()));
+                   "<p><a href=\"https://office.auxinux.ca\">office.auxinux.ca</a></p>").arg(App::version()));
     box.exec();
 }
 

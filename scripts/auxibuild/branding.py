@@ -46,6 +46,9 @@ def shell_branding_header(p):
         "AUXI_DOCUMENT_APPLICATION_NAME": prod["name"],
         "AUXI_DOCUMENT_APPLICATION_COMPANY": "",
         "AUXI_TEXT_EXTENSIONS": ";".join(text_extensions(p)),
+        "AUXI_ENGINE_SWITCHES": ";".join(p["privacy"]["engine_switches"]),
+        "AUXI_DEFAULT_USER_NAME_FR": p["privacy"]["default_user_name"]["fr"],
+        "AUXI_DEFAULT_USER_NAME_EN": p["privacy"]["default_user_name"]["en"],
         "AUXI_XDG_NAME": lin["xdg_name"],
         "AUXI_WIN_VENDOR_DIR": win["vendor_dir"],
         "AUXI_WIN_APP_DIR": win["app_dir"],
@@ -124,7 +127,7 @@ def shell_defines_p(p):
 #define APP_USER_MODEL_ID       {c_str(win['app_user_model_id'])}
 #define APP_SIMPLE_WINDOW_TITLE {c_str(name)}
 #define APP_PROTOCOL            {c_str(win['url_protocol'])}
-#define FILE_PREFIX             "auxioffice_"
+#define FILE_PREFIX             "auxinux-office_"
 #define URL_SITE                AUXI_WEBSITE
 #define URL_SIGNUP              ""
 #define DOWNLOAD_PAGE           AUXI_WEBSITE
@@ -195,6 +198,13 @@ def brand_shell(p):
     write_text(src / "prop" / "defines_p.h", shell_defines_p(p))
     write_text(src / "prop" / "version_p.h", shell_version_p(p))
     copytree(ROOT / "src" / "shell" / "auxinux", src / "auxinux")
+    # AuxiText intégré aux onglets du shell (auxinux.pri) : mêmes sources que l'application
+    text = src / "auxinux" / "auxitext"
+    text.mkdir(parents=True, exist_ok=True)
+    for f in (ROOT / "src" / "auxitext").iterdir():
+        if f.suffix in (".cpp", ".h") and f.name != "main.cpp":
+            shutil.copy2(f, text / f.name)
+    shutil.copy2(ROOT / "VERSION", text / "VERSION")
     overlay = BRANDING / "overlays" / "desktop-apps"
     if overlay.exists():
         copytree(overlay, UPSTREAM_SRC / "desktop-apps")

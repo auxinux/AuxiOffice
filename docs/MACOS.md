@@ -22,8 +22,8 @@ lisez les limites (§3) avant de la diffuser.
      « Ouvrir quand même »**.
 3. Lancez AuxiNux Office depuis le Launchpad ou le dossier Applications.
 
-Données : `~/Library/Application Support/ca.auxinux.AuxiOffice/` ; réglages :
-`~/Library/Preferences/ca.auxinux.AuxiOffice.plist` (distincts d'une éventuelle installation
+Données : `~/Library/Application Support/ca.auxinux.AuxiNuxOffice/` ; réglages :
+`~/Library/Preferences/ca.auxinux.AuxiNuxOffice.plist` (distincts d'une éventuelle installation
 d'ONLYOFFICE). Désinstallation : mettre l'application à la Corbeille (et, si souhaité, ces
 deux emplacements).
 
@@ -61,8 +61,8 @@ python3 scripts/auxibuild all --target macos --local-deps
 |---|---|
 | fetch | `ONLYOFFICE-arm.dmg` de la release 9.4.0 (SHA-256 et taille vérifiés, `upstream.lock.json`), extrait avec 7-Zip |
 | prepare, build | page d'accueil et interface des éditeurs compilées depuis les sources patchées (mêmes que Linux/Windows) |
-| assemble | remplacement de la page d'accueil, des éditeurs, des modules réseau ; identité (Info.plist, textes de toutes les langues, menus anglais, icônes de l'application et des types de documents) ; mentions légales ; Sparkle désactivé ; **re-signature** du bundle avec rcodesign 0.29.0 |
-| test | identité, mentions légales, absence de logo ONLYOFFICE, textes, Sparkle, signature |
+| assemble | remplacement de la page d'accueil, des éditeurs, des modules réseau ; identité (Info.plist, textes de toutes les langues, menus anglais, icônes de l'application et des types de documents) ; mentions légales ; Sparkle désactivé ; confidentialité (lanceur AuxiNux avec les options réseau du moteur, garde réseau du convertisseur, adresse Google Analytics du shell retirée, CSP des pages) ; **re-signature** du bundle avec rcodesign 0.29.0 |
+| test | identité, mentions légales, absence de logo ONLYOFFICE, textes, Sparkle, confidentialité (lanceur, garde x2t, traqueurs, CSP), signature |
 | package | `AuxiNuxOffice-0.1.0-arm64.zip` (liens symboliques et droits conservés), `SHA256SUMS`, `update-info.json` |
 
 Signature : ad hoc par défaut. Avec un certificat **Developer ID Application** (compte Apple
@@ -78,9 +78,10 @@ elle-même (`rcodesign notary-submit`) demande une clé d'API App Store Connect.
 | AuxiText | inclus quand l'application est construite **sur un Mac** (`./build.sh`) ; absent des builds faits depuis Linux (tuile « Nouveau fichier texte » alors masquée) |
 | « Ouvrir PDF » | ouvre le dialogue d'ouverture standard (tous types) |
 | Assistant IA | désactivé par l'écran d'accueil au premier lancement (l'option reste dans les paramètres) |
-| Réglages réseau du moteur web (DNS sur HTTPS, réseau d'arrière-plan) | **non appliqués** (pas de lanceur AuxiNux sous macOS) : à vérifier (§4) |
+| Réglages réseau du moteur web (DNS sur HTTPS, réseau d'arrière-plan) | appliqués par un lanceur AuxiNux (exécutable de l'application, `src/launcher/auxioffice_macos.c`) qui démarre le shell d'upstream renommé « AuxiNux Office Engine » ; compilé depuis Linux (clang, ld64.lld), **pas encore exécuté sur un Mac** : à vérifier (§4, M-1 et M-9) |
+| Ressources distantes des documents | convertisseur x2t remplacé par la garde réseau AuxiNux (`x2t` -> `x2t-engine`), pages des éditeurs limitées aux ressources locales (CSP) ; à vérifier (M-11) |
 | Mises à jour (Sparkle) | vérifications automatiques désactivées, flux supprimé ; le menu « Rechercher des mises à jour » affichera une erreur |
-| Menu Aide | ouvre le site AuxiNux (adresses d'ONLYOFFICE remplacées dans le shell) |
+| Menu Aide | ouvre office.auxinux.ca (adresses d'ONLYOFFICE remplacées dans le shell) |
 | Logo de l'onglet d'accueil | entrées du catalogue compilé `Assets.car` neutralisées pour que macOS charge les images AuxiNux : à vérifier (§4) |
 | Signature | ad hoc, non notarisée (§1) |
 
@@ -101,5 +102,6 @@ Ces limites disparaîtront avec la compilation du shell macOS dans Xcode (patche
 | M-8 | Paramètres de l'accueil : IA | désactivée après le premier lancement (redémarrer l'application une fois) |
 | M-9 | Réseau : application ouverte avec des documents, dans Moniteur d'activité > Réseau, ou `sudo lsof -i -P \| grep -i auxinux`, ou Little Snitch / LuLu | noter toute connexion sortante (en particulier vers dns.google ou Cloudflare) |
 | M-10 | À propos > Logiciels libres et licences (écran d'accueil) | mentions AuxiNux, liens vers LICENSE, NOTICE et licences tierces |
+| M-11 | Ouvrir les documents piégés (`python3 tests/fixtures/make_fixtures.py /tmp/f`, dossier `/tmp/f/pieges`) avec LuLu ou Little Snitch actif | aucune connexion vers 203.0.113.x ; aucun processus `curl` lancé |
 
 Merci de signaler les résultats (captures bienvenues), en particulier M-3 et M-9.

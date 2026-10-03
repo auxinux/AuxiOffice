@@ -46,7 +46,7 @@ $p = Start-Process .\AuxiNuxOffice-0.1.0-x64.exe -ArgumentList '/S','/NODESKTOP'
 | W-SIL-2 | `/S /D=C:\Apps\AuxiNux Office` | installé dans ce dossier |
 | W-SIL-3 | `/S /NODESKTOP` | pas de raccourci sur le Bureau |
 | W-SIL-4 | `/S /NOASSOC` | aucune déclaration de types de fichiers (§5 sans objet) |
-| W-SIL-5 | `/S /LANG=en` | `HKLM\Software\AuxiNux\AuxiOffice\locale` = `en-US` ; AuxiNux Office démarre en anglais |
+| W-SIL-5 | `/S /LANG=en` | `HKLM\Software\AuxiNux\AuxiNuxOffice\locale` = `en-US` ; AuxiNux Office démarre en anglais |
 | W-SIL-6 | `/S /NOVCREDIST` sur un système sans redistribuable | installation terminée, mais l'application ne démarre pas (DLL Visual C++ manquantes) : comportement attendu de cette option réservée aux parcs gérés |
 | W-SIL-7 | Installation pendant qu'AuxiNux Office est ouvert | demande de fermer l'application (en silencieux : code 2, rien n'est modifié) |
 
@@ -56,12 +56,12 @@ $p = Start-Process .\AuxiNuxOffice-0.1.0-x64.exe -ArgumentList '/S','/NODESKTOP'
 |---|---|---|
 | W-RES-1 | `C:\Program Files\AuxiNux Office\` | `auxioffice.exe`, `auxioffice-editors.exe`, `auxitext.exe`, `converter\`, `editors\`, `LICENSE.txt`, `NOTICE.txt`, `licenses\`, `uninstall.exe` |
 | W-RES-2 | Menu Démarrer > dossier « AuxiNux Office » | AuxiNux Office, AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF, AuxiText, avec leurs icônes |
-| W-RES-3 | `Get-StartApps \| Where-Object Name -like 'Auxi*'` | AppID `AuxiNux.AuxiOffice` pour AuxiNux Office, AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF (identifiant d'application posé sur les raccourcis : regroupement dans la barre des tâches, notifications) |
+| W-RES-3 | `Get-StartApps \| Where-Object Name -like 'Auxi*'` | AppID `AuxiNux.AuxiNuxOffice` pour AuxiNux Office, AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF (identifiant d'application posé sur les raccourcis : regroupement dans la barre des tâches, notifications) |
 | W-RES-4 | Bureau | raccourci AuxiNux Office (sauf `/NODESKTOP`) |
 | W-RES-5 | Paramètres > Applications > Applications installées | AuxiNux Office, éditeur Projet AuxiNux, version 0.1.0, taille, icône ; pas de « Modifier » |
 | W-RES-6 | `Win+R` → `auxioffice` | l'accueil s'ouvre (App Paths) |
 | W-RES-7 | `& 'C:\Program Files\AuxiNux Office\auxioffice.exe' --version \| Out-String` ; dans `cmd` : `"C:\Program Files\AuxiNux Office\auxioffice.exe" --version \| more` | `AuxiNux Office 0.1.0` |
-| W-RES-8 | `reg query "HKLM\Software\AuxiNux\AuxiOffice"` | AppPath, Version, PackageType, locale |
+| W-RES-8 | `reg query "HKLM\Software\AuxiNux\AuxiNuxOffice"` | AppPath, Version, PackageType, locale |
 
 ## 5. Types de fichiers et applications par défaut (O)
 
@@ -85,6 +85,7 @@ AuxiSheet, AuxiPresent, AuxiPDF, AuxiText) sous Windows, en particulier :
 | W-APP-2 | DOCX, XLSX, PPTX : ouvrir, modifier, enregistrer, exporter en PDF, imprimer | fonctionnel |
 | W-APP-3 | PDF : navigation, zoom, recherche, copie, rotation, impression | fonctionnel |
 | W-APP-4 | AuxiText : fichier CRLF et fichier LF, UTF-8 avec accents ; « Ouvrir dans AuxiWriter » | fins de ligne conservées ; ouverture dans AuxiWriter |
+| W-APP-4b | AuxiText intégré : tuile « Nouveau fichier texte », « Ouvrir un fichier » sur un `.txt`, glisser un `.txt` sur la fenêtre ; fermer un onglet texte modifié | onglet AuxiText dans AuxiNux Office ; message « Enregistrer les modifications ? » ; aucune perte |
 | W-APP-5 | Ouvrir un second document depuis l'Explorateur, application déjà ouverte | ouvert dans l'instance existante |
 | W-APP-6 | Interface en français par défaut (Windows français) ; changement de langue | fonctionnel |
 
@@ -92,8 +93,8 @@ AuxiSheet, AuxiPresent, AuxiPDF, AuxiText) sous Windows, en particulier :
 
 | ID | Vérification | Résultat attendu |
 |---|---|---|
-| W-DAT-1 | `%APPDATA%\AuxiNux\AuxiOffice\` | `settings.ini`, `auxitext.ini` |
-| W-DAT-2 | `%LOCALAPPDATA%\AuxiNux\AuxiOffice\` | `data\` (settings.xml, fonts, recents.xml, recover…), `cache\` |
+| W-DAT-1 | `%APPDATA%\AuxiNux\AuxiNuxOffice\` | `settings.ini`, `auxitext.ini` |
+| W-DAT-2 | `%LOCALAPPDATA%\AuxiNux\AuxiNuxOffice\` | `data\` (settings.xml, fonts, recents.xml, recover…), `cache\` |
 | W-DAT-3 | `C:\Program Files\AuxiNux Office\` après utilisation | inchangé (aucune écriture de l'application) |
 | W-DAT-4 | Réseau désactivé (mode avion) : scénarios du §6 | tout fonctionne |
 | W-DAT-5 | Moniteur de ressources > Réseau, application ouverte avec des documents | aucune connexion de `auxioffice-editors.exe` ni `editors_helper.exe` (hors 127.0.0.1) |
@@ -102,8 +103,8 @@ AuxiSheet, AuxiPresent, AuxiPDF, AuxiText) sous Windows, en particulier :
 
 | ID | Étapes | Résultat attendu |
 |---|---|---|
-| W-UNI-1 | Paramètres > Applications installées > AuxiNux Office > Désinstaller | dossier d'installation, raccourcis, entrée « Applications installées », clés `HKLM\Software\AuxiNux`, ProgID `AuxiOffice.*`, valeur `RegisteredApplications` supprimés |
-| W-UNI-2 | Après désinstallation | les associations des autres applications sont intactes ; `%APPDATA%\AuxiNux\AuxiOffice` et `%LOCALAPPDATA%\AuxiNux\AuxiOffice` conservés |
+| W-UNI-1 | Paramètres > Applications installées > AuxiNux Office > Désinstaller | dossier d'installation, raccourcis, entrée « Applications installées », clés `HKLM\Software\AuxiNux`, ProgID `AuxiNuxOffice.*`, valeur `RegisteredApplications` supprimés |
+| W-UNI-2 | Après désinstallation | les associations des autres applications sont intactes ; `%APPDATA%\AuxiNux\AuxiNuxOffice` et `%LOCALAPPDATA%\AuxiNux\AuxiNuxOffice` conservés |
 | W-UNI-3 | Silencieuse : `Start-Process 'C:\Program Files\AuxiNux Office\uninstall.exe' -ArgumentList '/S'` | même résultat (le désinstalleur se recopie dans `%TEMP%` puis se termine : attendre quelques secondes avant de vérifier) |
 | W-UNI-4 | Réinstaller par-dessus une installation existante | remplacement propre ; réglages conservés |
 
@@ -145,7 +146,7 @@ avec les artefacts finaux (`AuxiNuxOffice-0.1.0-x64.exe` sha256 `1331d792…`,
 | Vérification | Résultat |
 |---|---|
 | Installation silencieuse `/S` | code 0 ; 5 159 fichiers ; contenu identique octet pour octet à l'arbre de build |
-| Registre | `HKLM\Software\AuxiNux\AuxiOffice` (locale `fr-FR`), Applications installées (nom, version, éditeur, taille, désinstallation silencieuse), `RegisteredApplications`, 33 types déclarés, App Paths |
+| Registre | `HKLM\Software\AuxiNux\AuxiNuxOffice` (locale `fr-FR`), Applications installées (nom, version, éditeur, taille, désinstallation silencieuse), `RegisteredApplications`, 33 types déclarés, App Paths |
 | Association existante (`.docx` → Word simulé) | conservée ; AuxiNux Office ajouté à « Ouvrir avec » seulement |
 | Raccourcis | dossier du menu Démarrer (6 raccourcis), raccourci du Bureau public |
 | Démarrage par `auxioffice.exe` (cible des raccourcis) | accueil en français ; DOCX, XLSX (formules), PPTX, PDF ouverts dans AuxiWriter, AuxiSheet, AuxiPresent, AuxiPDF ; TXT (CRLF, UTF-8) dans AuxiText |

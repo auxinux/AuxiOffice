@@ -27,6 +27,12 @@ from pathlib import Path
 MARK = "AuxiNux-Test-7Q2"
 
 
+def no_core_dumps():
+    """Aucun vidage mémoire (il contiendrait l'environnement de la machine de test)."""
+    import resource
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+
+
 class Session:
     def __init__(self, args):
         args.app = str(Path(args.app).resolve())
@@ -81,10 +87,11 @@ class Session:
     def launch(self, *files, audit=False):
         prefix = ["unshare", "-Un"] if self.offline else []
         if audit and self.args.network_audit:
-            prefix += [self.args.network_audit, "-f", "-qq", "-s", "200", "-e", "trace=connect,sendto,sendmsg",
+            prefix += [self.args.network_audit, "-f", "-qq", "-s", "200", "-e", "trace=connect,sendto,sendmsg,execve",
                        "-o", str(self.out / f"strace-{len(self.results)}.log")]
         subprocess.Popen(prefix + [str(Path(self.args.app) / "auxioffice"), *map(str, files)], env=self.env,
-                         stdout=open(self.out / "app.log", "a"), stderr=subprocess.STDOUT, cwd=str(self.home))
+                         stdout=open(self.out / "app.log", "a"), stderr=subprocess.STDOUT, cwd=str(self.home),
+                         preexec_fn=no_core_dumps)
 
     def wait_window(self, name, timeout=60):
         end = time.time() + timeout
@@ -157,8 +164,12 @@ class Session:
     def dismiss_tips(self, ox, oy, buttons):
         """Ferme les bulles « Nouveau » affichées au premier lancement de chaque éditeur
         (positions des boutons OK pour la taille de fenêtre par défaut 1200x740)."""
-        for x, y in buttons:
-            self.click(ox + x, oy + y)
+        # Deux passages : certaines bulles s'affichent quelques secondes après les autres.
+        for attempt in range(2):
+            for x, y in buttons:
+                self.click(ox + x, oy + y)
+            if attempt == 0:
+                time.sleep(3)
 
     def record(self, name, ok, detail=""):
         self.results.append({"test": name, "ok": bool(ok), "detail": detail})
@@ -177,19 +188,19 @@ class Session:
     def test_startpage(self):
         self.launch()
         ok = self.main_window(90) is not None
-        fonts = self.home / ".local/share/auxioffice/data/fonts/font_selection.bin"
+        fonts = self.home / ".local/share/auxinux-office/data/fonts/font_selection.bin"
         end = time.time() + 60
         while not fonts.exists() and time.time() < end:
             time.sleep(1)
         time.sleep(5)
         self.shot("01-accueil")
-        settings = (self.home / ".local/share/auxioffice/data/settings.xml")
+        settings = (self.home / ".local/share/auxinux-office/data/settings.xml")
         ai_off = settings.exists() and "<disable-ai>1</disable-ai>" in settings.read_text()
         self.record("écran d'accueil", ok and fonts.exists(), "fenêtre « AuxiNux Office », cache des polices créé")
         self.record("IA désactivée par défaut", ai_off, str(settings))
-        xdg = (self.home / ".config/auxioffice").is_dir() and (self.home / ".local/share/auxioffice").is_dir() \
-            and (self.home / ".cache/auxioffice").is_dir()
-        self.record("répertoires XDG", xdg, "~/.config/auxioffice, ~/.local/share/auxioffice, ~/.cache/auxioffice")
+        xdg = (self.home / ".config/auxinux-office").is_dir() and (self.home / ".local/share/auxinux-office").is_dir() \
+            and (self.home / ".cache/auxinux-office").is_dir()
+        self.record("répertoires XDG", xdg, "~/.config/auxinux-office, ~/.local/share/auxinux-office, ~/.cache/auxinux-office")
 
     def test_docx(self):
         doc = self.docs / "rapport.docx"
@@ -226,6 +237,8 @@ class Session:
         self.xdo("key", "Tab")
         self.xdo("type", "--delay", "60", "=B7*2")
         self.xdo("key", "Return")
+        # La bulle « Nouveau » peut s'afficher après le premier clic : elle capterait Ctrl+S.
+        self.dismiss_tips(ox, oy, [(791, 307)])
         self.xdo("key", "ctrl+s")
         saved = self.wait_saved(doc, before)
         self.shot("03-xlsx")
@@ -263,7 +276,7 @@ class Session:
         time.sleep(4)
         self.wait_stable(90)
         # ouvert dans AuxiPDF : le shell l'inscrit dans les documents récents (type 513 = PDF)
-        recents = self.home / ".local" / "share" / "auxioffice" / "recents.xml"
+        recents = self.home / ".local" / "share" / "auxinux-office" / "recents.xml"
         text = recents.read_text(encoding="utf-8-sig", errors="replace") if recents.exists() else ""
         opened = f'path="{pdf}" type="513"' in text
         ox, oy = self.main_origin()
@@ -320,8 +333,55 @@ class Session:
         self.launch(self.docs / "LISEZMOI")
         self.record("fichier sans extension -> AuxiText", self.wait_window("^LISEZMOI ", 30) is not None)
 
+    def test_text_tab(self):
+        """AuxiText intégré : un fichier texte ouvert depuis AuxiNux Office (instance déjà ouverte)
+        et un nouveau fichier texte (tuile de l'accueil) s'affichent dans un onglet, sans lancer
+        l'application AuxiText ; enregistrement depuis l'onglet."""
+        self.stop_app()
+        doc = self.docs / "notes-lf.txt"
+        before = doc.stat().st_mtime
+        app = Path(self.args.app) / "auxioffice"
+        # Hors espace réseau isolé : l'instance unique d'upstream communique par UDP sur la boucle
+        # locale, désactivée dans un espace réseau neuf (unshare -n) ; ce scénario n'utilise pas le
+        # réseau (l'audit réseau est fait par network_session). Le second lancement transmet le
+        # fichier au premier ; --app=writer : le fichier passe par le shell, qui le confie à AuxiText.
+        script = f'"{app}" & sleep 25; "{app}" --app=writer "{doc}"; wait'
+        subprocess.Popen(["sh", "-c", script], env=self.env, stdout=open(self.out / "app.log", "a"),
+                         stderr=subprocess.STDOUT, cwd=str(self.home), preexec_fn=no_core_dumps)
+        wid = self.wait_window("^notes-lf\\.txt$", 90)
+        standalone = subprocess.run(["pgrep", "-x", "auxitext"], capture_output=True, text=True).stdout.split()
+        saved = False
+        if wid:
+            time.sleep(3)
+            ox, oy = self.main_origin()
+            self.click(ox + 600, oy + 300)                     # zone de texte de l'onglet
+            self.xdo("key", "ctrl+End")
+            self.xdo("type", "--delay", "40", "Onglet AuxiText")
+            self.xdo("key", "ctrl+s")
+            saved = self.wait_saved(doc, before, 10)
+        self.shot("07-onglet-texte")
+        data = doc.read_bytes()
+        self.record("fichier texte ouvert dans un onglet (AuxiText intégré)",
+                    bool(wid) and not standalone and saved and data.endswith(b"Onglet AuxiText"),
+                    f"onglet {'présent' if wid else 'absent'}, {len(standalone)} application(s) AuxiText séparée(s), "
+                    f"{'enregistré' if saved else 'non enregistré'}")
+        ok = False
+        if wid:
+            ox, oy = self.main_origin()
+            self.click(ox + 55, oy + 15)                       # onglet d'accueil
+            time.sleep(3)
+            self.click(ox + 727, oy + 350)                     # tuile « Nouveau fichier texte »
+            ok = self.wait_window("^Sans titre$", 20) is not None
+            standalone = subprocess.run(["pgrep", "-x", "auxitext"], capture_output=True, text=True).stdout.split()
+            ok = ok and not standalone
+        self.shot("08-nouveau-texte")
+        self.record("nouveau fichier texte dans un onglet (tuile de l'accueil)", ok)
+        self.stop_app()
+
     def network_session(self):
-        """Session séparée sous strace : écran d'accueil puis un document de chaque type."""
+        """Session séparée sous strace : écran d'accueil, un document de chaque type, puis les
+        documents piégés (images et feuille de style distantes, voir tests/fixtures/trap_documents.py).
+        Les fichiers suivants sont transmis à l'instance principale, suivie par strace (-f)."""
         if not self.args.network_audit:
             return
         self.stop_app()
@@ -331,8 +391,14 @@ class Session:
         for name in ("rapport.docx", "budget.xlsx", "presentation.pptx", "document.pdf"):
             self.launch(self.docs / name, audit=True)
             time.sleep(25)
+        traps = sorted((self.docs / "pieges").glob("piege-*"))
+        for trap in traps:
+            self.launch(trap, audit=True)
+            time.sleep(25)
+        self.shot("documents-pieges")
         time.sleep(10)
         self.stop_app()
+        self.traps_opened = len(traps)
 
     def test_sigterm(self):
         """Arrêt par SIGTERM (fermeture de session) : terminaison normale, sans erreur de
@@ -341,7 +407,8 @@ class Session:
         prefix = ["unshare", "-Un"] if self.offline else []
         # unshare (sans --fork) puis le lanceur remplacent leur image : le processus suivi est le shell.
         proc = subprocess.Popen(prefix + [str(Path(self.args.app) / "auxioffice")], env=self.env,
-                                stdout=open(self.out / "app.log", "a"), stderr=subprocess.STDOUT, cwd=str(self.home))
+                                stdout=open(self.out / "app.log", "a"), stderr=subprocess.STDOUT, cwd=str(self.home),
+                                preexec_fn=no_core_dumps)
         started = self.main_window(120) is not None
         time.sleep(10)
         proc.send_signal(signal.SIGTERM)
@@ -361,24 +428,38 @@ class Session:
             subprocess.run(["pkill", "-x", name], capture_output=True)
         time.sleep(2)
 
+    # Programmes de téléchargement que le moteur d'upstream lance de lui-même (core,
+    # Common/Network/FileTransporter) : leur exécution est une infraction, réseau ou non.
+    DOWNLOADERS = ("/curl\"", "/wget\"")
+
     def network_report(self):
         if not self.args.network_audit:
             return
-        external = []
+        external, downloads, traps = [], [], []
         for log in sorted(self.out.glob("strace-*.log")):
             for line in log.read_text(errors="replace").splitlines():
                 if "connect(" in line and ("AF_INET" in line or "AF_INET6" in line):
-                    if "127.0.0." not in line and "::1" not in line:
+                    # boucle locale : 127.0.0.0/8 (l'instance unique écoute sur 127.<uid>.1) et ::1
+                    if 'inet_addr("127.' not in line and '"::1"' not in line:
                         external.append(line.strip()[:200])
+                        if '"203.0.113.' in line:
+                            traps.append(line.strip()[:200])
+                elif "execve(" in line and any(d in line.split(",")[0] for d in self.DOWNLOADERS):
+                    downloads.append(line.strip()[:200])
         self.record("aucune connexion réseau sortante", not external,
                     f"{len(external)} tentative(s)" + ("" if not external else " : " + external[0]))
-        (self.out / "network-attempts.txt").write_text("\n".join(external) + "\n")
+        self.record("aucun programme de téléchargement lancé (curl, wget)", not downloads,
+                    f"{len(downloads)} lancement(s)" + ("" if not downloads else " : " + downloads[0]))
+        opened = getattr(self, "traps_opened", 0)
+        self.record("documents piégés : aucune ressource distante chargée", opened > 0 and not traps and not downloads,
+                    f"{opened} document(s) piégé(s) ouverts, {len(traps)} tentative(s) vers 203.0.113.0/24")
+        (self.out / "network-attempts.txt").write_text("\n".join(external + downloads) + "\n")
 
     def run(self):
         self.start_x()
         try:
             for t in (self.test_startpage, self.test_docx, self.test_xlsx, self.test_pptx, self.test_pdf, self.test_text,
-                      self.test_sigterm):
+                      self.test_text_tab, self.test_sigterm):
                 try:
                     t()
                 except Exception as e:   # un scénario en échec n'arrête pas les autres

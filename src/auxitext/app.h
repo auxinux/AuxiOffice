@@ -13,6 +13,8 @@
 #include <QString>
 #include <QStringList>
 
+class QWidget;
+
 namespace App {
 
 enum class ThemeMode { System, Light, Dark };
@@ -21,7 +23,7 @@ QString version();
 QString versionLine();          // "AuxiText 0.1.0 (AuxiNux Office)"
 void printToConsole(const QString& text);
 
-QSettings& settings();          // ~/.config/auxioffice/auxitext.conf | %APPDATA%\AuxiNux\AuxiOffice\auxitext.ini
+QSettings& settings();          // ~/.config/auxinux-office/auxitext.ini | %APPDATA%\AuxiNux\AuxiNuxOffice\auxitext.ini
 
 // Langue de l'interface : réglage AuxiText, sinon langue d'AuxiNux Office,
 // sinon langue du système ; français par défaut (langue principale du projet).
@@ -34,7 +36,7 @@ ThemeMode themeMode();
 void setThemeMode(ThemeMode mode);
 bool systemPrefersDark();
 bool isDark();
-void applyPalette(bool dark);
+void applyPalette(bool dark, QWidget* target = nullptr);  // target : widget seul, sinon l'application
 
 QString installDir();
 QString writerExecutable();     // lanceur AuxiNux Office (ouverture dans AuxiWriter avec --writer)

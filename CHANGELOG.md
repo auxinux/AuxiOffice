@@ -17,6 +17,11 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
   MD, CSV, JSON, XML, YAML, INI, CONF, sans extension ; fins de ligne CRLF/LF conservées ;
   encodages ; rechercher/remplacer ; numéros de ligne ; thèmes clair/sombre ; coloration
   minimale), même code sous Linux et Windows.
+- **AuxiText intégré** : un fichier texte ouvert ou créé depuis AuxiNux Office (Ouvrir un
+  fichier, documents récents, glisser-déposer, tuile « Nouveau fichier texte ») s'affiche dans
+  un onglet, avec les menus d'AuxiText ; « Enregistrer les modifications ? » à la fermeture.
+  L'application AuxiText reste disponible à part (menu, fichiers texte du système). Linux et
+  Windows (patch desktop-apps 0012).
 - **Lanceur `auxioffice`** : point d'entrée unique, détection du type de fichier, options
   `--new-*`, `--writer`, `--app=`, `--version`.
 - **Écran d'accueil** : Nouveau document, Nouvelle feuille de calcul, Nouvelle présentation,
@@ -24,6 +29,13 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
   section « Logiciels libres et licences ».
 
 ### Identité et licences
+
+- Nom du produit : toujours « AuxiNux Office ». Site dédié : <https://office.auxinux.ca>
+  (accueil, À propos, aide, AuxiText, métadonnées des paquets). Identifiants techniques
+  alignés sur le nom : `AuxiNuxOffice` (dossiers de réglages et de données Windows, registre,
+  ProgID, AppUserModelID), `ca.auxinux.AuxiNuxOffice` (fichiers .desktop, AppStream, macOS),
+  `auxinux-office` (dossiers XDG, `/usr/lib/auxinux-office`, protocole) ; la commande reste
+  `auxioffice`.
 
 - Identité AuxiNux centralisée (`branding/product.json`, ressources générées) appliquée
   automatiquement au build : shell, accueil, éditeurs, icônes, installateurs ; **aucun logo
@@ -39,12 +51,29 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
   moteur web, aide en ligne, page d'inscription, service de mise à jour d'upstream.
 - Retirés : modules DeepL, LanguageTool, Zotero, Thésaurus, OCR. Assistant IA désactivé par
   défaut. Détails : [PRIVACY.md](PRIVACY.md).
+- Audit de confidentialité du 2026-10-02 (analyse du code livré et test avec des documents
+  piégés), infractions corrigées :
+  - ouvrir un DOCX, ODT, PPTX ou une page HTML téléchargeait ses images et feuilles de style
+    distantes (pixel espion) : le convertisseur x2t passe par une garde AuxiNux qui lui
+    interdit tout téléchargement ; pages de l'accueil, des éditeurs et des modules limitées
+    aux ressources locales (`Content-Security-Policy`), préchargement DNS désactivé ;
+  - le module Éditeur photo envoyait des statistiques à Google Analytics : désactivées ;
+  - macOS : options réseau du moteur web non appliquées (sondes DNS sur HTTPS) : lanceur
+    AuxiNux dans l'application ; adresse Google Analytics retirée du shell ; exception HTTP
+    non chiffré retirée ;
+  - auteur des documents rempli avec le nom réel du compte : nom neutre par défaut ;
+  - un vidage mémoire de la machine de build se trouvait dans les installateurs Windows :
+    retiré, le build refuse désormais d'emballer un vidage mémoire ou une adresse de traçage.
+- Renforcements : le shell s'impose les options réseau du moteur s'il est démarré sans le
+  lanceur ; correcteur orthographique de Chromium désactivé ; fournisseur d'IA relayé par un
+  serveur d'ONLYOFFICE retiré ; copies de travail d'une session interrompue supprimées au
+  démarrage ; réglages d'AuxiText lisibles par l'utilisateur seul.
 
 ### Linux
 
 - Paquet `auxinux-office_0.1.0_amd64.deb` (dépendances calculées) et
   `AuxiNuxOffice-0.1.0-x86_64.AppImage` ; six entrées de menu, types MIME, AppStream ;
-  répertoires XDG `~/.config/auxioffice`, `~/.local/share/auxioffice`, `~/.cache/auxioffice`.
+  répertoires XDG `~/.config/auxinux-office`, `~/.local/share/auxinux-office`, `~/.cache/auxinux-office`.
 
 ### Windows
 
@@ -53,8 +82,8 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
   installation silencieuse et options) et paquet `AuxiNuxOffice-0.1.0-x64.msi`.
 - Types de fichiers déclarés (« Ouvrir avec », Applications par défaut) **sans jamais imposer**
   AuxiNux Office comme application par défaut.
-- Réglages dans `%APPDATA%\AuxiNux\AuxiOffice`, données et cache dans
-  `%LOCALAPPDATA%\AuxiNux\AuxiOffice`.
+- Réglages dans `%APPDATA%\AuxiNux\AuxiNuxOffice`, données et cache dans
+  `%LOCALAPPDATA%\AuxiNux\AuxiNuxOffice`.
 
 ### macOS (préliminaire)
 
@@ -88,7 +117,7 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
 ### Build, tests, documentation
 
 - Orchestrateur `scripts/auxibuild` (Python) ; versions upstream, binaires et outils épinglés
-  et vérifiés (`upstream/upstream.lock.json`) ; file de 11 patches courts et outil de gestion
+  et vérifiés (`upstream/upstream.lock.json`) ; file de 13 patches courts et outil de gestion
   (`auxibuild patches`) ; compilation croisée Windows depuis Linux (clang-cl, xwin) ;
   `scripts/build-linux.sh`, `package-deb.sh`, `package-appimage.sh`, `build-windows.ps1`,
   `package-windows.ps1`.
@@ -101,29 +130,33 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
 
 ### Vérifications
 
-Builds complets du 2026-10-02 sur Debian 13 x86_64 (Linux depuis zéro ; Windows par
-compilation croisée).
+Builds complets du 2026-10-03 sur Debian 13 x86_64 (Linux ; Windows par compilation croisée ;
+macOS réempaqueté depuis Linux), après l'audit de confidentialité et l'intégration d'AuxiText.
 
-- **Linux : 40 tests automatiques sur 40 réussis** — contrôles statiques, versions, 19 tests
-  unitaires d'AuxiText, tests graphiques sans réseau (accueil, DOCX, XLSX, PPTX, PDF, AuxiText,
-  arrêt par SIGTERM), audit réseau (0 connexion), 10 conversions x2t. `.deb` : installation
-  simulée par APT sur Debian 13, dépendances satisfaites ; AppImage : lancée sous Xvfb.
-- **Windows : 21 tests automatiques réussis**, 1 ignoré (tests fonctionnels sur Windows) ;
-  essais sous Wine 10 avec les installateurs finaux : installation et désinstallation
-  silencieuses (`.exe` et `.msi`), registre, raccourcis, démarrage et ouverture de documents
-  DOCX/XLSX/PPTX/PDF/TXT ([docs/TESTING-WINDOWS.md](docs/TESTING-WINDOWS.md)).
+- **Linux : 50 tests automatiques sur 50 réussis** — contrôles statiques (dont confidentialité :
+  aucun traqueur ni vidage mémoire, CSP, garde du convertisseur, commutateurs du moteur),
+  versions, 19 tests unitaires d'AuxiText, tests graphiques sans réseau (accueil, DOCX, XLSX,
+  PPTX, PDF, AuxiText, AuxiText intégré aux onglets, arrêt par SIGTERM), audit réseau avec
+  4 documents piégés (0 connexion, 0 lancement de curl/wget), conversions x2t.
+- **Windows : 27 tests automatiques sur 27 réussis** (contrôles statiques et de
+  confidentialité, versions et démarrage du shell sous Wine 10). Les essais d'installation sous
+  Wine du 2026-10-02 n'ont pas été refaits avec ces installateurs.
+- **macOS : 29 contrôles statiques sur 29 réussis** (lanceur, garde x2t, adresse Google
+  Analytics retirée, signature) ; rien n'a été exécuté sur un Mac.
 - Défauts trouvés et corrigés pendant la validation : lanceur Windows sans `converter\` dans le
   `PATH` du shell (le shell n'aurait pas démarré) ; logo ONLYOFFICE encore présent dans la
   fenêtre À propos et l'en-tête des éditeurs ; plantage du shell à la fermeture de session
-  (SIGTERM) ; AuxiText ouvrant le shell sans passer par le lanceur.
+  (SIGTERM) ; AuxiText ouvrant le shell sans passer par le lanceur ; infractions de
+  confidentialité de l'audit (voir « Confidentialité »).
 
 Empreintes SHA-256 des artefacts de ce build :
 
 ```text
-f09c316363dd7f3f9a7ea18d84d2e8c270be4e92aa33af80c8edf733efc89892  auxinux-office_0.1.0_amd64.deb
-728c18091998df65d3e1a2194bbbc881c6859c64bfc8698f20f057e2e72638a4  AuxiNuxOffice-0.1.0-x86_64.AppImage
-1331d792cb136f776f724272c8d0897e0e11a8b299f2b8f0c170ad6c7222c589  AuxiNuxOffice-0.1.0-x64.exe
-afb3fcf6f0c723374a34dd2ebecc0d50d95d9b273c9e1a61613789a578276eea  AuxiNuxOffice-0.1.0-x64.msi
+27e5114d4e84b82b7728c2717d3c1a7f1cfc99e11f42edc83eca571677766b90  auxinux-office_0.1.0_amd64.deb
+c4b09fabc320d0b06393387b5034c2cba31fb3c5f2663add3d2c726502b3b94a  AuxiNuxOffice-0.1.0-x86_64.AppImage
+122f435058c3590b3b72748e18a561d568b17293b5cda2834fbc81eb6a91c26b  AuxiNuxOffice-0.1.0-x64.exe
+15f08e82dd833f9cd843f4fa658b7a1da978b8ee153e753e51e28cbc97a03354  AuxiNuxOffice-0.1.0-x64.msi
+4fdb7e3dd29378353b48ce1b46b2a714d2b6db3ea14520f8ae5127592111447b  AuxiNuxOffice-0.1.0-arm64.zip
 ```
 
 ### Limites connues
@@ -134,7 +167,7 @@ afb3fcf6f0c723374a34dd2ebecc0d50d95d9b273c9e1a61613789a578276eea  AuxiNuxOffice-
 - Paquets Linux pas encore testés dans une vraie session de bureau (Debian 13, Ubuntu 24.04,
   AuxiNux OS ; X11/Wayland ; impression réelle).
 - Installateurs Windows non signés (avertissement SmartScreen) ; raccourcis du MSI sans
-  AppUserModelID ; le MSI requiert le redistribuable Visual C++ déjà installé.
+  AppUserModelID (le shell s'impose quand même les options réseau du moteur) ; le MSI requiert le redistribuable Visual C++ déjà installé.
 - Aide hors ligne non livrée (l'aide en ligne d'upstream est retirée).
 - Moteur natif et sdkjs repris de la release upstream vérifiée (non recompilés).
 - glibc 2.38 minimum (Debian 12 non pris en charge).
