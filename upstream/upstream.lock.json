@@ -200,6 +200,12 @@
       "url": "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.29.0/apple-codesign-0.29.0-macos-universal.tar.gz",
       "sha256": "d98372d5524226ccf9dc0eda03d4e4f5826182dabb2fc3f2bd303ed9113a748d",
       "purpose": "rcodesign pour un build effectué sur Mac (même signature que depuis Linux)"
+    },
+    "nodejs_linux": {
+      "version": "22.23.2",
+      "url": "https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.xz",
+      "sha256": "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307",
+      "purpose": "Node.js et npm du build (page d'accueil, éditeurs) quand ceux du système sont trop anciens (npm < 10 : Debian 13 fournit npm 9, qui refuse les fichiers de verrouillage d'upstream)"
     }
   },
   "windows_runtime": {

@@ -167,6 +167,8 @@ def build_sdkjs(args):
 
 
 def build_all(args):
+    from .toolchain import use_supported_node
+    use_supported_node()
     wanted = set(args.components)
     if wanted & {"js", "startpage"}:
         build_startpage(args)

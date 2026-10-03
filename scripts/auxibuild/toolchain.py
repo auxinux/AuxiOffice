@@ -176,8 +176,38 @@ def local_tool_env(tools):
     return env
 
 
+def _version(tool):
+    exe = which(tool)
+    if not exe:
+        return (0,)
+    out = subprocess.run([exe, "--version"], capture_output=True, text=True).stdout.strip().lstrip("v")
+    try:
+        return tuple(int(x) for x in out.split(".")[:3])
+    except ValueError:
+        return (0,)
+
+
+def use_supported_node():
+    """Linux : Node.js >= 18 et npm >= 10 exigés par les fichiers de verrouillage d'upstream. Si ceux
+    du système sont plus anciens (Debian 13 : npm 9), Node.js épinglé (upstream.lock.json) téléchargé,
+    vérifié et placé en tête du PATH de ce build."""
+    if not sys.platform.startswith("linux"):
+        return
+    if _version("node") >= (18,) and _version("npm") >= (10,):
+        return
+    spec = lock()["toolchains"]["nodejs_linux"]
+    home = TOOLCHAINS_DIR / f"node-v{spec['version']}-linux-x64"
+    if not (home / "bin" / "npm").exists():
+        step(f"Node.js {spec['version']} (npm du système trop ancien)")
+        archive = download(spec["url"], TOOLCHAINS_DIR / "downloads" / Path(spec["url"]).name, sha256=spec["sha256"])
+        run(["tar", "-xJf", archive, "-C", TOOLCHAINS_DIR], quiet=True)
+    os.environ["PATH"] = f"{home / 'bin'}{os.pathsep}{os.environ['PATH']}"
+    ok(f"Node.js {spec['version']} : {home / 'bin'}")
+
+
 def doctor(target, local_deps=False):
     """Check the build host. Returns the list of problems (empty = OK)."""
+    use_supported_node()
     step(f"Vérification de l'hôte de build (cible {target})")
     problems = []
     tools = ["git", "python3" if not IS_WINDOWS_HOST else "python", "node", "npm"]
