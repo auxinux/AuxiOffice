@@ -123,9 +123,11 @@ cd AuxiNux_Office
 powershell -ExecutionPolicy Bypass -File .\build.ps1     # Windows 11 : .exe + .msi dans dist\windows\ (via WSL 2)
 ```
 
-Prérequis installés ou proposés automatiquement : sous Linux (Debian, Ubuntu, AuxiNux OS), les
-paquets manquants avec `apt` (mot de passe `sudo` demandé une fois ; sans `sudo`, paquets de
-développement extraits localement) ; sur Mac, les outils de ligne de commande d'Apple et
+Prévoir environ 20 Go d'espace libre (cloner dans son dossier personnel plutôt que dans `/tmp`,
+souvent en mémoire vive). Prérequis installés ou proposés automatiquement : sous Linux, les
+paquets manquants avec `sudo auxi install --deb` sur AuxiNux OS, avec `apt` sur Debian et Ubuntu
+(mot de passe `sudo` demandé une fois ; sans `sudo`, paquets de développement extraits
+localement) ; sur Mac, les outils de ligne de commande d'Apple et
 Homebrew (puis Qt 5, Node.js…), Xcode pour le shell macOS ; sous Windows, WSL 2 (Ubuntu 24.04). Pour les
 options avancées (compilation croisée, composants, CI) : `scripts/build-linux.sh`,
 `scripts/build-windows.ps1`, `python3 scripts/auxibuild --help`.

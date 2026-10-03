@@ -30,14 +30,27 @@ done
 say()  { printf '\n\033[1;33m==> %s\033[0m\n' "$*"; }
 die()  { printf '\n\033[1;31mÉCHEC : %s\033[0m\n' "$*" >&2; exit 1; }
 
+# Espace disque : sources, moteur upstream, arbres de build et paquets (environ 15 à 20 Go)
+NEED_GB=20
+FREE_KB=$(df -Pk "$ROOT" | awk 'NR==2 {print $4}')
+if [ -z "${AUXI_SKIP_SPACE_CHECK:-}" ] && [ -n "$FREE_KB" ] && [ "$FREE_KB" -lt $((NEED_GB * 1024 * 1024)) ]; then
+    die "espace libre insuffisant dans $ROOT : $((FREE_KB / 1024 / 1024)) Go, ${NEED_GB} Go nécessaires.
+  /tmp est souvent en mémoire vive (tmpfs) et trop petit : clonez le projet dans votre dossier
+  personnel (ex. ~/AuxiNux_Office) puis relancez ./build.sh (vérification à ignorer :
+  AUXI_SKIP_SPACE_CHECK=1 ./build.sh)"
+fi
+
 case "$(uname -s)" in
 # ---------------------------------------------------------------------------
 Linux)
     [ "$(uname -m)" = "x86_64" ] || die "Linux : seule l'architecture x86_64 est prise en charge en 0.1.0"
     EXTRA=()
-    if command -v apt-get >/dev/null; then
+    # AuxiNux OS : apt/apt-get sont désactivés, les paquets Debian s'installent avec « auxi »
+    AUXINUXOS=0
+    if command -v auxi >/dev/null || grep -qi '^ID=.*auxinux' /etc/os-release 2>/dev/null; then AUXINUXOS=1; fi
+    if command -v dpkg-query >/dev/null; then
         # Paquets nécessaires au build (compilation, page d'accueil et éditeurs, paquets .deb et
-        # AppImage, tests graphiques sans écran) : installés avec apt s'ils manquent.
+        # AppImage, tests graphiques sans écran) : installés s'ils manquent.
         REQ=(build-essential pkg-config git curl ca-certificates python3 python3-venv nodejs npm
              fakeroot dpkg-dev desktop-file-utils file xz-utils
              libgtk-3-dev libglib2.0-dev libnotify-dev libcups2-dev libx11-dev libx11-xcb-dev
@@ -51,9 +64,16 @@ Linux)
             SUDO=()
             [ "$(id -u)" -ne 0 ] && SUDO=(sudo)
             if [ "$(id -u)" -eq 0 ] || command -v sudo >/dev/null; then
-                say "Installation des paquets nécessaires avec apt : ${NEED[*]}"
-                ${SUDO[@]+"${SUDO[@]}"} apt-get update
-                ${SUDO[@]+"${SUDO[@]}"} apt-get install -y "${NEED[@]}"
+                if [ "$AUXINUXOS" -eq 1 ]; then
+                    say "AuxiNux OS : installation des paquets nécessaires (auxi install --deb) : ${NEED[*]}"
+                    ${SUDO[@]+"${SUDO[@]}"} auxi install --deb "${NEED[@]}"
+                else
+                    say "Installation des paquets nécessaires avec apt : ${NEED[*]}"
+                    ${SUDO[@]+"${SUDO[@]}"} apt-get update
+                    ${SUDO[@]+"${SUDO[@]}"} apt-get install -y "${NEED[@]}"
+                fi
+            elif [ "$AUXINUXOS" -eq 1 ]; then
+                die "paquets manquants : ${NEED[*]} — installez-les avec : sudo auxi install --deb ${NEED[*]}"
             else
                 # Sans sudo : paquets de développement extraits localement (outils de base requis)
                 say "sudo indisponible : paquets de développement extraits localement (--local-deps)"
