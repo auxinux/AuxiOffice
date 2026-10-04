@@ -6,6 +6,7 @@
  */
 
 #include "auxinux/texttabs.h"
+#include "auxinux/texttabs_config.h"    // généré : AUXI_TEXT_TABS selon apps.text.integrated_tabs
 
 #ifdef AUXI_TEXT_TABS
 

@@ -3,13 +3,12 @@
 # Copyright (C) 2026 Projet AuxiNux
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-HEADERS += $$PWD/texttabs.h
+HEADERS += $$PWD/texttabs.h $$PWD/texttabs_config.h
 SOURCES += $$PWD/texttabs.cpp
 
 # AuxiText intégré aux onglets : sources de src/auxitext copiées dans auxitext/ par le build
 # (scripts/auxibuild/branding.py), sans son main.cpp ; traductions compilées par build_native.py.
 exists($$PWD/auxitext/mainwindow.cpp) {
-    DEFINES += AUXI_TEXT_TABS
     DEFINES += AUXI_VERSION=\\\"$$cat($$PWD/auxitext/VERSION)\\\"
     INCLUDEPATH += $$PWD/auxitext
     HEADERS += $$PWD/auxitext/app.h $$PWD/auxitext/codeeditor.h $$PWD/auxitext/finddialog.h \
