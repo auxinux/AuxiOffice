@@ -85,7 +85,7 @@ AuxiSheet, AuxiPresent, AuxiPDF, AuxiText) sous Windows, en particulier :
 | W-APP-2 | DOCX, XLSX, PPTX : ouvrir, modifier, enregistrer, exporter en PDF, imprimer | fonctionnel |
 | W-APP-3 | PDF : navigation, zoom, recherche, copie, rotation, impression | fonctionnel |
 | W-APP-4 | AuxiText : fichier CRLF et fichier LF, UTF-8 avec accents ; « Ouvrir dans AuxiWriter » | fins de ligne conservées ; ouverture dans AuxiWriter |
-| W-APP-4b | AuxiText intégré : tuile « Nouveau fichier texte », « Ouvrir un fichier » sur un `.txt`, glisser un `.txt` sur la fenêtre ; fermer un onglet texte modifié | onglet AuxiText dans AuxiNux Office ; message « Enregistrer les modifications ? » ; aucune perte |
+| W-APP-4b | Tuile « Nouveau fichier texte », « Ouvrir un fichier » sur un `.txt`, glisser un `.txt` sur la fenêtre | ouverture dans l'application AuxiText (jamais dans AuxiWriter) |
 | W-APP-5 | Ouvrir un second document depuis l'Explorateur, application déjà ouverte | ouvert dans l'instance existante |
 | W-APP-6 | Interface en français par défaut (Windows français) ; changement de langue | fonctionnel |
 

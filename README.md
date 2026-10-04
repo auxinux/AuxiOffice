@@ -13,7 +13,7 @@ Version : **0.1.0** (fichier [`VERSION`](VERSION), source unique de la version).
 | **AuxiSheet** | tableur | XLSX (prioritaire), XLS, ODS, CSV |
 | **AuxiPresent** | présentations | PPTX, PPT, ODP ; export PDF |
 | **AuxiPDF** | lecteur PDF | PDF (aussi DjVu, XPS) |
-| **AuxiText** | éditeur de texte brut léger : application à part, et intégré aux onglets d'AuxiNux Office | TXT, LOG, MD, CSV, JSON, XML, YAML, INI, CONF, sans extension |
+| **AuxiText** | éditeur de texte brut léger (les fichiers texte ouverts depuis AuxiNux Office lui sont confiés) | TXT, LOG, MD, CSV, JSON, XML, YAML, INI, CONF, sans extension |
 | AuxiMail | *étude technique* ([docs/AUXIMAIL.md](docs/AUXIMAIL.md)) | — |
 
 AuxiNux Office est un **fork maintenable d'[ONLYOFFICE Desktop Editors](https://github.com/ONLYOFFICE/DesktopEditors)**
@@ -32,7 +32,7 @@ Résumé honnête de ce qui a été vérifié (détails : [CHANGELOG.md](CHANGEL
 
 - **Linux x86_64** : compilé depuis zéro et testé automatiquement — **50 tests sur 50
   réussis** (versions, tests unitaires d'AuxiText, contrôles statiques et de confidentialité,
-  conversions du moteur, tests graphiques des cinq applications et d'AuxiText intégré sous Xvfb
+  conversions du moteur, tests graphiques des cinq applications sous Xvfb
   sans réseau, audit réseau avec documents piégés : 0 connexion, aucun téléchargement).
   Paquets `.deb` (installation simulée par APT sur Debian 13) et AppImage produits ; pas encore
   essayés dans une vraie session de bureau.

@@ -333,13 +333,11 @@ class Session:
         self.launch(self.docs / "LISEZMOI")
         self.record("fichier sans extension -> AuxiText", self.wait_window("^LISEZMOI ", 30) is not None)
 
-    def test_text_tab(self):
-        """AuxiText intégré : un fichier texte ouvert depuis AuxiNux Office (instance déjà ouverte)
-        et un nouveau fichier texte (tuile de l'accueil) s'affichent dans un onglet, sans lancer
-        l'application AuxiText ; enregistrement depuis l'onglet."""
+    def test_text_from_office(self):
+        """Fichier texte ouvert depuis AuxiNux Office (instance déjà ouverte) et nouveau fichier
+        texte (tuile de l'accueil) : confiés à l'application AuxiText, pas à AuxiWriter."""
         self.stop_app()
         doc = self.docs / "notes-lf.txt"
-        before = doc.stat().st_mtime
         app = Path(self.args.app) / "auxioffice"
         # Hors espace réseau isolé : l'instance unique d'upstream communique par UDP sur la boucle
         # locale, désactivée dans un espace réseau neuf (unshare -n) ; ce scénario n'utilise pas le
@@ -348,34 +346,24 @@ class Session:
         script = f'"{app}" & sleep 25; "{app}" --app=writer "{doc}"; wait'
         subprocess.Popen(["sh", "-c", script], env=self.env, stdout=open(self.out / "app.log", "a"),
                          stderr=subprocess.STDOUT, cwd=str(self.home), preexec_fn=no_core_dumps)
-        wid = self.wait_window("^notes-lf\\.txt$", 90)
-        standalone = subprocess.run(["pgrep", "-x", "auxitext"], capture_output=True, text=True).stdout.split()
-        saved = False
-        if wid:
-            time.sleep(3)
-            ox, oy = self.main_origin()
-            self.click(ox + 600, oy + 300)                     # zone de texte de l'onglet
-            self.xdo("key", "ctrl+End")
-            self.xdo("type", "--delay", "40", "Onglet AuxiText")
-            self.xdo("key", "ctrl+s")
-            saved = self.wait_saved(doc, before, 10)
-        self.shot("07-onglet-texte")
-        data = doc.read_bytes()
-        self.record("fichier texte ouvert dans un onglet (AuxiText intégré)",
-                    bool(wid) and not standalone and saved and data.endswith(b"Onglet AuxiText"),
-                    f"onglet {'présent' if wid else 'absent'}, {len(standalone)} application(s) AuxiText séparée(s), "
-                    f"{'enregistré' if saved else 'non enregistré'}")
+        wid = self.wait_window("notes-lf\\.txt.+AuxiText", 90)
+        writer = self.wait_window("^notes-lf\\.txt$", 2)
+        self.shot("07-texte-depuis-accueil")
+        self.record("fichier texte ouvert depuis AuxiNux Office -> AuxiText", bool(wid) and not writer,
+                    f"AuxiText {'ouvert' if wid else 'absent'}, onglet AuxiWriter {'présent' if writer else 'absent'}")
         ok = False
-        if wid:
+        # Fenêtre AuxiText précédente fermée : sans gestionnaire de fenêtres, elle recouvre la tuile.
+        subprocess.run(["pkill", "-x", "auxitext"], capture_output=True)
+        time.sleep(2)
+        main = self.main_window(10)
+        if main:
             ox, oy = self.main_origin()
             self.click(ox + 55, oy + 15)                       # onglet d'accueil
             time.sleep(3)
             self.click(ox + 727, oy + 350)                     # tuile « Nouveau fichier texte »
-            ok = self.wait_window("^Sans titre$", 20) is not None
-            standalone = subprocess.run(["pgrep", "-x", "auxitext"], capture_output=True, text=True).stdout.split()
-            ok = ok and not standalone
+            ok = self.wait_window("Sans titre.+AuxiText", 20) is not None
         self.shot("08-nouveau-texte")
-        self.record("nouveau fichier texte dans un onglet (tuile de l'accueil)", ok)
+        self.record("nouveau fichier texte (tuile de l'accueil) -> AuxiText", ok)
         self.stop_app()
 
     def network_session(self):
@@ -459,7 +447,7 @@ class Session:
         self.start_x()
         try:
             for t in (self.test_startpage, self.test_docx, self.test_xlsx, self.test_pptx, self.test_pdf, self.test_text,
-                      self.test_text_tab, self.test_sigterm):
+                      self.test_text_from_office, self.test_sigterm):
                 try:
                     t()
                 except Exception as e:   # un scénario en échec n'arrête pas les autres

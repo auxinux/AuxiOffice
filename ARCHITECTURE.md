@@ -135,20 +135,13 @@ AuxiText existe sous deux formes, avec le même code :
 
 - **l'application AuxiText** (programme `auxitext`, entrée de menu, association des fichiers
   texte, `auxioffice notes.txt`) ;
-- **AuxiText intégré** aux onglets d'AuxiNux Office : un fichier texte ouvert depuis AuxiNux
-  Office (« Ouvrir un fichier », documents récents, glisser-déposer, fichier transmis à
-  l'instance déjà ouverte) ou créé par la tuile « Nouveau fichier texte » s'affiche dans un
-  onglet, comme un document. Les sources de `src/auxitext` (sauf `main.cpp`) sont compilées
-  dans le shell (`src/shell/auxinux/auxinux.pri`, `texttabs.cpp`, patch desktop-apps 0012).
-  L'onglet garde une vue vide et cachée du moteur web, exigée par la gestion des onglets
-  d'upstream (identifiant, fermeture) ; l'éditeur Qt la recouvre. À la fermeture d'un onglet
-  modifié, le message « Enregistrer les modifications ? » du shell enregistre par l'éditeur.
-  En mode intégré, AuxiText suit le thème et la langue d'AuxiNux Office (menus Thème, Langue
-  et Quitter masqués) et « Nouvel onglet » remplace « Nouvelle fenêtre » ; l'onglet ne peut pas
-  être détaché dans une fenêtre séparée. « Ouvrir dans AuxiWriter » (`--writer`) ouvre bien le
-  fichier dans AuxiWriter. Sans fenêtre principale (premier lancement avec un fichier texte),
-  le fichier va à l'application AuxiText. macOS : application AuxiText séparée (shell macOS
-  d'upstream non recompilé).
+- **appelé par AuxiNux Office** : un fichier texte ouvert depuis AuxiNux Office (« Ouvrir un
+  fichier », documents récents, glisser-déposer, fichier transmis à l'instance ouverte) ou créé
+  par la tuile « Nouveau fichier texte » est confié à l'application AuxiText (module AuxiNux du
+  shell, patches desktop-apps 0003 et 0012 ; macOS : patch 0013 et `src/macos/auxinux-mac-text.js`).
+  Une intégration aux onglets (`src/shell/auxinux/texttabs.cpp`, sources d'AuxiText compilées
+  dans le shell) existe mais est désactivée (`apps.text.integrated_tabs` de product.json) :
+  l'éditeur ne s'affichait pas sous Wayland.
 
 ## 3. Arborescences installées
 

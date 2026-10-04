@@ -198,13 +198,21 @@ def brand_shell(p):
     write_text(src / "prop" / "defines_p.h", shell_defines_p(p))
     write_text(src / "prop" / "version_p.h", shell_version_p(p))
     copytree(ROOT / "src" / "shell" / "auxinux", src / "auxinux")
-    # AuxiText intégré aux onglets du shell (auxinux.pri) : mêmes sources que l'application
+    # AuxiText intégré aux onglets du shell (auxinux.pri) : mêmes sources que l'application ;
+    # seulement si apps.text.integrated_tabs (sinon : application AuxiText séparée)
     text = src / "auxinux" / "auxitext"
-    text.mkdir(parents=True, exist_ok=True)
-    for f in (ROOT / "src" / "auxitext").iterdir():
-        if f.suffix in (".cpp", ".h") and f.name != "main.cpp":
-            shutil.copy2(f, text / f.name)
-    shutil.copy2(ROOT / "VERSION", text / "VERSION")
+    tabs = bool(p["apps"]["text"].get("integrated_tabs", False))
+    # En-tête généré (et non une option de compilation) : make recompile texttabs.cpp quand il change.
+    write_text(src / "auxinux" / "texttabs_config.h",
+               GENERATED_HEADER + ("#define AUXI_TEXT_TABS 1\n" if tabs else "/* AuxiText intégré aux onglets : désactivé */\n"))
+    if tabs:
+        text.mkdir(parents=True, exist_ok=True)
+        for f in (ROOT / "src" / "auxitext").iterdir():
+            if f.suffix in (".cpp", ".h") and f.name != "main.cpp":
+                shutil.copy2(f, text / f.name)
+        shutil.copy2(ROOT / "VERSION", text / "VERSION")
+    elif text.exists():
+        shutil.rmtree(text)
     overlay = BRANDING / "overlays" / "desktop-apps"
     if overlay.exists():
         copytree(overlay, UPSTREAM_SRC / "desktop-apps")

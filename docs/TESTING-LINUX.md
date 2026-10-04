@@ -22,7 +22,7 @@ Prérequis : `xvfb`, `xdotool`, `strace` (voir [BUILD.md](../BUILD.md)). Rapport
 | Versions | `auxioffice --version`, `auxitext --version`, `auxioffice-editors --version` affichent `AuxiNux Office 0.1.0` / `AuxiText 0.1.0` |
 | AuxiText (unitaires) | 19 tests : décodage/encodage, BOM, UTF-16, Latin-1, fins de ligne CRLF/LF/CR, détection, conversions sans perte |
 | Statiques | identité de la page d'accueil, mentions légales installées, NOTICE, modules réseau retirés, service de mise à jour absent |
-| Graphiques (Xvfb, sans réseau) | accueil et répertoires XDG, IA désactivée par défaut ; DOCX ouvrir/modifier/enregistrer + métadonnée « AuxiNux Office » ; XLSX modification + formules recalculées ; PPTX titre modifié + nouvelle diapositive ; PDF ouvert + recherche ; AuxiText (CRLF et UTF-8 conservés, Markdown, fichier sans extension) ; AuxiText intégré (fichier texte transmis à l'instance ouverte et tuile « Nouveau fichier texte » dans un onglet, enregistrement) ; arrêt par SIGTERM sans plantage ; audit réseau avec documents piégés |
+| Graphiques (Xvfb, sans réseau) | accueil et répertoires XDG, IA désactivée par défaut ; DOCX ouvrir/modifier/enregistrer + métadonnée « AuxiNux Office » ; XLSX modification + formules recalculées ; PPTX titre modifié + nouvelle diapositive ; PDF ouvert + recherche ; AuxiText (CRLF et UTF-8 conservés, Markdown, fichier sans extension) ; fichiers texte confiés à AuxiText (fichier transmis à l'instance ouverte, tuile « Nouveau fichier texte ») ; arrêt par SIGTERM sans plantage ; audit réseau avec documents piégés |
 | Réseau | session complète sous `strace` : aucune connexion sortante (hors 127.0.0.0/8 et ::1) |
 | Conversions (x2t) | DOCX/XLSX/PPTX → PDF (texte vérifié), → ODT/ODS/ODP, CSV → XLSX, DOCX → RTF/TXT, ODT → DOCX aller-retour |
 
@@ -100,9 +100,7 @@ Prérequis : `xvfb`, `xdotool`, `strace` (voir [BUILD.md](../BUILD.md)). Rapport
 | L-TXT-6 | Numéros de ligne, retour à la ligne, zoom, thème clair/sombre | fonctionnel |
 | L-TXT-7 | Modifier le fichier ouvert depuis un autre programme | AuxiText propose de recharger |
 | L-TXT-8 | Fichier > Ouvrir dans AuxiWriter | le fichier s'ouvre dans AuxiWriter |
-| L-TXT-9 | AuxiNux Office ouvert : tuile « Nouveau fichier texte » ; « Ouvrir un fichier » sur un `.txt` ; glisser un `.md` sur la fenêtre | onglet AuxiText dans AuxiNux Office (menus Fichier, Édition, Affichage, Document, Aide ; barre d'état), pas de fenêtre séparée ; un fichier déjà ouvert active son onglet |
-| L-TXT-10 | Onglet texte modifié : Ctrl+S ; puis modifier et fermer l'onglet (Oui / Non / Annuler) ; fermer la fenêtre avec un onglet texte modifié | enregistré ; le message « Enregistrer les modifications ? » d'AuxiNux Office enregistre, abandonne ou annule ; aucune perte |
-| L-TXT-11 | Thème sombre d'AuxiNux Office (Paramètres), puis afficher un onglet texte ; tenter de détacher l'onglet (glisser hors de la barre) | l'onglet suit le thème ; l'onglet reste dans la fenêtre principale |
+| L-TXT-9 | AuxiNux Office ouvert : tuile « Nouveau fichier texte » ; « Ouvrir un fichier » sur un `.txt` ; glisser un `.md` sur la fenêtre | ouverture dans l'application AuxiText (jamais dans AuxiWriter) ; titre de la fenêtre d'AuxiNux Office dans la barre des tâches : « AuxiNux Office » |
 
 ## 9. Intégration au bureau (O)
 

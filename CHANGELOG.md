@@ -17,11 +17,13 @@ Elle ne sera publiée qu'après validation sur un vrai Windows 10/11 (voir « V�
   MD, CSV, JSON, XML, YAML, INI, CONF, sans extension ; fins de ligne CRLF/LF conservées ;
   encodages ; rechercher/remplacer ; numéros de ligne ; thèmes clair/sombre ; coloration
   minimale), même code sous Linux et Windows.
-- **AuxiText intégré** : un fichier texte ouvert ou créé depuis AuxiNux Office (Ouvrir un
-  fichier, documents récents, glisser-déposer, tuile « Nouveau fichier texte ») s'affiche dans
-  un onglet, avec les menus d'AuxiText ; « Enregistrer les modifications ? » à la fermeture.
-  L'application AuxiText reste disponible à part (menu, fichiers texte du système). Linux et
-  Windows (patch desktop-apps 0012).
+- **AuxiText depuis AuxiNux Office** : un fichier texte ouvert depuis AuxiNux Office (Ouvrir un
+  fichier, documents récents, glisser-déposer, fichier transmis à l'instance ouverte) ou créé par
+  la tuile « Nouveau fichier texte » s'ouvre dans l'application AuxiText, jamais dans AuxiWriter
+  (sauf « Ouvrir dans AuxiWriter »). L'intégration aux onglets a été essayée puis désactivée :
+  l'éditeur ne s'affichait pas sous Wayland (`apps.text.integrated_tabs`).
+- Linux : une seule entrée de menu déclare la classe de fenêtre du shell (sous Wayland, la
+  fenêtre d'AuxiNux Office s'affichait sous le nom « AuxiPresent »).
 - **Lanceur `auxioffice`** : point d'entrée unique, détection du type de fichier, options
   `--new-*`, `--writer`, `--app=`, `--version`.
 - **Écran d'accueil** : Nouveau document, Nouvelle feuille de calcul, Nouvelle présentation,
@@ -148,7 +150,7 @@ macOS réempaqueté depuis Linux), après l'audit de confidentialité et l'inté
   saisie clavier simulée perdue — réussissent rejoués seuls) — contrôles statiques (dont confidentialité :
   aucun traqueur ni vidage mémoire, CSP, garde du convertisseur, commutateurs du moteur),
   versions, 19 tests unitaires d'AuxiText, tests graphiques sans réseau (accueil, DOCX, XLSX,
-  PPTX, PDF, AuxiText, AuxiText intégré aux onglets, arrêt par SIGTERM), audit réseau avec
+  PPTX, PDF, AuxiText, fichiers texte confiés à AuxiText, arrêt par SIGTERM), audit réseau avec
   4 documents piégés (0 connexion, 0 lancement de curl/wget), conversions x2t.
 - **Windows : 27 tests automatiques sur 27 réussis** (contrôles statiques et de
   confidentialité, versions et démarrage du shell sous Wine 10). Les essais d'installation sous

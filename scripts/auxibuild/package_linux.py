@@ -35,6 +35,9 @@ def desktop_files(p, exec_cmd):
 
     def entry(suffix, name, generic_en, generic_fr, comment_en, comment_fr, exec_args, categories, mimes,
               wmclass, keywords, actions=""):
+        # Une seule entrée déclare la classe de fenêtre du shell : sinon le bureau (Wayland,
+        # barre des tâches) choisit au hasard l'une d'elles pour nommer la fenêtre (« AuxiPresent »).
+        wmclass_line = f"StartupWMClass={wmclass}\n" if wmclass else ""
         return f"""[Desktop Entry]
 Version=1.0
 Type=Application
@@ -47,8 +50,7 @@ Exec={exec_cmd} {exec_args}
 Icon={app_id}{suffix}
 Terminal=false
 StartupNotify=true
-StartupWMClass={wmclass}
-Categories={categories}
+{wmclass_line}Categories={categories}
 Keywords={keywords}
 MimeType={';'.join(mimes)};
 {actions}"""
@@ -87,24 +89,24 @@ Exec={e} --new-text
             ".Writer", apps["writer"]["name"], "Word Processor", "Traitement de texte",
             "Create and edit text documents (DOCX, ODT, DOC, RTF)",
             "Créez et modifiez des documents texte (DOCX, ODT, DOC, RTF)",
-            "--app=writer %F", "Office;WordProcessor;", FILETYPES["writer"]["mime"], office_class,
+            "--app=writer %F", "Office;WordProcessor;", FILETYPES["writer"]["mime"], "",
             "word;docx;odt;rtf;document;texte;"),
         f"{app_id}.Sheet.desktop": entry(
             ".Sheet", apps["sheet"]["name"], "Spreadsheet", "Tableur",
             "Create and edit spreadsheets (XLSX, ODS, XLS, CSV)",
             "Créez et modifiez des feuilles de calcul (XLSX, ODS, XLS, CSV)",
-            "--app=sheet %F", "Office;Spreadsheet;", FILETYPES["sheet"]["mime"], office_class,
+            "--app=sheet %F", "Office;Spreadsheet;", FILETYPES["sheet"]["mime"], "",
             "excel;xlsx;ods;csv;tableur;calcul;"),
         f"{app_id}.Present.desktop": entry(
             ".Present", apps["present"]["name"], "Presentation", "Présentation",
             "Create and show presentations (PPTX, ODP, PPT)",
             "Créez et projetez des présentations (PPTX, ODP, PPT)",
-            "--app=present %F", "Office;Presentation;", FILETYPES["present"]["mime"], office_class,
+            "--app=present %F", "Office;Presentation;", FILETYPES["present"]["mime"], "",
             "powerpoint;pptx;odp;diaporama;slides;"),
         f"{app_id}.PDF.desktop": entry(
             ".PDF", apps["pdf"]["name"], "PDF Viewer", "Lecteur PDF",
             "View, search and print PDF documents", "Consultez, recherchez et imprimez des documents PDF",
-            "--app=pdf %F", "Office;Viewer;", FILETYPES["pdf"]["mime"], office_class,
+            "--app=pdf %F", "Office;Viewer;", FILETYPES["pdf"]["mime"], "",
             "pdf;viewer;lecteur;djvu;xps;"),
         f"{app_id}.Text.desktop": entry(
             ".Text", apps["text"]["name"], "Text Editor", "Éditeur de texte",

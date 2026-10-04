@@ -112,7 +112,9 @@
         "ini",
         "conf",
         "cfg"
-      ]
+      ],
+      "integrated_tabs_comment": "AuxiText dans les onglets d'AuxiNux Office (texttabs.cpp) : désactivé, l'éditeur ne s'affichait pas sous Wayland. Les fichiers texte ouverts depuis AuxiNux Office vont à l'application AuxiText.",
+      "integrated_tabs": false
     },
     "mail": {
       "name": "AuxiMail",

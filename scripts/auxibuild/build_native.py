@@ -34,6 +34,13 @@ def shell_src():
     return UPSTREAM_SRC / "desktop-apps" / "win-linux"
 
 
+def _clean_auxinux_objects():
+    """Objets du module AuxiNux toujours recompilés : leurs options dépendent de product.json
+    (ex. AuxiText dans les onglets), ce que make ne détecte pas."""
+    for obj in (shell_src() / "build").glob("*/obj/src/auxinux/**/*.o*"):
+        obj.unlink()
+
+
 def _link_engine_for_qmake(target):
     """Expose the pinned engine binaries where upstream's qmake files expect the
     core build outputs (core/build/lib/<platform>, core/Common/3dParty/icu/...)."""
@@ -112,6 +119,7 @@ def build_shell_linux(args):
     qmake_args += [f"LIBS+=-L{engine_qt_link_dir()}", f"QMAKE_LFLAGS+=-Wl,-rpath-link,{engine_dir('linux')}"]
     if sysdeps_lib:
         qmake_args.append(f"LIBS+=-L{sysdeps_lib}")
+    _clean_auxinux_objects()
     run(qmake_args, cwd=out, env=env, log_file=out / "qmake.log")
     run(["make", f"-j{args.jobs}"], cwd=out, env=env, log_file=out / "make.log")
     binary = shell_src() / "build" / ("linux_64" if args.mode == "release" else "debug/linux_64") / "DesktopEditors"
@@ -144,6 +152,7 @@ def build_shell_windows(args):
          "QMAKE_TARGET.arch=x86_64", shell_src() / "ASCDocumentEditor.pro"],
         cwd=out, env=env, log_file=out / "qmake.log")
     fix_nmake_inline_files(out / "Makefile")
+    _clean_auxinux_objects()
     run(["make", f"-j{args.jobs}"], cwd=out, env=env, log_file=out / "make.log")
     binary = shell_src() / "build" / ("win_64" if args.mode == "release" else "debug/win_64") / "DesktopEditors.exe"
     if not binary.exists():
