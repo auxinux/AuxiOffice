@@ -12,7 +12,9 @@
 
     La compilation s'exécute dans WSL 2 (Linux intégré à Windows, fourni par Microsoft), avec la
     même chaîne que les builds officiels. Le script :
-      1. vérifie WSL 2 et propose de l'installer (droits administrateur, redémarrage) ;
+      1. vérifie WSL 2 et choisit une distribution déjà installée qui convient (Debian 13,
+         Ubuntu 24.04 ou plus récente) ; sinon, propose d'installer Ubuntu 24.04 (droits
+         administrateur, redémarrage) ;
       2. installe dans WSL les quelques outils nécessaires (python3, git, make, Node.js) ;
       3. demande d'accepter les licences Microsoft du CRT Visual C++ et du SDK Windows,
          téléchargés pour compiler (sauf si -AcceptMsvcLicense est donné) ;
@@ -24,12 +26,13 @@
 .PARAMETER AcceptMsvcLicense
     Accepter sans question les licences Microsoft (CRT MSVC, SDK Windows).
 .PARAMETER Distro
-    Distribution WSL à utiliser (défaut : Ubuntu-24.04, installée si absente).
+    Distribution WSL à utiliser (défaut : la première distribution installée compatible, en
+    commençant par celle par défaut de WSL ; Ubuntu-24.04, installée si aucune ne convient).
 #>
 param(
     [switch]$Clean,
     [switch]$AcceptMsvcLicense,
-    [string]$Distro = "Ubuntu-24.04"
+    [string]$Distro = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -46,9 +49,44 @@ if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
     Die "WSL n'est pas disponible sur ce Windows. Windows 11 à jour requis."
 }
 $distros = @(& wsl.exe --list --quiet 2>$null | ForEach-Object { ($_ -replace "`0", "").Trim() } | Where-Object { $_ })
+
+# Une distribution convient si elle tourne sous WSL 2, fournit apt-get et une glibc >= 2.38
+# (Debian 13, Ubuntu 24.04 ou plus récente : voir BUILD.md).
+function Test-Distro([string]$name) {
+    # Pas de guillemets doubles (mal transmis par Windows PowerShell 5.1) ; --exec évite que le
+    # shell de connexion de la distribution n'interprète la commande une seconde fois.
+    $probe = 'uname -r | grep -q Microsoft && exit 1; command -v apt-get >/dev/null || exit 2; ' +
+             'v=$(getconf GNU_LIBC_VERSION 2>/dev/null | cut -d'' '' -f2); ' +
+             'test $(printf ''%s\n2.38\n'' $v | sort -V | head -n1) = 2.38 || exit 3; ' +
+             '. /etc/os-release; echo $PRETTY_NAME'
+    $out = (& wsl.exe -d $name --exec sh -c $probe 2>$null | Out-String).Trim()
+    switch ($LASTEXITCODE) {
+        0 { return @{ Ok = $true; Info = $out } }
+        1 { return @{ Ok = $false; Info = "WSL 1 (WSL 2 requis : wsl --set-version $name 2)" } }
+        2 { return @{ Ok = $false; Info = "pas de apt-get (Debian ou Ubuntu requis)" } }
+        3 { return @{ Ok = $false; Info = "trop ancienne (glibc 2.38 requise : Debian 13, Ubuntu 24.04)" } }
+        default { return @{ Ok = $false; Info = "ne démarre pas" } }
+    }
+}
+
+if (-not $Distro) {
+    # wsl --list place la distribution par défaut en tête : elle est essayée en premier.
+    foreach ($d in $distros) {
+        if ($d -match '^docker-desktop') { continue }
+        $result = Test-Distro $d
+        if ($result.Ok) { $Distro = $d; Write-Host "Distribution WSL : $d ($($result.Info))"; break }
+        Write-Host "Distribution WSL « $d » ignorée : $($result.Info)"
+    }
+    if (-not $Distro) { $Distro = "Ubuntu-24.04" }
+} elseif ($distros -contains $Distro) {
+    $result = Test-Distro $Distro
+    if (-not $result.Ok) { Die "la distribution WSL « $Distro » ne convient pas : $($result.Info)" }
+    Write-Host "Distribution WSL : $Distro ($($result.Info))"
+}
+
 if ($distros -notcontains $Distro) {
-    Write-Host "La distribution WSL « $Distro » n'est pas installée."
-    $answer = Read-Host "L'installer maintenant ? (droits administrateur ; un redémarrage peut être demandé) [o/N]"
+    Write-Host "Aucune distribution WSL compatible n'est installée (Debian 13 ou Ubuntu 24.04 requis)."
+    $answer = Read-Host "Installer « $Distro » maintenant ? (droits administrateur ; un redémarrage peut être demandé) [o/N]"
     if ($answer -notmatch '^[oOyY]') { Die "WSL 2 est nécessaire pour compiler AuxiNux Office (voir BUILD.md)." }
     Start-Process wsl.exe -ArgumentList @("--install", "-d", $Distro) -Verb RunAs -Wait
     Write-Host ""
