@@ -8,10 +8,10 @@ import os
 import shutil
 from pathlib import Path
 
-from .common import ROOT, fail, ok, product, rmtree, run, step, version, version_tuple4, build_number, write_text
+from .common import BUILD_DIR, ROOT, fail, ok, product, rmtree, run, step, version, version_tuple4, build_number, write_text
 from .toolchain import ensure_qt, linux_build_env
 
-NATIVE_DIR = ROOT / "build" / "native"
+NATIVE_DIR = BUILD_DIR / "native"
 AUXITEXT_SRC = ROOT / "src" / "auxitext"
 LAUNCHER_SRC = ROOT / "src" / "launcher"
 X2T_GUARD_SRC = ROOT / "src" / "x2tguard" / "x2t_guard.c"
