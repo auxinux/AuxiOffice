@@ -32,15 +32,15 @@ Vérifié sous Linux x86_64 (Debian 13, sous Xvfb) :
   orphelins ;
 - un moteur par document : un plantage de LibreOffice ne ferme que l'onglet concerné.
 
-Pas encore fait : paquets, Windows et macOS (le code est prévu pour, mais n'est pas encore
-compilé ni testé), menus contextuels, boîtes de dialogue de LibreOffice (paragraphe, mise en
+Pas encore fait : paquets, Windows (prévu mais non compilé), macOS (script prêt, pas encore
+essayé sur un Mac), menus contextuels, boîtes de dialogue de LibreOffice (paragraphe, mise en
 page…), diaporama, impression, rechercher-remplacer.
 
 ## Développement
 
-Voir [BUILD.md](BUILD.md). En bref, sous Linux :
+Voir [BUILD.md](BUILD.md). En bref (Linux x86_64 ou Mac Apple Silicon) :
 
 ```sh
-scripts/fetch-engine.sh          # LibreOffice 26.2.6 vérifié, dans .engine/
+scripts/dev.sh                   # moteur LibreOffice, compilation, lancement
 scripts/test.sh                  # tests de l'interface, du moteur et d'intégration
 ```

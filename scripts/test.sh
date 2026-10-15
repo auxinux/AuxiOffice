@@ -14,8 +14,10 @@ cd "$ROOT"
 echo "== Interface"
 (cd app && npm run --silent typecheck && npx vitest run --reporter=dot)
 
-if [ -z "${AUXI_LO_PROGRAM:-}" ] && [ -f .engine/linux-x86_64/program-dir ]; then
-  AUXI_LO_PROGRAM=$(cat .engine/linux-x86_64/program-dir)
+if [ -z "${AUXI_LO_PROGRAM:-}" ]; then
+  for f in .engine/*/program-dir; do
+    [ -f "$f" ] && AUXI_LO_PROGRAM=$(cat "$f")
+  done
 fi
 if [ -n "${AUXI_LO_PROGRAM:-}" ] && [ -z "${AUXI_FIXTURES:-}" ]; then
   AUXI_FIXTURES="$ROOT/target/fixtures"
