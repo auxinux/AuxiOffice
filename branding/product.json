@@ -1,8 +1,8 @@
 {
-  "_comment": "Source unique de l'identité AuxiNux Office. La version vient du fichier VERSION à la racine (ne pas la dupliquer ici). Consommé par scripts/auxibuild (branding, packaging, génération d'en-têtes).",
+  "_comment": "Source unique de l'identité AuxiOffice. La version vient du fichier VERSION à la racine (ne pas la dupliquer ici).",
   "product": {
-    "name": "AuxiNux Office",
-    "short_name": "AuxiNuxOffice",
+    "name": "AuxiOffice",
+    "short_name": "AuxiOffice",
     "vendor": "Projet AuxiNux",
     "vendor_en": "AuxiNux Project",
     "copyright_holder": "Projet AuxiNux",
@@ -10,18 +10,9 @@
     "website": "https://office.auxinux.ca",
     "source_url": "https://git.auxinux.ca",
     "support_url": "https://office.auxinux.ca",
-    "license_spdx": "AGPL-3.0-only",
-    "modification_start_date": "2026-10-01",
-    "description_fr": "Suite bureautique libre de l'écosystème AuxiNux",
-    "description_en": "Free office suite from the AuxiNux ecosystem"
-  },
-  "upstream": {
-    "name": "ONLYOFFICE Desktop Editors",
-    "developer": "Ascensio System SIA",
-    "url": "https://github.com/ONLYOFFICE/DesktopEditors",
-    "trademark_notice_en": "ONLYOFFICE is a trademark of Ascensio System SIA.",
-    "trademark_notice_fr": "ONLYOFFICE est une marque d'Ascensio System SIA.",
-    "copyright": "© 2009-2026 Ascensio System SIA"
+    "license_spdx": "LicenseRef-AuxiOffice-Proprietary",
+    "description_fr": "Suite bureautique de l'écosystème AuxiNux",
+    "description_en": "Office suite from the AuxiNux ecosystem"
   },
   "apps": {
     "writer": {
@@ -128,30 +119,27 @@
   },
   "linux": {
     "executable": "auxioffice",
-    "package": "auxinux-office",
-    "app_id": "ca.auxinux.AuxiNuxOffice",
-    "install_dir": "/usr/lib/auxinux-office",
-    "xdg_name": "auxinux-office",
-    "shell_binary": "auxioffice-editors",
-    "text_binary": "auxitext",
-    "single_instance_key": "auxinux-office:editors",
+    "engine_executable": "auxi-engine",
+    "package": "auxioffice",
+    "replaces_packages": [
+      "auxinux-office"
+    ],
+    "app_id": "ca.auxinux.office",
+    "install_dir": "/usr/lib/auxioffice",
+    "xdg_name": "auxioffice",
     "maintainer": "AuxiNux <repo@auxinux.ca>"
   },
   "windows": {
     "executable": "auxioffice.exe",
-    "shell_binary": "auxioffice-editors.exe",
-    "text_binary": "auxitext.exe",
-    "install_dir_name": "AuxiNux Office",
+    "engine_executable": "auxi-engine.exe",
+    "install_dir_name": "AuxiOffice",
     "vendor_dir": "AuxiNux",
-    "app_dir": "AuxiNuxOffice",
     "registry_vendor": "AuxiNux",
-    "registry_app": "AuxiNuxOffice",
-    "uninstall_key": "AuxiNux Office",
-    "app_user_model_id": "AuxiNux.AuxiNuxOffice",
-    "progid_prefix": "AuxiNuxOffice",
-    "single_instance_key": "AuxiNux.AuxiNuxOffice.Editors",
-    "msi_upgrade_code": "{6C1B6F3E-3B53-4E2F-9E0B-4A8F2E7C5D11}",
-    "url_protocol": "auxinux-office"
+    "registry_app": "AuxiOffice",
+    "uninstall_key": "AuxiOffice",
+    "app_user_model_id": "AuxiNux.AuxiOffice",
+    "progid_prefix": "AuxiOffice",
+    "replaces_uninstall_key": "AuxiNux Office"
   },
   "colors": {
     "primary": "#F26F00",
@@ -177,43 +165,17 @@
       "beta"
     ],
     "feed_url_template": "",
-    "_comment": "Aucune URL de mise à jour n'est définie officiellement : laisser vide tant que l'infrastructure (ex. dep.auxinux.ca) n'est pas publiée. Voir docs/UPDATES.md."
+    "_comment": "Aucune URL de mise à jour officielle : laisser vide tant que l'infrastructure n'est pas publiée."
   },
   "privacy": {
-    "_comment": "Plugins upstream non installés par défaut : leur fonction principale envoie le contenu du document à un service en ligne tiers. Ils restent installables volontairement via le gestionnaire de plugins. Voir PRIVACY.md.",
-    "removed_plugins": {
-      "{b78a062b-e349-4634-8a44-99825600d299}": "DeepL (traduction en ligne)",
-      "{7CDB02C9-A0BF-4B56-9A1A-71C860B8498F}": "LanguageTool (correction grammaticale en ligne)",
-      "{BFC5D5C6-89DE-4168-9565-ABD8D1E48711}": "Zotero (bibliographie en ligne)",
-      "{BE5CBF95-C0AD-4842-B157-AC40FEDD9840}": "Thesaurus (API words.bighugelabs.com)",
-      "{440EBF13-9B19-4BD8-8621-05200E58140B}": "OCR (données de langue téléchargées en ligne)"
-    },
-    "engine_switches_comment": "Commutateurs Chromium/CEF imposés à chaque démarrage du moteur (lanceur, shell, application macOS) : aucune communication d'arrière-plan. Voir PRIVACY.md.",
-    "engine_switches": [
-      "--disable-features=DnsOverHttps",
-      "--disable-background-networking",
-      "--disable-domain-reliability",
-      "--no-pings",
-      "--disable-spell-checking"
-    ],
-    "removed_ai_providers": [
-      "together.ai"
-    ],
-    "local_ai_providers_first": [
-      "ollama",
-      "lmstudio",
-      "gpt4all"
-    ],
-    "cloud_providers_comment": "Clouds proposés par l'accueil : services que l'utilisateur peut héberger lui-même. Aucune connexion avant qu'il saisisse l'adresse de son serveur.",
-    "cloud_providers": [
-      "nextcloud",
-      "owncloud",
-      "seafile"
-    ],
-    "ai_disabled_by_default": true,
-    "default_user_name": {
-      "fr": "Utilisateur",
-      "en": "User"
-    }
+    "_comment": "Le moteur LibreOffice tourne sans affichage ni dialogue système ; AuxiOffice n'envoie aucune donnée en ligne (pas de télémétrie, pas de vérification de mise à jour tant que updates.enabled est faux)."
+  },
+  "engine": {
+    "name": "LibreOffice",
+    "developer": "The Document Foundation",
+    "url": "https://www.libreoffice.org",
+    "license_spdx": "MPL-2.0",
+    "trademark_notice_fr": "LibreOffice est une marque déposée de The Document Foundation.",
+    "trademark_notice_en": "LibreOffice is a registered trademark of The Document Foundation."
   }
 }

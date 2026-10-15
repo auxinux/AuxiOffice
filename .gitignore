@@ -1,22 +1,8 @@
-# Upstream sources and binary caches (fetched by scripts/auxibuild fetch)
-/upstream/src/
-/upstream/cache/
-# Build trees and toolchains
-/build/
-/.toolchains/
-# Release artifacts
-/dist/*
-!/dist/.gitkeep
-# Python
+/target/
+/.engine/
+node_modules/
+/app/ui/dist/
+/app/src-tauri/gen/
 __pycache__/
 *.pyc
-/.venv/
-# Misc
-*.log
-*.swp
-.DS_Store
-aqtinstall.log
-
-# Vidages mémoire de processus
-core
-core.[0-9]*
+.~lock.*#

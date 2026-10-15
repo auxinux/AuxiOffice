@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: CC-BY-SA-4.0 OR AGPL-3.0-or-later
 # Copyright (C) 2026 Projet AuxiNux
-"""Génère l'identité visuelle d'AuxiNux Office à partir de branding/product.json.
+"""Génère l'identité visuelle d'AuxiOffice à partir de branding/product.json.
 
 Sorties (versionnées dans branding/generated/, régénérables) :
   svg/   sources vectorielles (icônes d'applications, types de fichiers, logo, écran de démarrage)
@@ -133,26 +133,23 @@ def mime_icon(label, base):
 
 
 def wordmark(dark=False):
-    """Logo horizontal « AuxiNux Office » (Auxi orange, Nux argent, contour sombre)."""
+    """Logo horizontal « AuxiOffice » (Auxi orange, Office argent, contour sombre)."""
     size = 120
     auxi, (a0, ay0, a1, ay1) = text_outline("Auxi", size)
-    nux, (n0, ny0, n1, ny1) = text_outline("Nux", size)
-    office, (o0, oy0, o1, oy1) = text_outline("Office", size * 0.86)
+    office, (o0, oy0, o1, oy1) = text_outline("Office", size)
     gap = size * 0.06
-    nux_dx = a1 + gap - n0
-    office_dx = nux_dx + n1 + size * 0.28 - o0
+    office_dx = a1 + gap - o0
     width = office_dx + o1 + 24
-    top = min(ay0, ny0, oy0)
-    bottom = max(ay1, ny1, oy1)
+    top = min(ay0, oy0)
+    bottom = max(ay1, oy1)
     height = bottom - top + 48
     base_y = -top + 22
-    office_fill = "#E8E8E6" if dark else GRAPHITE
-    outline = "#0E0F11"
+    outline = "#0E0F11" if not dark else "#000000"
     body = f'''  <defs>
     <linearGradient id="auxi" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="{AMBER}"/><stop offset="0.55" stop-color="{ORANGE}"/><stop offset="1" stop-color="{shade(ORANGE, 0.85)}"/>
     </linearGradient>
-    <linearGradient id="nux" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="office" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#F4F5F5"/><stop offset="0.55" stop-color="{SILVER}"/><stop offset="1" stop-color="#8E9193"/>
     </linearGradient>
     <linearGradient id="swoosh" x1="0" y1="0" x2="1" y2="0">
@@ -162,12 +159,11 @@ def wordmark(dark=False):
   </defs>
   <g transform="translate(12 {base_y:.1f})">
     <g stroke="{outline}" stroke-width="7" stroke-linejoin="round" fill="none">
-      <path d="{auxi}"/><path transform="translate({nux_dx:.1f} 0)" d="{nux}"/>
+      <path d="{auxi}"/><path transform="translate({office_dx:.1f} 0)" d="{office}"/>
     </g>
     <path fill="url(#auxi)" d="{auxi}"/>
-    <path fill="url(#nux)" transform="translate({nux_dx:.1f} 0)" d="{nux}"/>
-    <path fill="{office_fill}" transform="translate({office_dx:.1f} 0)" d="{office}"/>
-    <rect x="{a0 + 10:.1f}" y="{ny1 + 10:.1f}" width="{nux_dx + n1 - a0 - 20:.1f}" height="5" rx="2.5" fill="url(#swoosh)"/>
+    <path fill="url(#office)" transform="translate({office_dx:.1f} 0)" d="{office}"/>
+    <rect x="{a0 + 10:.1f}" y="{oy1 + 10:.1f}" width="{office_dx + o1 - a0 - 20:.1f}" height="5" rx="2.5" fill="url(#swoosh)"/>
   </g>'''
     return svg_doc(int(width + 24), int(height), body)
 
@@ -190,7 +186,7 @@ def splash():
     mh = int(mark.split('height="', 1)[1].split('"', 1)[0])
     scale = 560 / mw
     version = PRODUCT_VERSION
-    tagline, _ = text_outline("Suite bureautique libre", 30)
+    tagline, _ = text_outline("Suite bureautique AuxiNux", 30)
     vpath, _ = text_outline(f"Version {version}", 24)
     body = f'''  <defs>
     <linearGradient id="splashbg" x1="0" y1="0" x2="1" y2="1">

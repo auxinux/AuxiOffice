@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AuxiOffice",
+  "version": "0.1.0",
+  "identifier": "ca.auxinux.office",
+  "build": {
+    "frontendDist": "../ui/dist",
+    "devUrl": "http://localhost:5174",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "AuxiOffice",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 800,
+        "minHeight": 520
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": [
+      "icons/icon.png"
+    ],
+    "resources": {
+      "templates/*": "templates/"
+    }
+  }
+}

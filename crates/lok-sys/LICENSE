@@ -1,0 +1,5 @@
+Ce crate est distribué sous la Mozilla Public License 2.0.
+Texte complet : https://mozilla.org/MPL/2.0/
+
+Il transcrit en Rust les en-têtes C de LibreOfficeKit (LibreOffice,
+The Document Foundation), eux-mêmes sous MPL 2.0.

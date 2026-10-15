@@ -1,7 +1,0 @@
-<!DOCTYPE RCC>
-<RCC version="1.0">
-    <qresource prefix="/icons">
-        <file alias="auxitext.png">../../../branding/generated/png/256x256/auxitext.png</file>
-        <file alias="auxitext-64.png">../../../branding/generated/png/64x64/auxitext.png</file>
-    </qresource>
-</RCC>

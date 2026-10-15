@@ -1,0 +1,86 @@
+import { describe, expect, it } from "vitest";
+import { KEY, colorToLong, intersects, isUntitled, lokKeyFor, parseInvalidation, parseRects, parseState, unoArgs } from "./lok";
+
+const key = (k: Partial<Parameters<typeof lokKeyFor>[0]>) => ({ key: "", code: "", ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, ...k });
+
+describe("rectangles", () => {
+  it("lit un ou plusieurs rectangles", () => {
+    expect(parseRects("1, 2, 3, 4")).toEqual([{ x: 1, y: 2, w: 3, h: 4 }]);
+    expect(parseRects("1, 2, 3, 4; 5, 6, 7, 8")).toHaveLength(2);
+    expect(parseRects("EMPTY")).toEqual([]);
+    expect(parseRects("")).toEqual([]);
+  });
+
+  it("lit les invalidations", () => {
+    expect(parseInvalidation("EMPTY")).toEqual({ rect: null, part: null });
+    expect(parseInvalidation("EMPTY, 2")).toEqual({ rect: null, part: 2 });
+    expect(parseInvalidation("10, 20, 30, 40, 1, 0")).toEqual({ rect: { x: 10, y: 20, w: 30, h: 40 }, part: 1 });
+    expect(parseInvalidation("0, 0, 1000000000, 1000000000").rect).toBeNull();
+  });
+
+  it("détecte les chevauchements", () => {
+    expect(intersects({ x: 0, y: 0, w: 10, h: 10 }, { x: 5, y: 5, w: 10, h: 10 })).toBe(true);
+    expect(intersects({ x: 0, y: 0, w: 10, h: 10 }, { x: 10, y: 0, w: 5, h: 5 })).toBe(false);
+  });
+});
+
+describe("états", () => {
+  it("lit les deux formes de state_changed", () => {
+    expect(parseState(".uno:Bold=true")).toEqual({ command: ".uno:Bold", value: "true" });
+    expect(parseState(".uno:CharFontName=Liberation Serif")).toEqual({ command: ".uno:CharFontName", value: "Liberation Serif" });
+    expect(parseState('{"commandName":".uno:Undo","state":"enabled"}')).toEqual({ command: ".uno:Undo", value: "enabled" });
+    expect(parseState("n'importe quoi")).toBeNull();
+  });
+});
+
+describe("touches", () => {
+  it("laisse passer les caractères ordinaires vers la saisie de texte", () => {
+    expect(lokKeyFor(key({ key: "é", code: "Digit2" }))).toBeNull();
+    expect(lokKeyFor(key({ key: "A", code: "KeyA", shiftKey: true }))).toBeNull();
+  });
+
+  it("traduit la navigation et l'édition", () => {
+    expect(lokKeyFor(key({ key: "Enter", code: "Enter" }))).toEqual({ char: 13, code: KEY.RETURN });
+    expect(lokKeyFor(key({ key: "ArrowLeft", code: "ArrowLeft", shiftKey: true }))).toEqual({ char: 0, code: KEY.LEFT | KEY.SHIFT });
+    expect(lokKeyFor(key({ key: "Backspace", code: "Backspace" }))).toEqual({ char: 8, code: KEY.BACKSPACE });
+    expect(lokKeyFor(key({ key: "F2", code: "F2" }))).toEqual({ char: 0, code: KEY.F1 + 1 });
+  });
+
+  it("traduit les raccourcis selon la touche physique", () => {
+    expect(lokKeyFor(key({ key: "b", code: "KeyB", ctrlKey: true }))).toEqual({ char: 0, code: (KEY.A + 1) | KEY.MOD1 });
+    // Clavier AZERTY : Ctrl + touche physique « KeyQ » qui affiche « a ».
+    expect(lokKeyFor(key({ key: "a", code: "KeyQ", ctrlKey: true }))?.code).toBe((KEY.A + 16) | KEY.MOD1);
+    expect(lokKeyFor(key({ key: "End", code: "End", ctrlKey: true }))).toEqual({ char: 0, code: KEY.END | KEY.MOD1 });
+  });
+
+  it("utilise Cmd comme touche principale sous macOS", () => {
+    expect(lokKeyFor(key({ key: "s", code: "KeyS", metaKey: true }), true)?.code).toBe((KEY.A + 18) | KEY.MOD1);
+    expect(lokKeyFor(key({ key: "s", code: "KeyS", ctrlKey: true }), true)?.code).toBe((KEY.A + 18) | KEY.MOD3);
+  });
+});
+
+describe("divers", () => {
+  it("convertit couleurs et arguments UNO", () => {
+    expect(colorToLong("#ff0000")).toBe(0xff0000);
+    expect(unoArgs({ Bold: true, Height: 12.5, Size: 3, Name: "Arial" })).toEqual({
+      Bold: { type: "boolean", value: true },
+      Height: { type: "float", value: 12.5 },
+      Size: { type: "long", value: 3 },
+      Name: { type: "string", value: "Arial" },
+    });
+  });
+
+  it("reconnaît les documents sans titre", () => {
+    expect(isUntitled("/tmp/AuxiOffice/Sans titre 1760000000000.docx")).toBe(true);
+    expect(isUntitled("C:\\Users\\a\\AppData\\Local\\Temp\\AuxiOffice\\Sans titre 17.xlsx")).toBe(true);
+    expect(isUntitled("/home/a/Documents/rapport.docx")).toBe(false);
+  });
+});
+
+describe("URL de fichiers", () => {
+  it("encode les chemins Unix et Windows", async () => {
+    const { toFileUrl } = await import("./lok");
+    expect(toFileUrl("/home/a/Mes images/été.png")).toBe("file:///home/a/Mes%20images/%C3%A9t%C3%A9.png");
+    expect(toFileUrl("C:\\Users\\a\\photo 1.jpg")).toBe("file:///C:/Users/a/photo%201.jpg");
+  });
+});

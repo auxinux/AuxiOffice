@@ -1,0 +1,13 @@
+[package]
+name = "lok-sys"
+description = "Liaison C brute vers LibreOfficeKit (transcription des en-têtes de LibreOffice)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+# Ce fichier transcrit des en-têtes de LibreOffice : il reste sous MPL 2.0
+# et son code source est publié avec chaque version (voir LICENSING.md).
+license = "MPL-2.0"
+publish = false
+
+[dependencies]
+libloading = "0.8"
