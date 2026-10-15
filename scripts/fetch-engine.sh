@@ -29,15 +29,32 @@ sha256() {
 }
 
 # Télécharge un fichier du verrou dans le cache et vérifie sa somme.
+# Les miroirs de LibreOffice coupent parfois la connexion : reprise du
+# transfert (-C -) et nouvelles tentatives, éventuellement sur un autre miroir.
 fetch() {
   file=$1 sum=$2
   dest="$CACHE/$(basename "$file")"
-  if [ ! -f "$dest" ] || [ "$(sha256 "$dest")" != "$sum" ]; then
-    echo "Téléchargement de $(basename "$file")…"
-    curl -fL --retry 3 -o "$dest.part" "$base/$file"
-    mv "$dest.part" "$dest"
+  if [ -f "$dest" ] && [ "$(sha256 "$dest")" = "$sum" ]; then
+    return 0
   fi
-  [ "$(sha256 "$dest")" = "$sum" ] || { echo "Somme SHA-256 incorrecte : $(basename "$file")" >&2; exit 1; }
+  echo "Téléchargement de $(basename "$file")…"
+  n=0
+  while [ $n -lt 5 ]; do
+    n=$((n + 1))
+    if curl -fL --retry 3 --retry-delay 2 -C - -o "$dest.part" "$base/$file"; then
+      if [ "$(sha256 "$dest.part")" = "$sum" ]; then
+        mv "$dest.part" "$dest"
+        return 0
+      fi
+      echo "Somme SHA-256 incorrecte, nouveau téléchargement…" >&2
+      rm -f "$dest.part"
+    else
+      echo "Transfert interrompu (essai $n sur 5), reprise…" >&2
+    fi
+    sleep 2
+  done
+  rm -f "$dest.part"
+  return 1
 }
 
 install_linux() {
@@ -85,15 +102,28 @@ entries=$(python3 -c "
 import json,sys
 lock=json.load(open(sys.argv[1]))
 for s in sys.argv[2:]:
-    for e in lock[s]: print(e['file'], e['sha256'])" "$LOCK" $sets)
+    for e in lock[s]: print(e['file'], e['sha256'], 'optional' if e.get('optional') else 'required')" "$LOCK" $sets)
 
-echo "$entries" | while read -r file sum; do
-  fetch "$file" "$sum"
+# Pas de tube vers « while » : un échec doit arrêter le script lui-même.
+tmp_entries=$(mktemp "${TMPDIR:-/tmp}/auxi-entries.XXXXXX")
+echo "$entries" > "$tmp_entries"
+while read -r file sum need; do
+  if ! fetch "$file" "$sum"; then
+    if [ "$need" = optional ]; then
+      echo "Avertissement : $(basename "$file") n'a pas pu être téléchargé ; on continue sans lui." >&2
+      echo "  (relancez scripts/fetch-engine.sh plus tard pour l'ajouter)" >&2
+      continue
+    fi
+    echo "Échec du téléchargement de $(basename "$file"). Vérifiez la connexion puis relancez le script." >&2
+    rm -f "$tmp_entries"
+    exit 1
+  fi
   case "$PLATFORM" in
     linux-*) install_linux "$CACHE/$(basename "$file")" ;;
     macos-*) install_macos "$CACHE/$(basename "$file")" ;;
   esac
-done
+done < "$tmp_entries"
+rm -f "$tmp_entries"
 
 case "$PLATFORM" in
   linux-*) program=$(find "$OUT/root/opt" -maxdepth 2 -type d -name program | head -n1) ;;

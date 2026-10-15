@@ -1,5 +1,5 @@
 {
-  "_comment": "Version de LibreOffice livrée comme moteur d'AuxiOffice : binaires officiels de The Document Foundation, non modifiés. Mettre à jour version + sommes SHA-256 ensemble (scripts/fetch-engine.sh vérifie chaque fichier).",
+  "_comment": "Version de LibreOffice livrée comme moteur d'AuxiOffice : binaires officiels de The Document Foundation, non modifiés. Mettre à jour version + sommes SHA-256 ensemble (scripts/fetch-engine.sh vérifie chaque fichier). Les entrées « optional » (modules de langue) ne bloquent pas l'installation si leur téléchargement échoue.",
   "version": "26.2.6",
   "build": "26.2.6.3",
   "base_url": "https://download.documentfoundation.org/libreoffice/stable/26.2.6",
@@ -8,17 +8,37 @@
     "sha256": "3a2570aa7087bf8e0cbdf49ac5bd0e452c2025274af99e07882daa104c5685bd"
   },
   "linux-x86_64": [
-    { "file": "deb/x86_64/LibreOffice_26.2.6_Linux_x86-64_deb.tar.gz", "sha256": "fd0e8f8f2408dd2e5b90286e60f3f97cf566ba441cd48cfc5bcc68067303e0bc" },
-    { "file": "deb/x86_64/LibreOffice_26.2.6_Linux_x86-64_deb_langpack_fr.tar.gz", "sha256": "2406754ae51e52ab92d2dd1cf005a44bb3728cd54830477e58759a71411ce1a6" }
+    {
+      "file": "deb/x86_64/LibreOffice_26.2.6_Linux_x86-64_deb.tar.gz",
+      "sha256": "fd0e8f8f2408dd2e5b90286e60f3f97cf566ba441cd48cfc5bcc68067303e0bc"
+    },
+    {
+      "file": "deb/x86_64/LibreOffice_26.2.6_Linux_x86-64_deb_langpack_fr.tar.gz",
+      "sha256": "2406754ae51e52ab92d2dd1cf005a44bb3728cd54830477e58759a71411ce1a6",
+      "optional": true
+    }
   ],
   "sdk-linux-x86_64": [
-    { "file": "deb/x86_64/LibreOffice_26.2.6_Linux_x86-64_deb_sdk.tar.gz", "sha256": "c38a6a9a68aa785942f8492811adc799c50ae7b94eb50773355bba2aa90cfe8b" }
+    {
+      "file": "deb/x86_64/LibreOffice_26.2.6_Linux_x86-64_deb_sdk.tar.gz",
+      "sha256": "c38a6a9a68aa785942f8492811adc799c50ae7b94eb50773355bba2aa90cfe8b"
+    }
   ],
   "windows-x86_64": [
-    { "file": "win/x86_64/LibreOffice_26.2.6_Win_x86-64.msi", "sha256": "f9877032fd908beb9c0ddf06df4af5c2e85f419c42e14876c4cce5aae5fb2660" }
+    {
+      "file": "win/x86_64/LibreOffice_26.2.6_Win_x86-64.msi",
+      "sha256": "f9877032fd908beb9c0ddf06df4af5c2e85f419c42e14876c4cce5aae5fb2660"
+    }
   ],
   "macos-aarch64": [
-    { "file": "mac/aarch64/LibreOffice_26.2.6_MacOS_aarch64.dmg", "sha256": "94bb3248df074c225490a8a6d1d9dc87c7d6783dbb7a8e9f0d0c3d94348552af" },
-    { "file": "mac/aarch64/LibreOffice_26.2.6_MacOS_aarch64_langpack_fr.dmg", "sha256": "3792b8468ab6327c011ab9d7c41513fd6cff3c1c309a1567e1822cb4faa3fe47" }
+    {
+      "file": "mac/aarch64/LibreOffice_26.2.6_MacOS_aarch64.dmg",
+      "sha256": "94bb3248df074c225490a8a6d1d9dc87c7d6783dbb7a8e9f0d0c3d94348552af"
+    },
+    {
+      "file": "mac/aarch64/LibreOffice_26.2.6_MacOS_aarch64_langpack_fr.dmg",
+      "sha256": "3792b8468ab6327c011ab9d7c41513fd6cff3c1c309a1567e1822cb4faa3fe47",
+      "optional": true
+    }
   ]
 }

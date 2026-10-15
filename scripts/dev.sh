@@ -13,6 +13,15 @@ case "$(uname -s)-$(uname -m)" in
   *) echo "Plateforme non prise en charge : $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
 
+missing=""
+for tool in cargo npm python3 curl; do
+  command -v "$tool" >/dev/null || missing="$missing $tool"
+done
+if [ -n "$missing" ]; then
+  echo "Outils manquants :$missing — voir BUILD.md (Rust via rustup, Node.js 22+, outils Xcode sur Mac)." >&2
+  exit 1
+fi
+
 [ -f ".engine/$PLATFORM/program-dir" ] || scripts/fetch-engine.sh
 
 echo "== Interface"
