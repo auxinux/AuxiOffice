@@ -73,10 +73,14 @@ fi
 [ -f "$SRC/autogen.sh" ] || die "sources incomplètes dans $SRC"
 
 cd "$SRC"
-if [ ! -f config.status ]; then
+# Le module svp a besoin de fontconfig, freetype et cairo : macOS ne les
+# fournit pas, on fait compiler les versions internes de LibreOffice.
+if [ ! -f config.status ] || ! grep -q -- '--without-system-fontconfig' config.status 2>/dev/null; then
   say "Configuration (module svp, sans interface graphique de LibreOffice)"
   ./autogen.sh \
     --enable-headless \
+    --without-system-fontconfig \
+    --without-system-freetype \
     --with-lang="fr en-US" \
     --with-myspell-dicts \
     --with-parallelism="$(sysctl -n hw.ncpu)" \
