@@ -4,17 +4,20 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { call, onEngineEvent, paint, uno, type DocInfo, type EngineEvent } from "./engine";
-import { lokKeyFor, parseInvalidation, parseRects, parseState, TWIPS_PER_PX, type Rect } from "./lok";
+import { lokKeyFor, parseInvalidation, parseRects, parseState, toFileUrl, TWIPS_PER_PX, type Rect } from "./lok";
 import { TileView } from "./TileView";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import type { Action, AppAction } from "./actions";
+import { ContextMenu, type LoMenuItem } from "./ContextMenu";
+import { DialogLayer, type DialogLayerHandle } from "./DialogLayer";
 import { Icon } from "./icons";
 import { Toolbar } from "./Toolbar";
 
 const IS_MAC = navigator.platform.toLowerCase().includes("mac");
 
 export interface DocHandle {
-  save: () => Promise<void>;
-  saveAs: () => Promise<void>;
-  exportPdf: () => Promise<void>;
+  /** Exécute une commande du catalogue (menus, ruban) sur ce document. */
+  run: (a: Action) => void;
 }
 
 interface Props {
@@ -24,8 +27,10 @@ interface Props {
   onEngineLost: () => void;
   onMessage: (text: string, kind?: "info" | "error") => void;
   register: (h: DocHandle) => void;
-  saveDocument: (asNew: boolean) => Promise<void>;
-  exportPdf: () => Promise<void>;
+  /** Actions de l'application (enregistrer, ouvrir…), traitées par App. */
+  onAppAction: (a: AppAction) => void;
+  /** États des commandes (menus cochés), relayés à App. */
+  onStates?: (states: Record<string, string>) => void;
 }
 
 interface Headers {
@@ -33,7 +38,7 @@ interface Headers {
   rows: { start: number; end: number; text: string }[];
 }
 
-export function DocView({ info, active, onModified, onEngineLost, onMessage, register, saveDocument, exportPdf }: Props) {
+export function DocView({ info, active, onModified, onEngineLost, onMessage, register, onAppAction, onStates }: Props) {
   const doc = info.doc;
   const scrollerRef = useRef<HTMLDivElement>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
@@ -53,11 +58,14 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
   const isSheet = info.type === "spreadsheet";
   const isSlides = info.type === "presentation" || info.type === "drawing";
 
-  useEffect(() => {
-    register({ save: () => saveDocument(false), saveAs: () => saveDocument(true), exportPdf });
-  }, [register, saveDocument, exportPdf]);
+  const dialogRef = useRef<DialogLayerHandle>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number; items: LoMenuItem[] } | null>(null);
+  const lastPointer = useRef({ x: 0, y: 0 });
 
-  const focusInput = useCallback(() => inputRef.current?.focus({ preventScroll: true }), []);
+  // Le clavier reste dans une boîte de dialogue ouverte.
+  const focusInput = useCallback(() => {
+    if (!dialogRef.current?.hasDialog()) inputRef.current?.focus({ preventScroll: true });
+  }, []);
 
   // --- Tableur : zoom et zone visible à signaler au moteur, en-têtes -------
   const syncSheetViewport = useCallback(async () => {
@@ -193,6 +201,17 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
         case "invalidate_sheet_geometry":
           void syncSheetViewport();
           break;
+        case "window":
+          dialogRef.current?.onWindowEvent(payload);
+          break;
+        case "context_menu":
+          try {
+            const m = JSON.parse(payload);
+            if (Array.isArray(m.menu) && m.menu.length) setCtx({ ...lastPointer.current, items: m.menu });
+          } catch {
+            /* menu illisible : ignoré */
+          }
+          break;
         case "error":
           try {
             const e = JSON.parse(payload);
@@ -259,6 +278,8 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
     const { x, y } = v.clientToDoc(e.clientX - box.left, e.clientY - box.top);
     if (kind === "move" && e.buttons === 0) return;
     if (kind === "down") {
+      lastPointer.current = { x: e.clientX, y: e.clientY };
+      setCtx(null);
       const lc = lastClick.current;
       const near = Math.abs(lc.x - e.clientX) < 4 && Math.abs(lc.y - e.clientY) < 4;
       lc.n = near && e.timeStamp - lc.t < 400 ? Math.min(lc.n + 1, 3) : 1;
@@ -295,7 +316,7 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
       const k = e.key.toLowerCase();
       if (k === "s") {
         e.preventDefault();
-        void saveDocument(e.shiftKey);
+        onAppAction(e.shiftKey ? "saveAs" : "save");
         return;
       }
       if (k === "c" || k === "x" || k === "v") return; // événements copy/cut/paste
@@ -392,6 +413,51 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
     [doc, focusInput],
   );
 
+  const insertImage = useCallback(async () => {
+    const path = await openDialog({ multiple: false, filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "tif", "tiff"] }] });
+    if (typeof path === "string") command(".uno:InsertGraphic", { FileName: { type: "string", value: toFileUrl(path) } });
+  }, [command]);
+
+  const runAction = useCallback(
+    (a: Action) => {
+      if (a.uno) {
+        command(a.uno, a.args);
+        return;
+      }
+      const z = viewRef.current?.zoom ?? 1;
+      switch (a.app) {
+        case "zoomIn":
+          applyZoom(z * 1.1);
+          break;
+        case "zoomOut":
+          applyZoom(z / 1.1);
+          break;
+        case "zoom100":
+          applyZoom(1);
+          break;
+        case "fitWidth":
+          fitWidth();
+          break;
+        case "insertImage":
+          void insertImage();
+          break;
+        case "selectAll":
+          command(".uno:SelectAll");
+          break;
+        default:
+          if (a.app) onAppAction(a.app);
+      }
+    },
+    [command, applyZoom, fitWidth, insertImage, onAppAction],
+  );
+
+  useEffect(() => {
+    register({ run: runAction });
+  }, [register, runAction]);
+  useEffect(() => {
+    if (active) onStates?.(states);
+  }, [active, states, onStates]);
+
   const v = viewRef.current;
   const originX = v?.origin.x ?? 0;
   const scrollLeft = scrollerRef.current?.scrollLeft ?? 0;
@@ -399,14 +465,7 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
 
   return (
     <div className={`docview type-${info.type}`} style={{ display: active ? "flex" : "none" }}>
-      <Toolbar
-        type={info.type}
-        doc={doc}
-        states={states}
-        command={command}
-        save={() => void saveDocument(false)}
-        exportPdf={() => void exportPdf()}
-      />
+      <Toolbar type={info.type} doc={doc} states={states} command={command} run={runAction} />
       {info.read_only && (
         <div className="banner">
           Lecture seule{info.locked_by ? ` — document ouvert par ${info.locked_by.user || "un autre utilisateur"}${info.locked_by.host ? ` (${info.locked_by.host})` : ""}` : ""}.
@@ -502,6 +561,19 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
             </button>
           ))}
         </div>
+      )}
+      <DialogLayer ref={dialogRef} doc={doc} onClosed={focusInput} />
+      {ctx && (
+        <ContextMenu
+          x={ctx.x}
+          y={ctx.y}
+          items={ctx.items}
+          onClose={() => setCtx(null)}
+          onCommand={(c) => {
+            setCtx(null);
+            command(c);
+          }}
+        />
       )}
       <div className="statusbar">
         <span>{pageInfo || (isSlides ? `Diapositive ${part + 1} sur ${partNames.length}` : isSheet ? partNames[part] : "")}</span>

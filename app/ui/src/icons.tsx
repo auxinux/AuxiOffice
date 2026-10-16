@@ -33,9 +33,42 @@ const P: Record<string, string> = {
   zoomIn: "M9 4a5 5 0 110 10A5 5 0 019 4zM13 13l4 4M7 9h4M9 7v4",
   zoomOut: "M9 4a5 5 0 110 10A5 5 0 019 4zM13 13l4 4M7 9h4",
   open: "M2 5h6l2 2h8v9H2zM2 9h16",
+  search: "M8.5 3a5.5 5.5 0 110 11 5.5 5.5 0 010-11zM12.5 12.5L17 17",
+  clear: "M4 16h7M9 4l-4 9M9 4l4 9M6.5 10h5M14 12l4 4M18 12l-4 4",
+  font: "M3 17L8 3h1l5 14M5 12h7M15 17h3",
+  paragraph: "M9 17V3h6M13 3v14M9 3a3.5 3.5 0 000 7",
+  link: "M8 12l4-4M9 6l1-1a3 3 0 014 4l-1 1M11 14l-1 1a3 3 0 01-4-4l1-1",
+  comment: "M3 4h14v9H8l-4 3v-3H3z",
+  chart: "M3 17h14M5 17V9M9 17V5M13 17v-6M17 17V7",
+  page: "M5 2h10v16H5zM8 6h4M8 9h4M8 12h4",
+  columns: "M3 3h6v14H3zM11 3h6v14h-6z",
+  bookmark: "M6 3h8v14l-4-3-4 3z",
+  footnote: "M3 4h11M3 8h11M3 12h6M14 12v5M12 14h4",
+  pagenumber: "M5 2h10v16H5zM9 13l1.5-1V16",
+  toc: "M3 4h2M8 4h9M3 9h2M8 9h9M3 14h2M8 14h9",
+  indentMore: "M3 4h14M9 8h8M9 12h8M3 16h14M3 8l3 2-3 2",
+  indentLess: "M3 4h14M9 8h8M9 12h8M3 16h14M6 8l-3 2 3 2",
+  spell: "M3 13l3-9 3 9M4 10h4M11 13l2 2 4-5",
+  thesaurus: "M4 3h9l3 3v11H4zM7 8h6M7 11h6M7 14h3",
+  count: "M4 7h12M4 13h12M8 3l-1 14M13 3l-1 14",
+  changes: "M4 4h12v12H4zM7 10l2 2 4-5",
+  pilcrow: "M9 17V3h6M13 3v14M9 3a3.5 3.5 0 000 7",
+  cell: "M3 3h14v14H3zM3 8h14M8 3v14",
+  condformat: "M3 3h14v14H3zM3 10h14M10 3v14M5 5h3v3H5z",
+  sheetAdd: "M3 4h11v11H3zM16 12v6M13 15h6",
+  function: "M12 3c-3 0-3 3-3 3v9c0 3-3 3-3 3M6 9h6M12 11l4 5M16 11l-4 5",
+  validity: "M3 3h14v14H3zM6 10l3 3 5-6",
+  master: "M3 4h14v10H3zM6 17h8M5 7h10",
+  textbox: "M3 4h14v12H3zM7 7h6M10 7v6",
+  headerfooter: "M3 3h14v14H3zM3 6h14M3 14h14",
+  transform: "M4 4h12v12H4zM2 2l3 3M18 2l-3 3M2 18l3-3M18 18l-3-3",
 };
 
 export type IconName = keyof typeof P;
+
+export function hasIcon(name?: string): name is IconName {
+  return !!name && name in P;
+}
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return (

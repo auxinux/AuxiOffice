@@ -2,6 +2,13 @@
 
 ## Non publié
 
+- Barre de menus native et ruban à onglets, construits depuis un catalogue de commandes
+  vérifiées une à une avec LibreOffice (aucune ne fait planter le moteur).
+- Boîtes de dialogue de LibreOffice affichées et pilotées dans AuxiOffice (rendu net sur
+  écrans haute densité, souris, clavier, listes déroulantes, déplacement).
+- Menu contextuel de LibreOffice au clic droit.
+- Moteur prêt d'avance ; `dev.sh` compile en mode optimisé.
+
 - Moteur LibreOffice 26.8.1 (le rendu par tuiles sous macOS n'existe qu'à partir de 26.8) ;
   liaison `lok-sys` réalignée sur les tables de fonctions de 26.8 et contrôle de leur taille
   au démarrage.

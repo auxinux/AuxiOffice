@@ -1,11 +1,13 @@
-// Barre d'outils de l'éditeur, adaptée au type de document. Toutes les
-// actions passent par des commandes UNO de LibreOffice.
+// Ruban de l'éditeur : onglet Accueil (mise en forme courante) et onglets
+// thématiques (Insertion, Mise en page…) construits depuis actions.ts.
+// Toutes les actions passent par des commandes UNO de LibreOffice ou par
+// les actions de l'application.
 
-import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
+import { A, ribbonFor, type Action } from "./actions";
 import { call, type DocType } from "./engine";
-import { Icon, type IconName } from "./icons";
-import { colorToLong, toFileUrl } from "./lok";
+import { hasIcon, Icon, type IconName } from "./icons";
+import { colorToLong } from "./lok";
 
 type Cmd = (cmd: string, args?: Record<string, unknown>) => void;
 
@@ -14,8 +16,7 @@ interface Props {
   doc: number;
   states: Record<string, string>;
   command: Cmd;
-  save: () => void;
-  exportPdf: () => void;
+  run: (a: Action) => void;
 }
 
 const SIZES = ["8", "9", "10", "10.5", "11", "12", "14", "16", "18", "20", "24", "28", "32", "36", "48", "72"];
@@ -59,7 +60,59 @@ function Btn(p: { label?: string; icon?: IconName; title: string; onClick: () =>
   );
 }
 
-export function Toolbar({ type, doc, states, command, save, exportPdf }: Props) {
+/** Bouton du ruban : icône au-dessus du libellé. */
+function RibbonBtn({ action, states, run }: { action: Action; states: Record<string, string>; run: (a: Action) => void }) {
+  const label = action.label.replace(/…$/, "");
+  const active = action.check ? states[action.check] === "true" : false;
+  return (
+    <button
+      className={`rb ${active ? "on" : ""}`}
+      title={action.label}
+      aria-pressed={action.check ? active : undefined}
+      disabled={action.uno ? states[action.uno] === "disabled" : false}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => run(action)}
+    >
+      {hasIcon(action.icon) ? <Icon name={action.icon} size={22} /> : <span className="rb-noicon" />}
+      <span className="rb-label">{label}</span>
+    </button>
+  );
+}
+
+export function Toolbar(props: Props) {
+  const tabs = ribbonFor(props.type);
+  const [tab, setTab] = useState(0);
+  const current = tabs[Math.min(tab, tabs.length - 1)];
+  return (
+    <div className="ribbon">
+      <div className="ribbon-tabs" role="tablist">
+        {tabs.map((t, i) => (
+          <button key={t.label} role="tab" aria-selected={i === tab} className={i === tab ? "active" : ""} onMouseDown={(e) => e.preventDefault()} onClick={() => setTab(i)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {current.home ? (
+        <HomeBar {...props} />
+      ) : (
+        <div className="toolbar ribbon-body" role="toolbar">
+          {current.groups.map((g) => (
+            <div className="rgroup" key={g.label}>
+              <div className="rgroup-items">
+                {g.actions.map((a) => (
+                  <RibbonBtn key={a.label} action={a} states={props.states} run={props.run} />
+                ))}
+              </div>
+              <div className="rgroup-label">{g.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HomeBar({ type, doc, states, command, run }: Props) {
   const [fonts, setFonts] = useState<string[]>([]);
   const [styles, setStyles] = useState<string[]>([]);
 
@@ -81,18 +134,12 @@ export function Toolbar({ type, doc, states, command, save, exportPdf }: Props) 
   const style = states[".uno:StyleApply"] ?? "";
   const text = type === "text";
   const sheet = type === "spreadsheet";
-  const slides = type === "presentation" || type === "drawing";
-
-  const insertImage = async () => {
-    const path = await open({ multiple: false, filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "tif", "tiff"] }] });
-    if (typeof path === "string") command(".uno:InsertGraphic", { FileName: { type: "string", value: toFileUrl(path) } });
-  };
 
   return (
     <div className="toolbar" role="toolbar">
       <div className="group">
-        <Btn icon="save" title="Enregistrer (Ctrl+S)" onClick={save} />
-        <Btn icon="pdf" title="Exporter en PDF" onClick={exportPdf} />
+        <Btn icon="save" title="Enregistrer (Ctrl+S)" onClick={() => run({ label: "Enregistrer", app: "save" })} />
+        <Btn icon="pdf" title="Exporter en PDF" onClick={() => run({ label: "Exporter en PDF", app: "exportPdf" })} />
         <Btn icon="undo" title="Annuler (Ctrl+Z)" onClick={() => command(".uno:Undo")} disabled={disabled(states, ".uno:Undo")} />
         <Btn icon="redo" title="Rétablir (Ctrl+Y)" onClick={() => command(".uno:Redo")} disabled={disabled(states, ".uno:Redo")} />
       </div>
@@ -165,16 +212,27 @@ export function Toolbar({ type, doc, states, command, save, exportPdf }: Props) 
         {!sheet && <Btn icon="justify" title="Justifier" active={on(states, ".uno:JustifyPara")} onClick={() => command(".uno:JustifyPara")} />}
         {!sheet && <Btn icon="bullets" title="Liste à puces" active={on(states, ".uno:DefaultBullet")} onClick={() => command(".uno:DefaultBullet")} />}
         {!sheet && <Btn icon="numbering" title="Liste numérotée" active={on(states, ".uno:DefaultNumbering")} onClick={() => command(".uno:DefaultNumbering")} />}
+        {text && <Btn icon="indentLess" title="Diminuer le retrait" onClick={() => command(".uno:DecrementIndent")} />}
+        {text && <Btn icon="indentMore" title="Augmenter le retrait" onClick={() => command(".uno:IncrementIndent")} />}
+        {!sheet && (
+          <select className="spacing-select" title="Interligne" value="" onChange={(e) => e.target.value && command(e.target.value)}>
+            <option value="">Interligne</option>
+            <option value=".uno:SpacePara1">Simple</option>
+            <option value=".uno:SpacePara15">1,5 ligne</option>
+            <option value=".uno:SpacePara2">Double</option>
+          </select>
+        )}
       </div>
 
-      {text && (
-        <div className="group">
-          <Btn icon="table" title="Insérer un tableau (3 × 3)" onClick={() => command(".uno:InsertTable", { Columns: { type: "long", value: 3 }, Rows: { type: "long", value: 3 } })} />
-          <Btn icon="image" title="Insérer une image" onClick={() => void insertImage()} />
-          <Btn icon="pagebreak" title="Saut de page" onClick={() => command(".uno:InsertPagebreak")} />
-          <Btn icon="track" title="Suivi des modifications" active={on(states, ".uno:TrackChanges")} onClick={() => command(".uno:TrackChanges")} />
-        </div>
-      )}
+      <div className="group">
+        <Btn label="x²" title="Exposant" active={on(states, ".uno:SuperScript")} onClick={() => command(".uno:SuperScript")} />
+        <Btn label="x₂" title="Indice" active={on(states, ".uno:SubScript")} onClick={() => command(".uno:SubScript")} />
+        <Btn icon="clear" title="Effacer la mise en forme" onClick={() => command(".uno:ResetAttributes")} />
+        <Btn icon="font" title="Caractère…" onClick={() => run(A.fontDialog)} />
+        {!sheet && <Btn icon="paragraph" title="Paragraphe…" onClick={() => run(A.paragraphDialog)} />}
+        {sheet && <Btn icon="cell" title="Format des cellules…" onClick={() => run(A.cellFormat)} />}
+        <Btn icon="search" title="Rechercher et remplacer (Ctrl+H)" onClick={() => run(A.find)} />
+      </div>
 
       {sheet && (
         <div className="group">
@@ -190,15 +248,6 @@ export function Toolbar({ type, doc, states, command, save, exportPdf }: Props) 
           <Btn icon="rowAdd" title="Insérer une ligne au-dessus" onClick={() => command(".uno:InsertRowsBefore")} />
           <Btn icon="colAdd" title="Insérer une colonne à gauche" onClick={() => command(".uno:InsertColumnsBefore")} />
           <Btn icon="freeze" title="Figer les volets" active={on(states, ".uno:FreezePanes")} onClick={() => command(".uno:FreezePanes")} />
-        </div>
-      )}
-
-      {slides && (
-        <div className="group">
-          <Btn icon="slideAdd" title="Nouvelle diapositive" onClick={() => command(".uno:InsertPage")} />
-          <Btn icon="slideDup" title="Dupliquer la diapositive" onClick={() => command(".uno:DuplicatePage")} />
-          <Btn icon="slideDel" title="Supprimer la diapositive" onClick={() => command(".uno:DeletePage")} />
-          <Btn icon="image" title="Insérer une image" onClick={() => void insertImage()} />
         </div>
       )}
 

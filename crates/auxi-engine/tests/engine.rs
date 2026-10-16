@@ -262,3 +262,62 @@ fn bad_requests_are_rejected() {
     assert!(ctx.engine.call(json!({"cmd": "uno", "command": "macro:///Standard.x"})).is_err());
     assert!(ctx.engine.call(json!({"cmd": "paint", "px_w": 99999, "px_h": 10})).is_err());
 }
+
+#[test]
+fn libreoffice_dialogs_render_and_close() {
+    let Some((ctx, fx)) = setup("dialog") else { return };
+    ctx.call(json!({"cmd": "load", "path": fx.join("simple.docx")}));
+    ctx.settle();
+    let before = ctx.events.lock().unwrap().len();
+    ctx.call(json!({"cmd": "uno", "command": ".uno:FontDialog"}));
+    ctx.settle();
+    let created = ctx.events.lock().unwrap()[before..]
+        .iter()
+        .filter(|e| e["name"] == "window")
+        .filter_map(|e| serde_json::from_str::<Value>(e["payload"].as_str().unwrap_or("")).ok())
+        .find(|w| w["action"] == "created" && w["type"] == "dialog")
+        .expect("boîte de dialogue « Caractère » annoncée");
+    let id: i64 = created["id"].as_str().unwrap().parse().unwrap();
+    let size: Vec<i64> = created["size"].as_str().unwrap().split(',').map(|v| v.trim().parse().unwrap()).collect();
+
+    // Rendu à l'échelle 2 (écrans haute densité) : tampon entièrement dessiné.
+    let r = ctx
+        .engine
+        .request(json!({"cmd": "paint_window", "window": id, "x": 0, "y": 0, "w": size[0], "h": size[1], "scale": 2.0}), &[], Duration::from_secs(30))
+        .unwrap();
+    assert_eq!(r.bin.len() as i64, size[0] * 2 * size[1] * 2 * 4);
+    let drawn = r.bin.chunks_exact(4).filter(|p| p[3] > 0).count() as i64;
+    assert!(drawn > size[0] * size[1] * 3, "rendu incomplet : {drawn} pixels");
+
+    // Clic dans la boîte, puis fermeture : LibreOffice annonce « close ».
+    for kind in ["down", "up"] {
+        ctx.call(json!({"cmd": "window_mouse", "window": id, "kind": kind, "x": 100, "y": 61}));
+    }
+    let mark = ctx.events.lock().unwrap().len();
+    ctx.call(json!({"cmd": "window_close", "window": id}));
+    ctx.settle();
+    let closed = ctx.events.lock().unwrap()[mark..].iter().any(|e| {
+        e["name"] == "window" && e["payload"].as_str().is_some_and(|p| p.contains("\"close\"") || p.contains("\"hide\""))
+    });
+    assert!(closed, "fermeture non annoncée");
+}
+
+#[test]
+fn context_menu_is_described_by_libreoffice() {
+    let Some((ctx, fx)) = setup("ctxmenu") else { return };
+    ctx.call(json!({"cmd": "load", "path": fx.join("simple.docx")}));
+    ctx.settle();
+    for kind in ["down", "up"] {
+        ctx.call(json!({"cmd": "mouse", "kind": kind, "x": 3000, "y": 3000, "buttons": 4}));
+    }
+    ctx.settle();
+    let menu = ctx
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|e| e["name"] == "context_menu")
+        .and_then(|e| serde_json::from_str::<Value>(e["payload"].as_str().unwrap()).ok())
+        .expect("menu contextuel");
+    assert!(menu["menu"].as_array().is_some_and(|m| m.len() > 3));
+}

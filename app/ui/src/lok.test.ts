@@ -84,3 +84,21 @@ describe("URL de fichiers", () => {
     expect(toFileUrl("C:\\Users\\a\\photo 1.jpg")).toBe("file:///C:/Users/a/photo%201.jpg");
   });
 });
+
+describe("menu contextuel", () => {
+  it("nettoie le menu de LibreOffice", async () => {
+    const { cleanMenu, menuLabel } = await import("./ContextMenu");
+    expect(menuLabel("Tout i~gnorer")).toBe("Tout ignorer");
+    const items = cleanMenu([
+      { type: "separator" },
+      { type: "command", text: "~Couper", command: ".uno:Cut", enabled: "true" },
+      { type: "command", text: "Inactif", command: ".uno:X", enabled: "false" },
+      { type: "separator" },
+      { type: "separator" },
+      { type: "menu", text: "Vide", menu: [{ type: "command", text: "x", command: ".uno:Y", enabled: "false" }] },
+      { type: "command", text: "Coller", command: ".uno:Paste", enabled: "true" },
+      { type: "separator" },
+    ]);
+    expect(items.map((i) => i.text ?? "-")).toEqual(["~Couper", "-", "Coller"]);
+  });
+});

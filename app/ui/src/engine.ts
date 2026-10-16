@@ -53,7 +53,13 @@ export async function paint(doc: number, req: PaintRequest): Promise<Uint8Clampe
   return new Uint8ClampedArray(buf);
 }
 
-export const uno = (doc: number, command: string, args?: Record<string, unknown>, notify = false) =>
+/** Rendu d'une zone (pixels logiques) d'une fenêtre de LibreOffice. */
+export async function paintWindow(doc: number, req: { window: number; x: number; y: number; w: number; h: number; scale: number }): Promise<Uint8ClampedArray<ArrayBuffer>> {
+  const buf = await invoke<ArrayBuffer>("doc_paint", { doc, req });
+  return new Uint8ClampedArray(buf);
+}
+
+export const uno =(doc: number, command: string, args?: Record<string, unknown>, notify = false) =>
   call(doc, "uno", { command, args: args ?? null, notify });
 
 export const newDocument = (kind: "text" | "spreadsheet" | "presentation") => invoke<string>("new_document", { kind });
@@ -61,6 +67,9 @@ export const newDocument = (kind: "text" | "spreadsheet" | "presentation") => in
 export const recentFiles = (add?: string) => invoke<string[]>("recent_files", { add: add ?? null });
 
 export const startupFile = () => invoke<string | null>("startup_file");
+
+/** Prépare un moteur d'avance (ouverture plus rapide du document suivant). */
+export const warmEngine = () => invoke<void>("warm_engine");
 
 type Listener = (e: EngineEvent) => void;
 const listeners = new Map<number, Set<Listener>>();

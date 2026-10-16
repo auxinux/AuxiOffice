@@ -226,6 +226,48 @@ impl Document {
         }
     }
 
+    /// Dessine une zone (pixels logiques) d'une fenêtre de LibreOffice
+    /// (boîte de dialogue, liste déroulante) à l'échelle `scale` ; retourne
+    /// les pixels RGBA et leurs dimensions.
+    pub fn paint_window(&self, id: u32, x: i32, y: i32, w: i32, h: i32, scale: f64) -> (Vec<u8>, i32, i32) {
+        // paintWindowDPI attend position et taille en pixels physiques
+        // (tampon de nWidth × nHeight) ; l'échelle ne sert qu'au dessin.
+        let dev = |v: i32| ((v as f64) * scale).round() as i32;
+        let (pw, ph) = (dev(w), dev(h));
+        let mut buf = vec![0u8; (pw.max(0) * ph.max(0) * 4) as usize];
+        unsafe {
+            let _ = call!(self.doc, paintWindowDPI(id, buf.as_mut_ptr(), dev(x), dev(y), pw, ph, scale));
+        }
+        to_straight_rgba(&mut buf, self.tile_mode() == sys::LOK_TILEMODE_BGRA);
+        (buf, pw, ph)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn post_window_mouse(&self, id: u32, kind: i32, x: i32, y: i32, count: i32, buttons: i32, mods: i32) {
+        unsafe {
+            let _ = call!(self.doc, postWindowMouseEvent(id, kind, x, y, count, buttons, mods));
+        }
+    }
+
+    pub fn post_window_key(&self, id: u32, kind: i32, char_code: i32, key_code: i32) {
+        unsafe {
+            let _ = call!(self.doc, postWindowKeyEvent(id, kind, char_code, key_code));
+        }
+    }
+
+    pub fn post_window_text(&self, id: u32, kind: i32, text: &str) {
+        let t = cstr(text);
+        unsafe {
+            let _ = call!(self.doc, postWindowExtTextInputEvent(id, kind, t.as_ptr()));
+        }
+    }
+
+    pub fn close_window(&self, id: u32) {
+        unsafe {
+            let _ = call!(self.doc, postWindow(id, sys::LOK_WINDOW_CLOSE, std::ptr::null()));
+        }
+    }
+
     pub fn post_mouse(&self, kind: i32, x: i32, y: i32, count: i32, buttons: i32, mods: i32) {
         unsafe {
             let _ = call!(self.doc, postMouseEvent(kind, x, y, count, buttons, mods));

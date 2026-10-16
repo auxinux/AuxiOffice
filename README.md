@@ -20,21 +20,25 @@ AuxiOffice est un **produit propriétaire du Projet AuxiNux**. Son interface et 
 
 ## État : prototype 0.1.0
 
-Vérifié sous Linux x86_64 (Debian 13, sous Xvfb) :
+Vérifié sous Linux x86_64 ; Mac Apple Silicon : ouverture et édition vérifiées par
+l'utilisateur.
 
 - ouverture, édition, enregistrement et export PDF de documents DOCX, XLSX et PPTX ;
-- AuxiWriter : saisie, styles, polices, gras/italique…, listes, tableaux, images, sauts de page,
-  suivi des modifications, nombre de pages et de mots ;
-- AuxiSheet : saisie et formules, barre de formule, zone de nom, en-têtes de lignes et colonnes,
-  onglets de feuilles, formats nombre/monétaire/pourcentage, tri, filtre, volets figés ;
-- AuxiPresent : panneau des diapositives avec miniatures, ajout, duplication, suppression ;
-- documents verrouillés par un autre utilisateur (lecture seule, ouverture forcée), verrous
-  orphelins ;
-- un moteur par document : un plantage de LibreOffice ne ferme que l'onglet concerné.
+- **barre de menus** native (Fichier, Édition, Affichage, Insertion, Format, Tableau ou
+  Feuille/Données ou Diapositive, Outils) et **ruban à onglets** (Accueil, Insertion, Mise en
+  page, Révision, Affichage…), adaptés au type de document ;
+- **boîtes de dialogue de LibreOffice** dans AuxiOffice : Caractère, Paragraphe, Style de page
+  (marges, orientation, en-tête et pied de page), Rechercher et remplacer, Puces et
+  numérotation, Colonnes, Table des matières, Format de cellule, Tri, Filtre, Assistant
+  fonction, Assistant diagramme, Formatage conditionnel, Propriétés de la diapositive… ;
+- **menu contextuel** (clic droit) de LibreOffice, avec les suggestions d'orthographe ;
+- AuxiWriter, AuxiSheet, AuxiPresent : mise en forme courante, styles, listes, tableaux,
+  images, barre de formule, en-têtes de lignes et colonnes, onglets de feuilles, miniatures
+  de diapositives ;
+- documents verrouillés, verrous orphelins ; un moteur par document, et un moteur prêt
+  d'avance pour accélérer l'ouverture.
 
-Pas encore fait : paquets, Windows (prévu mais non compilé), macOS (script prêt, pas encore
-essayé sur un Mac), menus contextuels, boîtes de dialogue de LibreOffice (paragraphe, mise en
-page…), diaporama, impression, rechercher-remplacer.
+Pas encore fait : paquets, Windows (prévu mais non compilé), diaporama, impression.
 
 ## Développement
 

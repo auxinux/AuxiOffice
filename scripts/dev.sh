@@ -40,12 +40,18 @@ fi
 echo "== Interface"
 (cd app && { [ -d node_modules ] || npm install --no-audit --no-fund; } && npm run --silent build)
 
-echo "== Moteur et coque"
-cargo build -p auxi-engine
-cargo build -p auxioffice --features custom-protocol
+# Compilation optimisée (--release) : le code Rust convertit chaque tuile
+# affichée ; en mode débogage, l'ouverture et le défilement sont nettement
+# plus lents. AUXI_DEBUG=1 pour une compilation de débogage.
+PROFILE=release
+FLAG=--release
+if [ -n "${AUXI_DEBUG:-}" ]; then PROFILE=debug; FLAG=; fi
+echo "== Moteur et coque ($PROFILE)"
+cargo build $FLAG -p auxi-engine
+cargo build $FLAG -p auxioffice --features custom-protocol
 
-export AUXI_ENGINE_EXE="$ROOT/target/debug/auxi-engine"
+export AUXI_ENGINE_EXE="$ROOT/target/$PROFILE/auxi-engine"
 export AUXI_LO_PROGRAM="$(cat ".engine/$PLATFORM/program-dir")"
 export AUXI_TEMPLATES="$ROOT/app/src-tauri/templates"
 echo "== Lancement d'AuxiOffice"
-exec "$ROOT/target/debug/auxioffice" "$@"
+exec "$ROOT/target/$PROFILE/auxioffice" "$@"

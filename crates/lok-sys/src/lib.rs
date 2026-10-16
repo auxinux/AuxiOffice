@@ -114,14 +114,14 @@ pub struct LibreOfficeKitDocumentClass {
     pub paintPartTile: Option<unsafe extern "C" fn(Doc, *mut c_uchar, c_int, c_int, c_int, c_int, c_int, c_int, c_int, c_int)>,
     pub getViewIds: Slot,
     pub setOutlineState: Slot,
-    pub paintWindow: Slot,
-    pub postWindow: Slot,
-    pub postWindowKeyEvent: Slot,
-    pub postWindowMouseEvent: Slot,
+    pub paintWindow: Option<unsafe extern "C" fn(Doc, u32, *mut c_uchar, c_int, c_int, c_int, c_int)>,
+    pub postWindow: Option<unsafe extern "C" fn(Doc, u32, c_int, *const c_char)>,
+    pub postWindowKeyEvent: Option<unsafe extern "C" fn(Doc, u32, c_int, c_int, c_int)>,
+    pub postWindowMouseEvent: Option<unsafe extern "C" fn(Doc, u32, c_int, c_int, c_int, c_int, c_int, c_int)>,
     pub setViewLanguage: Option<unsafe extern "C" fn(Doc, c_int, *const c_char)>,
     pub postWindowExtTextInputEvent: Option<unsafe extern "C" fn(Doc, u32, c_int, *const c_char)>,
     pub getPartInfo: Option<unsafe extern "C" fn(Doc, c_int) -> *mut c_char>,
-    pub paintWindowDPI: Slot,
+    pub paintWindowDPI: Option<unsafe extern "C" fn(Doc, u32, *mut c_uchar, c_int, c_int, c_int, c_int, f64)>,
     pub insertCertificate: Slot,
     pub addCertificate: Slot,
     pub getSignatureState: Slot,
@@ -214,6 +214,9 @@ pub const LOK_PARTMODE_NOTES: c_int = 1;
 
 pub const LOK_TILEMODE_RGBA: c_int = 0;
 pub const LOK_TILEMODE_BGRA: c_int = 1;
+
+pub const LOK_WINDOW_CLOSE: c_int = 0;
+pub const LOK_WINDOW_PASTE: c_int = 1;
 
 pub const LOK_SELTYPE_NONE: c_int = 0;
 pub const LOK_SELTYPE_TEXT: c_int = 1;

@@ -329,6 +329,48 @@ impl Engine {
                 d.post_mouse(kind, int(req, "x"), int(req, "y"), count, buttons, int(req, "mods"));
                 (json!({}), none)
             }
+            // Fenêtres de LibreOffice (boîtes de dialogue, listes déroulantes)
+            // annoncées par les rappels « window » : rendu et saisie.
+            "paint_window" => {
+                let d = self.doc()?;
+                let (w, h) = (int(req, "w"), int(req, "h"));
+                if !(1..=4096).contains(&w) || !(1..=4096).contains(&h) {
+                    return Err("taille de fenêtre invalide".into());
+                }
+                let scale = req.get("scale").and_then(Value::as_f64).unwrap_or(1.0).clamp(1.0, 3.0);
+                let (px, pw, ph) = d.paint_window(int(req, "window") as u32, int(req, "x"), int(req, "y"), w, h, scale);
+                (json!({"px_w": pw, "px_h": ph}), px)
+            }
+            "window_mouse" => {
+                let d = self.doc()?;
+                let kind = match string(req, "kind") {
+                    Some("down") => sys::LOK_MOUSEEVENT_MOUSEBUTTONDOWN,
+                    Some("up") => sys::LOK_MOUSEEVENT_MOUSEBUTTONUP,
+                    _ => sys::LOK_MOUSEEVENT_MOUSEMOVE,
+                };
+                let buttons = req.get("buttons").and_then(Value::as_i64).unwrap_or(sys::MOUSE_LEFT as i64) as i32;
+                let count = req.get("count").and_then(Value::as_i64).unwrap_or(1) as i32;
+                d.post_window_mouse(int(req, "window") as u32, kind, int(req, "x"), int(req, "y"), count, buttons, int(req, "mods"));
+                (json!({}), none)
+            }
+            "window_key" => {
+                let d = self.doc()?;
+                let kind = if string(req, "kind") == Some("up") { sys::LOK_KEYEVENT_KEYUP } else { sys::LOK_KEYEVENT_KEYINPUT };
+                d.post_window_key(int(req, "window") as u32, kind, int(req, "char"), int(req, "code"));
+                (json!({}), none)
+            }
+            "window_text" => {
+                let d = self.doc()?;
+                let id = int(req, "window") as u32;
+                let text = string(req, "text").unwrap_or("");
+                d.post_window_text(id, sys::LOK_EXT_TEXTINPUT, text);
+                d.post_window_text(id, sys::LOK_EXT_TEXTINPUT_END, text);
+                (json!({}), none)
+            }
+            "window_close" => {
+                self.doc()?.close_window(int(req, "window") as u32);
+                (json!({}), none)
+            }
             "uno" => {
                 let d = self.doc()?;
                 let command = string(req, "command").ok_or("champ command manquant")?;

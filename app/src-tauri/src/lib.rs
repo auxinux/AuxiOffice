@@ -14,6 +14,55 @@ use tauri::{AppHandle, Emitter, Manager, State};
 struct Engines {
     docs: Mutex<HashMap<u64, Arc<Engine>>>,
     next: AtomicU64,
+    /// Moteur démarré d'avance (LibreOffice déjà initialisé) : l'ouverture
+    /// d'un document n'attend plus le démarrage de LibreOffice. Son numéro
+    /// de document lui est attribué au moment où il est pris.
+    spare: Mutex<Option<(Engine, Arc<AtomicU64>)>>,
+}
+
+/// Démarre un moteur de réserve en arrière-plan (s'il n'y en a pas déjà un).
+fn prepare_spare(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<Engines>();
+        if state.spare.lock().unwrap().is_some() {
+            return;
+        }
+        let Ok(cfg) = engine_config(&app) else { return };
+        let slot = Arc::new(AtomicU64::new(0));
+        let (emitter, s) = (app.clone(), slot.clone());
+        let sink = Box::new(move |mut ev: Value| {
+            let id = s.load(Ordering::Relaxed);
+            if id != 0 {
+                ev["doc"] = json!(id);
+                let _ = emitter.emit("engine", ev);
+            }
+        });
+        if let Ok(engine) = Engine::spawn(&cfg, sink) {
+            let mut spare = state.spare.lock().unwrap();
+            if spare.is_none() {
+                *spare = Some((engine, slot));
+            }
+        }
+    });
+}
+
+/// Moteur pour le document `id` : la réserve si elle est prête, sinon un neuf.
+fn take_engine(app: &AppHandle, id: u64) -> Result<Engine, String> {
+    let state = app.state::<Engines>();
+    let spare = state.spare.lock().unwrap().take();
+    if let Some((engine, slot)) = spare {
+        if engine.is_alive() {
+            slot.store(id, Ordering::Relaxed);
+            return Ok(engine);
+        }
+    }
+    let cfg = engine_config(app)?;
+    let emitter = app.clone();
+    Engine::spawn(&cfg, Box::new(move |mut ev| {
+        ev["doc"] = json!(id);
+        let _ = emitter.emit("engine", ev);
+    }))
 }
 
 impl Engines {
@@ -60,18 +109,12 @@ fn user_name() -> String {
 /// relayés à l'interface sous l'événement `engine` avec l'identifiant du document.
 #[tauri::command]
 async fn doc_open(app: AppHandle, state: State<'_, Engines>, path: String, ignore_lock: Option<bool>) -> Result<Value, String> {
-    let cfg = engine_config(&app)?;
     let id = state.next.fetch_add(1, Ordering::Relaxed) + 1;
-    let emitter = app.clone();
-    let engine = tauri::async_runtime::spawn_blocking(move || {
-        Engine::spawn(&cfg, Box::new(move |mut ev| {
-            ev["doc"] = json!(id);
-            let _ = emitter.emit("engine", ev);
-        }))
-    })
-    .await
-    .map_err(|e| e.to_string())??;
+    let a = app.clone();
+    let engine = tauri::async_runtime::spawn_blocking(move || take_engine(&a, id)).await.map_err(|e| e.to_string())??;
     let engine = Arc::new(engine);
+    // Préparer déjà le moteur du document suivant.
+    prepare_spare(&app);
     let e = engine.clone();
     let req = json!({"cmd": "load", "path": path, "ignore_lock": ignore_lock.unwrap_or(false)});
     let mut info = tauri::async_runtime::spawn_blocking(move || e.call(req)).await.map_err(|e| e.to_string())??;
@@ -89,12 +132,13 @@ async fn doc_call(state: State<'_, Engines>, doc: u64, req: Value) -> Result<Val
     tauri::async_runtime::spawn_blocking(move || engine.call(req)).await.map_err(|e| e.to_string())?
 }
 
-/// Rendu d'une tuile : retourne directement les octets RGBA.
+/// Rendu d'une tuile, ou d'une fenêtre de LibreOffice si `req.window` est
+/// présent : retourne directement les octets RGBA.
 #[tauri::command]
 async fn doc_paint(state: State<'_, Engines>, doc: u64, req: Value) -> Result<tauri::ipc::Response, String> {
     let engine = state.get(doc)?;
     let mut req = req;
-    req["cmd"] = json!("paint");
+    req["cmd"] = json!(if req.get("window").is_some() { "paint_window" } else { "paint" });
     let reply = tauri::async_runtime::spawn_blocking(move || engine.request(req, &[], Duration::from_secs(60)))
         .await
         .map_err(|e| e.to_string())??;
@@ -155,6 +199,14 @@ fn recent_files(app: AppHandle, add: Option<String>) -> Result<Vec<String>, Stri
     Ok(list)
 }
 
+/// Démarre le moteur de réserve. Appelé par l'interface une fois affichée :
+/// lancé plus tôt, le démarrage de LibreOffice retarde l'affichage de la
+/// fenêtre (initialisation concurrente des polices).
+#[tauri::command]
+fn warm_engine(app: AppHandle) {
+    prepare_spare(&app);
+}
+
 /// Fichier passé en argument de la ligne de commande (« Ouvrir avec »).
 #[tauri::command]
 fn startup_file() -> Option<String> {
@@ -173,14 +225,18 @@ pub fn run() {
             doc_close,
             new_document,
             recent_files,
-            startup_file
+            startup_file,
+            warm_engine
         ])
         .build(tauri::generate_context!())
         .expect("démarrage d'AuxiOffice")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 let engines = app.state::<Engines>();
-                let all: Vec<_> = engines.docs.lock().unwrap().drain().map(|(_, e)| e).collect();
+                let mut all: Vec<_> = engines.docs.lock().unwrap().drain().map(|(_, e)| e).collect();
+                if let Some((spare, _)) = engines.spare.lock().unwrap().take() {
+                    all.push(Arc::new(spare));
+                }
                 for e in all {
                     e.shutdown();
                 }

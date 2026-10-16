@@ -3,8 +3,10 @@
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Action, AppAction } from "./actions";
 import { DocView, type DocHandle } from "./DocView";
-import { call, closeDocument, newDocument, openDocument, recentFiles, startupFile, type DocInfo } from "./engine";
+import { installMenus, updateMenuChecks } from "./menus";
+import { call, closeDocument, newDocument, openDocument, recentFiles, startupFile, warmEngine, type DocInfo } from "./engine";
 import { Home } from "./Home";
 import { fileName, isUntitled } from "./lok";
 
@@ -61,7 +63,11 @@ export function App() {
 
   useEffect(() => {
     void recentFiles().then(setRecents);
-    void startupFile().then((f) => f && void openPath(f));
+    void startupFile().then((f) => {
+      if (f) void openPath(f);
+      // Moteur de réserve, une fois l'interface affichée.
+      window.setTimeout(() => void warmEngine(), f ? 4000 : 800);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -193,6 +199,56 @@ export function App() {
     });
   }, []);
 
+  const [about, setAbout] = useState(false);
+
+  /** Actions de l'application ; `doc` = document concerné (0 = aucun). */
+  const lastAction = useRef({ a: "", t: 0 });
+  const appAction = useCallback(
+    (a: AppAction, doc: number) => {
+      // Un raccourci peut arriver à la fois par le menu natif et par la page :
+      // ignorer le doublon immédiat.
+      const now = performance.now();
+      if (lastAction.current.a === a && now - lastAction.current.t < 400) return;
+      lastAction.current = { a, t: now };
+      switch (a) {
+        case "newText":
+          return void createNew("text");
+        case "newSheet":
+          return void createNew("spreadsheet");
+        case "newSlides":
+          return void createNew("presentation");
+        case "open":
+          return void openDialog();
+        case "about":
+          return setAbout(true);
+        case "save":
+          return doc ? void saveDocument(doc, false) : undefined;
+        case "saveAs":
+          return doc ? void saveDocument(doc, true) : undefined;
+        case "exportPdf":
+          return doc ? void exportPdf(doc) : undefined;
+        case "close":
+          return doc ? void closeTab(doc) : undefined;
+      }
+    },
+    [createNew, openDialog, saveDocument, exportPdf, closeTab],
+  );
+
+  // Barre de menus : reconstruite quand le type du document actif change ;
+  // les commandes de document vont au document actif.
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const activeType = tabs.find((t) => t.info.doc === active)?.info.type ?? null;
+  useEffect(() => {
+    const run = (a: Action) => {
+      const doc = activeRef.current;
+      const h = doc ? handles.current.get(doc) : undefined;
+      if (h) h.run(a);
+      else if (a.app) appAction(a.app, 0);
+    };
+    void installMenus(activeType, run).catch((e) => console.warn("menus", e));
+  }, [activeType, appAction]);
+
   // Fermeture de la fenêtre : confirmer s'il reste des modifications.
   useEffect(() => {
     const w = getCurrentWindow();
@@ -210,26 +266,8 @@ export function App() {
     return () => void un.then((f) => f());
   }, []);
 
-  // Raccourcis globaux.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const primary = navigator.platform.toLowerCase().includes("mac") ? e.metaKey : e.ctrlKey;
-      if (!primary) return;
-      const k = e.key.toLowerCase();
-      if (k === "o") {
-        e.preventDefault();
-        void openDialog();
-      } else if (k === "n") {
-        e.preventDefault();
-        setActive(0);
-      } else if (k === "w" && active) {
-        e.preventDefault();
-        void closeTab(active);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [openDialog, closeTab, active]);
+  // Raccourcis globaux (Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+W…) : portés par la
+  // barre de menus native, qui les intercepte avant la page.
 
   return (
     <div className="app">
@@ -261,7 +299,7 @@ export function App() {
         {active !== 0 && (
           <div className="file-actions">
             <button onClick={() => void openDialog()} title="Ouvrir (Ctrl+O)">Ouvrir</button>
-            <button onClick={() => void handles.current.get(active)?.saveAs()} title="Enregistrer sous (Ctrl+Maj+S)">Enregistrer sous</button>
+            <button onClick={() => void saveDocument(active, true)} title="Enregistrer sous (Ctrl+Maj+S)">Enregistrer sous</button>
           </div>
         )}
       </div>
@@ -294,8 +332,8 @@ export function App() {
               onEngineLost={() => setTab(t.info.doc, { lost: true })}
               onMessage={notify}
               register={(h) => handles.current.set(t.info.doc, h)}
-              saveDocument={(asNew) => saveDocument(t.info.doc, asNew)}
-              exportPdf={() => exportPdf(t.info.doc)}
+              onAppAction={(a) => appAction(a, t.info.doc)}
+              onStates={updateMenuChecks}
             />
           ),
         )}
@@ -307,6 +345,19 @@ export function App() {
         </div>
       )}
       {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
+      {about && (
+        <div className="dialog-backdrop" onClick={() => setAbout(false)}>
+          <div className="about" onClick={(e) => e.stopPropagation()}>
+            <img src="/logo-light.svg" alt="AuxiOffice" />
+            <p>Version 0.1.0 — suite bureautique de l'écosystème AuxiNux.</p>
+            <p>
+              Moteur de documents : LibreOffice{tabs[0]?.info.libreoffice ? "" : ""}. LibreOffice est une marque déposée de The Document Foundation.
+            </p>
+            <p>© 2026 Projet AuxiNux · office.auxinux.ca</p>
+            <button onClick={() => setAbout(false)}>Fermer</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
