@@ -27,7 +27,7 @@ die() { printf '\nErreur : %s\n' "$*" >&2; exit 1; }
 say "Vérification des outils"
 xcrun --show-sdk-path >/dev/null 2>&1 || die "outils Xcode absents : xcode-select --install (ou sudo xcode-select -s /chemin/Xcode.app)"
 command -v brew >/dev/null || die "Homebrew requis : https://brew.sh"
-BREW_PKGS="autoconf automake libtool pkgconf make bison flex gperf nasm gettext python@3.13"
+BREW_PKGS="autoconf automake libtool pkgconf make bison flex gperf nasm gettext python@3.13 ninja"
 missing=""
 for p in $BREW_PKGS; do brew list --versions "$p" >/dev/null 2>&1 || missing="$missing $p"; done
 if [ -n "$missing" ]; then
@@ -42,6 +42,9 @@ export PATH="$BP/opt/make/libexec/gnubin:$BP/opt/bison/bin:$BP/opt/flex/bin:$BP/
 export PYTHON="$BP/opt/python@3.13/bin/python3.13"
 [ -x "$PYTHON" ] || die "Python 3.13 de Homebrew introuvable (brew install python@3.13)"
 command -v msgfmt >/dev/null && command -v msguniq >/dev/null || die "gettext introuvable (brew install gettext)"
+# ninja pour harfbuzz (compilé avec meson ; LibreOffice fournit sa propre
+# copie de meson, à jour pour les SDK récents de Xcode).
+command -v ninja >/dev/null || die "ninja introuvable (brew install ninja)"
 make --version | head -1 | grep -q 'GNU Make 4' || die "GNU make 4 introuvable (brew install make)"
 # configure de LibreOffice refuse tout pkg-config dont il ne reconnaît pas
 # l'origine ; celui de Homebrew n'est accepté que sous ce chemin exact

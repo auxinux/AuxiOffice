@@ -18,7 +18,7 @@ rapides.
 1. Outils Apple : `xcode-select --install` ou, avec Xcode déjà installé ailleurs,
    `sudo xcode-select -s /chemin/vers/Xcode.app`.
 2. Homebrew (https://brew.sh) ; le script installe lui-même autoconf, automake, libtool,
-   pkgconf, GNU make, bison, flex, gperf, nasm, gettext et Python 3.13.
+   pkgconf, GNU make, bison, flex, gperf, nasm, gettext, Python 3.13 et ninja.
 3. Rust : `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`.
 4. Node.js 22 ou plus récent (nodejs.org ou `brew install node`).
 5. `scripts/dev.sh`.
