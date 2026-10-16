@@ -92,7 +92,10 @@ qui n'accepte que le fil principal. Le moteur y fonctionne donc en mode « unipo
    Grand Central Dispatch, que la boucle d'AppKit sert entre deux événements ;
 3. aucune requête ne bloque le fil principal : « Enregistrer » répond de façon différée, quand
    LibreOffice signale la fin de `.uno:Save` ;
-4. le moteur se retire du Dock (`NSApplicationActivationPolicyProhibited`).
+4. le moteur se retire du Dock (`NSApplicationActivationPolicyProhibited`) ;
+5. le moteur ne reçoit **aucun argument** (configuration par variables `AUXI_ENGINE_*`) :
+   sous macOS, LibreOffice lit les arguments du processus hôte, prend ceux qu'il ne connaît
+   pas pour une erreur, affiche son aide et arrête sa boucle aussitôt.
 
 Sous Linux et Windows, LibreOffice fait tourner sa boucle dans son propre fil et le moteur
 appelle LibreOfficeKit depuis le fil qui lit les requêtes.

@@ -49,14 +49,15 @@ pub struct Engine {
 impl Engine {
     /// Lance le moteur et attend qu'il signale qu'il est prêt.
     pub fn spawn(cfg: &EngineConfig, on_event: EventSink) -> Result<Engine, String> {
+        // Configuration par l'environnement, jamais par arguments : LibreOffice
+        // lit les arguments du processus sous macOS (voir auxi-engine).
         let mut cmd = Command::new(&cfg.engine_exe);
-        cmd.arg("--program-dir").arg(&cfg.program_dir).arg("--lang").arg(&cfg.lang);
-        if let Some(p) = &cfg.profile_dir {
-            cmd.arg("--profile").arg(p);
-        }
-        if !cfg.author.is_empty() {
-            cmd.arg("--author").arg(&cfg.author);
-        }
+        cmd.env("AUXI_ENGINE_PROGRAM_DIR", &cfg.program_dir).env("AUXI_ENGINE_LANG", &cfg.lang);
+        match &cfg.profile_dir {
+            Some(p) => cmd.env("AUXI_ENGINE_PROFILE", p),
+            None => cmd.env_remove("AUXI_ENGINE_PROFILE"),
+        };
+        cmd.env("AUXI_ENGINE_AUTHOR", &cfg.author);
         // Aucun accès réseau ni dialogue système depuis le moteur.
         // Langues pour lesquelles LibreOffice active correcteur et césure.
         cmd.env("LOK_ALLOWLIST_LANGUAGES", "fr-FR fr-CA en-US en-GB es-ES de-DE");

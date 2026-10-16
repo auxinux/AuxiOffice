@@ -1,8 +1,9 @@
 //! Processus moteur d'AuxiOffice : héberge LibreOffice (via LibreOfficeKit)
 //! pour un document et répond aux requêtes reçues sur l'entrée standard.
 //!
-//! Utilisation : `auxi-engine --program-dir <dossier program/ de LibreOffice>
-//!                [--profile <dossier>] [--lang fr-FR] [--author <nom>]`
+//! Utilisation : variables `AUXI_ENGINE_PROGRAM_DIR` (dossier program/ de
+//! LibreOffice, obligatoire), `AUXI_ENGINE_PROFILE`, `AUXI_ENGINE_LANG`,
+//! `AUXI_ENGINE_AUTHOR` ; aucun argument (voir `parse_args`).
 
 use auxi_engine::lok::{Document, Office};
 use auxi_engine::protocol::{callback_name, read_frame, write_frame, Frame};
@@ -22,25 +23,30 @@ struct Args {
     author: String,
 }
 
+/// Configuration lue dans l'environnement (`AUXI_ENGINE_PROGRAM_DIR`,
+/// `AUXI_ENGINE_PROFILE`, `AUXI_ENGINE_LANG`, `AUXI_ENGINE_AUTHOR`).
+///
+/// Pas d'arguments de ligne de commande : sous macOS, LibreOffice lit ceux du
+/// processus qui l'héberge (via _NSGetArgv), prend les nôtres pour des options
+/// inconnues, affiche son aide et arrête sa boucle aussitôt.
 fn parse_args() -> Result<Args, String> {
-    let mut a = Args { program_dir: PathBuf::new(), profile: None, lang: "fr-FR".into(), author: String::new() };
-    let mut it = std::env::args().skip(1);
-    while let Some(k) = it.next() {
-        let mut v = || it.next().ok_or(format!("valeur manquante pour {k}"));
-        match k.as_str() {
-            "--program-dir" => a.program_dir = PathBuf::from(v()?),
-            "--profile" => a.profile = Some(PathBuf::from(v()?)),
-            "--lang" => a.lang = v()?,
-            "--author" => a.author = v()?,
-            "--version" => {
-                println!("auxi-engine {}", env!("CARGO_PKG_VERSION"));
-                std::process::exit(0);
-            }
-            _ => return Err(format!("argument inconnu : {k}")),
-        }
+    if std::env::args().nth(1).as_deref() == Some("--version") {
+        println!("auxi-engine {}", env!("CARGO_PKG_VERSION"));
+        std::process::exit(0);
     }
-    if a.program_dir.as_os_str().is_empty() {
-        return Err("--program-dir est obligatoire".into());
+    if std::env::args().len() > 1 {
+        return Err("aucun argument attendu : la configuration passe par les variables AUXI_ENGINE_*".into());
+    }
+    let var = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+    let a = Args {
+        program_dir: var("AUXI_ENGINE_PROGRAM_DIR").map(PathBuf::from).ok_or("AUXI_ENGINE_PROGRAM_DIR est obligatoire")?,
+        profile: var("AUXI_ENGINE_PROFILE").map(PathBuf::from),
+        lang: var("AUXI_ENGINE_LANG").unwrap_or_else(|| "fr-FR".into()),
+        author: var("AUXI_ENGINE_AUTHOR").unwrap_or_default(),
+    };
+    // Ne pas transmettre ces variables aux composants de LibreOffice.
+    for k in ["AUXI_ENGINE_PROGRAM_DIR", "AUXI_ENGINE_PROFILE", "AUXI_ENGINE_LANG", "AUXI_ENGINE_AUTHOR"] {
+        std::env::remove_var(k);
     }
     Ok(a)
 }
