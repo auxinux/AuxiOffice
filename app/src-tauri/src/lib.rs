@@ -36,13 +36,16 @@ fn engine_config(app: &AppHandle) -> Result<EngineConfig, String> {
     if !program_dir.exists() {
         return Err(format!("LibreOffice introuvable : {}", program_dir.display()));
     }
-    let profile_dir = app.path().app_data_dir().ok().map(|d| d.join("moteur"));
+    let data_dir = app.path().app_data_dir().ok();
+    let profile_dir = data_dir.as_ref().map(|d| d.join("moteur"));
+    let log_file = data_dir.as_ref().map(|d| d.join("moteur.log"));
     Ok(EngineConfig {
         engine_exe,
         program_dir,
         profile_dir,
         lang: std::env::var("AUXI_LANG").unwrap_or_else(|_| "fr-FR".into()),
         author: user_name(),
+        log_file,
     })
 }
 

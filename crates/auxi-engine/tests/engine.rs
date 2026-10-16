@@ -32,6 +32,7 @@ fn setup(name: &str) -> Option<(Ctx, PathBuf)> {
             profile_dir: Some(tmp.join("profil")),
             lang: "fr-FR".into(),
             author: "Test AuxiOffice".into(),
+            log_file: None,
         },
         Box::new(move |e| ev.lock().unwrap().push(e)),
     )

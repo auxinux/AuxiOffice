@@ -22,7 +22,13 @@ pub struct EngineConfig {
     pub profile_dir: Option<PathBuf>,
     pub lang: String,
     pub author: String,
+    /// Journal où recopier la sortie d'erreur du moteur (diagnostic).
+    pub log_file: Option<PathBuf>,
 }
+
+/// Dernières lignes écrites par le moteur sur sa sortie d'erreur.
+type StderrTail = Arc<Mutex<std::collections::VecDeque<String>>>;
+const TAIL_LINES: usize = 25;
 
 pub struct Reply {
     pub json: Value,
@@ -58,11 +64,40 @@ impl Engine {
         let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| format!("impossible de lancer {} : {e}", cfg.engine_exe.display()))?;
         let stdin = child.stdin.take().unwrap();
         let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+
+        // Sortie d'erreur du moteur : recopiée sur la nôtre et dans le journal,
+        // et ses dernières lignes gardées pour expliquer un échec au démarrage.
+        let tail: StderrTail = Arc::new(Mutex::new(Default::default()));
+        let mut log = cfg.log_file.as_ref().and_then(|f| {
+            if let Some(d) = f.parent() {
+                let _ = std::fs::create_dir_all(d);
+            }
+            std::fs::OpenOptions::new().create(true).append(true).open(f).ok()
+        });
+        let t = tail.clone();
+        let stderr_thread = std::thread::Builder::new()
+            .name("auxi-engine-stderr".into())
+            .spawn(move || {
+                use std::io::{BufRead, Write};
+                for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                    eprintln!("{line}");
+                    if let Some(f) = log.as_mut() {
+                        let _ = writeln!(f, "{line}");
+                    }
+                    let mut q = t.lock().unwrap();
+                    if q.len() == TAIL_LINES {
+                        q.pop_front();
+                    }
+                    q.push_back(line);
+                }
+            })
+            .map_err(|e| e.to_string())?;
 
         let pending: Pending = Arc::new(Mutex::new(HashMap::new()));
         let (ready_tx, ready_rx) = channel::<Result<Option<String>, String>>();
@@ -72,15 +107,18 @@ impl Engine {
             .spawn(move || reader(BufReader::new(stdout), p, ready_tx, on_event))
             .map_err(|e| e.to_string())?;
 
-        let libreoffice = match ready_rx.recv_timeout(Duration::from_secs(120)) {
-            Ok(Ok(v)) => v,
-            Ok(Err(e)) => {
+        let failure = match ready_rx.recv_timeout(Duration::from_secs(120)) {
+            Ok(Ok(v)) => Ok(v),
+            Ok(Err(e)) => Err(e),
+            Err(_) => Err("le moteur ne répond pas".into()),
+        };
+        let libreoffice = match failure {
+            Ok(v) => v,
+            Err(e) => {
                 let _ = child.kill();
-                return Err(e);
-            }
-            Err(_) => {
-                let _ = child.kill();
-                return Err("le moteur ne répond pas".into());
+                let status = child.wait().ok();
+                let _ = stderr_thread.join();
+                return Err(startup_error(&e, status, &tail));
             }
         };
         Ok(Engine {
@@ -140,6 +178,33 @@ impl Drop for Engine {
             self.shutdown();
         }
     }
+}
+
+/// Message d'échec au démarrage : cause, statut de sortie, dernières lignes
+/// du moteur (souvent la vraie raison, écrite par LibreOffice).
+fn startup_error(e: &str, status: Option<std::process::ExitStatus>, tail: &StderrTail) -> String {
+    let mut msg = e.to_string();
+    if let Some(st) = status {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            if let Some(sig) = st.signal() {
+                msg.push_str(&format!(" (signal {sig}{})", if sig == 6 { ", abandon" } else if sig == 11 { ", erreur de segmentation" } else { "" }));
+            } else if let Some(code) = st.code() {
+                msg.push_str(&format!(" (code {code})"));
+            }
+        }
+        #[cfg(not(unix))]
+        if let Some(code) = st.code() {
+            msg.push_str(&format!(" (code {code})"));
+        }
+    }
+    let lines: Vec<String> = tail.lock().unwrap().iter().cloned().collect();
+    if !lines.is_empty() {
+        msg.push_str("\n\nDernières lignes du moteur :\n");
+        msg.push_str(&lines.join("\n"));
+    }
+    msg
 }
 
 fn reader(

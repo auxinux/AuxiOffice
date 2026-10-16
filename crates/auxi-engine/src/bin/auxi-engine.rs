@@ -466,9 +466,14 @@ fn main() {
         url::Url::from_directory_path(p.canonicalize().unwrap_or(p.clone())).map(|u| u.to_string()).unwrap_or_default()
     });
 
+    eprintln!("auxi-engine {} : démarrage de LibreOffice ({})", env!("CARGO_PKG_VERSION"), args.program_dir.display());
     let mut office = match Office::init(&args.program_dir, profile_url.as_deref()) {
-        Ok(o) => o,
+        Ok(o) => {
+            eprintln!("auxi-engine : LibreOffice initialisé ({})", o.version_info().unwrap_or_default());
+            o
+        }
         Err(e) => {
+            eprintln!("auxi-engine : échec de l'initialisation : {e}");
             send(&out, &json!({"event": "fatal", "error": e}), &[]);
             std::process::exit(1);
         }
@@ -556,6 +561,7 @@ fn run(engine: Engine, out: Out, ready: Value) -> ! {
     let ready_out = out.clone();
     mac::on_main(Box::new(move || {
         mac::hide_from_dock();
+        eprintln!("auxi-engine : prêt");
         send(&ready_out, &ready, &[]);
     }));
 
@@ -587,6 +593,7 @@ fn run(engine: Engine, out: Out, ready: Value) -> ! {
         0
     }
     unsafe extern "C" fn wake(_data: *mut std::ffi::c_void) {}
+    eprintln!("auxi-engine : boucle de LibreOffice sur le fil principal (unipoll)");
     unsafe {
         match (*(*kit).pClass).runLoop {
             Some(run_loop) => run_loop(kit, poll, wake, std::ptr::null_mut()),
@@ -595,6 +602,7 @@ fn run(engine: Engine, out: Out, ready: Value) -> ! {
             }
         }
     }
+    eprintln!("auxi-engine : la boucle de LibreOffice s'est terminée");
     std::process::exit(0);
 }
 
