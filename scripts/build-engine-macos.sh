@@ -38,6 +38,11 @@ BP=$(brew --prefix)
 # GNU make 4, bison et flex récents avant ceux de macOS (trop anciens).
 export PATH="$BP/opt/make/libexec/gnubin:$BP/opt/bison/bin:$BP/opt/flex/bin:$BP/bin:$PATH"
 make --version | head -1 | grep -q 'GNU Make 4' || die "GNU make 4 introuvable (brew install make)"
+# configure de LibreOffice refuse tout pkg-config dont il ne reconnaît pas
+# l'origine ; celui de Homebrew n'est accepté que sous ce chemin exact
+# (et non sous son autre nom, pkgconf, qu'il trouverait sinon en premier).
+[ -x "$BP/bin/pkg-config" ] || die "pkg-config de Homebrew introuvable (brew install pkgconf)"
+export PKG_CONFIG="$BP/bin/pkg-config"
 
 sha256() { shasum -a 256 "$1" | cut -d' ' -f1; }
 fetch() { # url sha256
