@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Action, AppAction } from "./actions";
 import { DocView, type DocHandle } from "./DocView";
 import { installMenus, updateMenuChecks } from "./menus";
+import { PrintDialog } from "./PrintDialog";
 import { call, closeDocument, newDocument, openDocument, recentFiles, startupFile, warmEngine, type DocInfo } from "./engine";
 import { Home } from "./Home";
 import { fileName, isUntitled } from "./lok";
@@ -200,6 +201,7 @@ export function App() {
   }, []);
 
   const [about, setAbout] = useState(false);
+  const [printing, setPrinting] = useState<number | null>(null);
 
   /** Actions de l'application ; `doc` = document concerné (0 = aucun). */
   const lastAction = useRef({ a: "", t: 0 });
@@ -227,6 +229,8 @@ export function App() {
           return doc ? void saveDocument(doc, true) : undefined;
         case "exportPdf":
           return doc ? void exportPdf(doc) : undefined;
+        case "print":
+          return doc ? setPrinting(doc) : undefined;
         case "close":
           return doc ? void closeTab(doc) : undefined;
       }
@@ -345,6 +349,17 @@ export function App() {
         </div>
       )}
       {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
+      {printing !== null && tabs.some((t) => t.info.doc === printing) && (
+        <PrintDialog
+          doc={printing}
+          title={(() => {
+            const t = tabs.find((x) => x.info.doc === printing)!;
+            return isUntitled(t.path) ? "Sans titre" : fileName(t.path);
+          })()}
+          onClose={() => setPrinting(null)}
+          onMessage={notify}
+        />
+      )}
       {about && (
         <div className="dialog-backdrop" onClick={() => setAbout(false)}>
           <div className="about" onClick={(e) => e.stopPropagation()}>

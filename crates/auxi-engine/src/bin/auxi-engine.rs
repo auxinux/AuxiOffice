@@ -21,6 +21,7 @@ struct Args {
     profile: Option<PathBuf>,
     lang: String,
     author: String,
+    profile_root: Option<PathBuf>,
 }
 
 /// Configuration lue dans l'environnement (`AUXI_ENGINE_PROGRAM_DIR`,
@@ -43,9 +44,10 @@ fn parse_args() -> Result<Args, String> {
         profile: var("AUXI_ENGINE_PROFILE").map(PathBuf::from),
         lang: var("AUXI_ENGINE_LANG").unwrap_or_else(|| "fr-FR".into()),
         author: var("AUXI_ENGINE_AUTHOR").unwrap_or_default(),
+        profile_root: var("AUXI_ENGINE_PROFILE_ROOT").map(PathBuf::from),
     };
     // Ne pas transmettre ces variables aux composants de LibreOffice.
-    for k in ["AUXI_ENGINE_PROGRAM_DIR", "AUXI_ENGINE_PROFILE", "AUXI_ENGINE_LANG", "AUXI_ENGINE_AUTHOR"] {
+    for k in ["AUXI_ENGINE_PROGRAM_DIR", "AUXI_ENGINE_PROFILE", "AUXI_ENGINE_LANG", "AUXI_ENGINE_AUTHOR", "AUXI_ENGINE_PROFILE_ROOT"] {
         std::env::remove_var(k);
     }
     Ok(a)
@@ -116,15 +118,14 @@ fn lock_owner(path: &str) -> Option<Value> {
     }))
 }
 
-/// Verrou laissé par AuxiOffice lui-même (même profil de moteur) après un
-/// arrêt brutal : l'application n'ouvre jamais deux fois le même fichier,
-/// un tel verrou est donc forcément orphelin.
-fn is_own_stale_lock(owner: &Value, profile_url: Option<&str>) -> bool {
+/// Verrou laissé par AuxiOffice lui-même (son profil, ou l'un des profils
+/// de l'application) après un arrêt brutal : l'application n'ouvre jamais
+/// deux fois le même fichier, un tel verrou est donc forcément orphelin.
+fn is_own_stale_lock(owner: &Value, profile_url: Option<&str>, root_url: Option<&str>) -> bool {
     let norm = |s: &str| s.trim_end_matches('/').to_string();
-    match (owner["profile"].as_str(), profile_url) {
-        (Some(p), Some(ours)) if !p.is_empty() => norm(p) == norm(ours),
-        _ => false,
-    }
+    let Some(p) = owner["profile"].as_str().filter(|p| !p.is_empty()) else { return false };
+    let p = norm(p);
+    profile_url.is_some_and(|ours| p == norm(ours)) || root_url.is_some_and(|root| p.starts_with(&(norm(root) + "/")))
 }
 
 /// Filtre d'enregistrement LibreOffice selon l'extension.
@@ -237,7 +238,8 @@ impl Engine {
                 // sans le dire : on le signale, et on ne le supprime que si
                 // l'utilisateur l'a demandé (verrou orphelin après un plantage).
                 let mut locked_by = lock_owner(path);
-                let own = locked_by.as_ref().is_some_and(|o| is_own_stale_lock(o, self.profile_url.as_deref()));
+                let root_url = self.args.profile_root.as_ref().and_then(|r| url::Url::from_directory_path(r.canonicalize().unwrap_or(r.clone())).ok()).map(|u| u.to_string());
+                let own = locked_by.as_ref().is_some_and(|o| is_own_stale_lock(o, self.profile_url.as_deref(), root_url.as_deref()));
                 if locked_by.is_some() && (own || req.get("ignore_lock").and_then(Value::as_bool) == Some(true)) {
                     if let Some(f) = lock_file(path) {
                         let _ = std::fs::remove_file(f);
@@ -508,6 +510,15 @@ fn main() {
 
     let profile_url = args.profile.as_ref().map(|p| {
         let _ = std::fs::create_dir_all(p);
+        // Après un plantage, LibreOffice laisse un rapport (crash/dump.ini) ;
+        // au démarrage suivant il prépare une récupération qui, sans écran,
+        // bloque ensuite tout enregistrement et toute exportation. Un moteur
+        // ne sert qu'un document : rien à récupérer, on retire le rapport.
+        let crash = p.join("crash");
+        if crash.exists() {
+            eprintln!("auxi-engine : rapport de plantage précédent retiré du profil");
+            let _ = std::fs::remove_dir_all(&crash);
+        }
         url::Url::from_directory_path(p.canonicalize().unwrap_or(p.clone())).map(|u| u.to_string()).unwrap_or_default()
     });
 

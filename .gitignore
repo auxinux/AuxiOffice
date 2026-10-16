@@ -6,3 +6,7 @@ node_modules/
 __pycache__/
 *.pyc
 .~lock.*#
+
+# Vidages mémoire de LibreOffice
+core
+core.[0-9]*

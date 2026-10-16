@@ -102,3 +102,15 @@ describe("menu contextuel", () => {
     expect(items.map((i) => i.text ?? "-")).toEqual(["~Couper", "-", "Coller"]);
   });
 });
+
+describe("impression", () => {
+  it("valide les plages de pages", async () => {
+    const { validPageRange } = await import("./PrintDialog");
+    expect(validPageRange("")).toBe(true);
+    expect(validPageRange("1-3, 5")).toBe(true);
+    expect(validPageRange("2;4-6")).toBe(true);
+    expect(validPageRange("0")).toBe(false);
+    expect(validPageRange("1-")).toBe(false);
+    expect(validPageRange("a")).toBe(false);
+  });
+});

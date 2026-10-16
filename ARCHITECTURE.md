@@ -73,6 +73,25 @@ Les rappels de LibreOffice (`invalidate_tiles`, `invalidate_visible_cursor`,
 - Un moteur de réserve est démarré après l'affichage de l'interface (commande
   `warm_engine`) ; l'ouverture d'un document n'attend plus le démarrage de LibreOffice.
 
+## Impression, diaporama
+
+- L'impression exporte un PDF (option `PageRange` du filtre pour les pages choisies) dans un
+  dossier temporaire, puis l'envoie à CUPS par `lp` (`app/src-tauri/src/print.rs` : nom
+  d'imprimante et options validés, aucun passage par un shell). « Aperçu du système » ouvre ce
+  PDF avec la visionneuse par défaut (`open`, `xdg-open`, `start`).
+- `.uno:Presentation` ne fait rien sous LibreOfficeKit : le diaporama (`SlideShow.tsx`) rend
+  chaque diapositive à la taille de l'écran (`paint` avec `part`). La vérification
+  orthographique en direct est suspendue pendant la projection.
+
+## Profils LibreOffice
+
+- Chaque moteur vivant a son propre profil (`moteur/profil-N`, rendu à la fermeture du
+  document) ; deux processus LibreOffice ne partagent jamais un profil.
+- Un dossier `crash` dans le profil (laissé par un plantage) bloque ensuite l'export PDF et
+  l'enregistrement : le moteur le supprime au démarrage.
+- Les verrous orphelins dont le propriétaire est un profil sous `moteur/` (variable
+  `AUXI_ENGINE_PROFILE_ROOT`) sont retirés comme les nôtres.
+
 ## Particularités de LibreOfficeKit à connaître
 
 - Ne pas activer `LOK_FEATURE_NO_TILED_ANNOTATIONS` : avec LibreOffice 26.2 et 26.8, il vide
@@ -80,8 +99,8 @@ Les rappels de LibreOffice (`invalidate_tiles`, `invalidate_visible_cursor`,
 - La saisie de texte passe par `postWindowExtTextInputEvent` (comme Collabora Online) ; les
   touches de caractères envoyées par `postKeyEvent` ne sont pas fiables.
 - Un verrou `.~lock.<nom>#` existant fait ouvrir le document **en lecture seule sans le
-  signaler** : le moteur le détecte lui-même. Les verrous laissés par notre propre profil sont
-  retirés automatiquement.
+  signaler** : le moteur le détecte lui-même. Les verrous laissés par un profil d'AuxiOffice
+  sont retirés automatiquement.
 - `.uno:SaveAs` est converti en simple export par LibreOfficeKit ; « Enregistrer sous » utilise
   `saveAs` avec l'option `TakeOwnership`.
 - Les événements clavier sont traités de façon asynchrone par LibreOffice.

@@ -13,6 +13,7 @@ export type AppAction =
   | "save"
   | "saveAs"
   | "exportPdf"
+  | "print"
   | "close"
   | "insertImage"
   | "zoomIn"
@@ -20,6 +21,8 @@ export type AppAction =
   | "zoom100"
   | "fitWidth"
   | "selectAll"
+  | "slideShow"
+  | "slideShowHere"
   | "about";
 
 export interface Action {
@@ -159,6 +162,113 @@ export const A = {
   headerFooter: u("En-tête et pied de page…", ".uno:HeaderAndFooter", { icon: "headerfooter" }),
   outlineBullets: u("Puces et numérotation…", ".uno:OutlineBullet", { icon: "bullets" }),
   transform: u("Position et taille…", ".uno:TransformDialog", { icon: "transform" }),
+  // Commun
+  pasteSpecial: u("Collage spécial…", ".uno:PasteSpecial"),
+  docProps: u("Propriétés du document…", ".uno:SetDocumentProperties"),
+  specialChar: u("Caractère spécial…", ".uno:InsertSymbol", { icon: "omega" }),
+  qrCode: u("QR code et code-barres…", ".uno:InsertQrCode", { icon: "qr" }),
+  fontwork: u("Fontwork…", ".uno:FontworkGalleryFloater"),
+  langDocFr: u("Français (France)", ".uno:LanguageStatus?Language:string=Default_Français (France)"),
+  langDocCa: u("Français (Canada)", ".uno:LanguageStatus?Language:string=Default_Français (Canada)"),
+  langDocEnCa: u("Anglais (Canada)", ".uno:LanguageStatus?Language:string=Default_Anglais (Canada)"),
+  langDocEnUs: u("Anglais (États-Unis)", ".uno:LanguageStatus?Language:string=Default_Anglais (États-Unis d'Amérique)"),
+  langParFr: u("Français (France)", ".uno:LanguageStatus?Language:string=Paragraph_Français (France)"),
+  langParCa: u("Français (Canada)", ".uno:LanguageStatus?Language:string=Paragraph_Français (Canada)"),
+  langParEn: u("Anglais (Canada)", ".uno:LanguageStatus?Language:string=Paragraph_Anglais (Canada)"),
+  print: a("Imprimer…", "print", { icon: "print" }),
+  // Writer
+  gotoPage: u("Aller à la page…", ".uno:GotoPage"),
+  acceptAll: u("Accepter toutes les modifications", ".uno:AcceptAllTrackedChanges"),
+  rejectAll: u("Refuser toutes les modifications", ".uno:RejectAllTrackedChanges"),
+  nextChange: u("Modification suivante", ".uno:NextTrackedChange"),
+  showChanges: u("Afficher les modifications", ".uno:ShowTrackedChanges", { check: ".uno:ShowTrackedChanges" }),
+  deleteComments: u("Supprimer tous les commentaires", ".uno:DeleteAllNotes"),
+  textBoundaries: u("Limites du texte", ".uno:ViewBounds", { check: ".uno:ViewBounds" }),
+  fieldShadings: u("Trame de fond des champs", ".uno:Marks", { check: ".uno:Marks" }),
+  textFrame: u("Zone de texte", ".uno:DrawText", { icon: "textbox" }),
+  formula: u("Formule mathématique", ".uno:InsertObjectStarMath", { icon: "function" }),
+  crossRef: u("Renvoi…", ".uno:InsertReferenceField"),
+  indexEntry: u("Entrée d'index…", ".uno:InsertIndexesEntry"),
+  envelope: u("Enveloppe…", ".uno:InsertEnvelope"),
+  titlePage: u("Pages de titre…", ".uno:TitlePageDialog"),
+  newStyle: u("Nouveau style à partir de la sélection…", ".uno:StyleNewByExample"),
+  theme: u("Thème…", ".uno:ThemeDialog"),
+  cloneFormat: u("Cloner la mise en forme", ".uno:FormatPaintbrush", { icon: "brush" }),
+  textToTable: u("Convertir le texte en tableau…", ".uno:ConvertTextToTable"),
+  sortText: u("Trier…", ".uno:SortDialog"),
+  hyphenate: u("Coupure des mots…", ".uno:Hyphenate"),
+  autoText: u("AutoTexte…", ".uno:EditGlossary"),
+  // Calc
+  fillDown: u("Remplir vers le bas", ".uno:FillDown"),
+  fillSeries: u("Remplir une série…", ".uno:FillSeries"),
+  deleteContents: u("Supprimer du contenu…", ".uno:Delete"),
+  pivot: u("Table dynamique…", ".uno:DataDataPilotRun", { icon: "pivot" }),
+  currentTime: u("Heure actuelle", ".uno:InsertCurrentTime"),
+  sparkline: u("Graphique sparkline…", ".uno:InsertSparkline"),
+  autoFormatCells: u("Styles d'AutoFormat…", ".uno:AutoFormat"),
+  hideRows: u("Masquer les lignes", ".uno:HideRow"),
+  showRows: u("Afficher les lignes", ".uno:ShowRow"),
+  hideCols: u("Masquer les colonnes", ".uno:HideColumn"),
+  showCols: u("Afficher les colonnes", ".uno:ShowColumn"),
+  optimalHeight: u("Hauteur optimale…", ".uno:SetOptimalRowHeight"),
+  colorScale: u("Échelle de couleurs…", ".uno:ColorScaleFormatDialog"),
+  dataBar: u("Barre de données…", ".uno:DataBarFormatDialog"),
+  iconSet: u("Jeu d'icônes…", ".uno:IconSetFormatDialog"),
+  manageCond: u("Gérer les formatages conditionnels…", ".uno:ConditionalFormatManagerDialog"),
+  numDecimal: u("Nombre", ".uno:NumberFormatDecimal"),
+  numScientific: u("Scientifique", ".uno:NumberFormatScientific"),
+  numTime: u("Heure", ".uno:NumberFormatTime"),
+  incDecimals: u("Ajouter une décimale", ".uno:NumberFormatIncDecimals"),
+  decDecimals: u("Retirer une décimale", ".uno:NumberFormatDecDecimals"),
+  sheetMove: u("Déplacer ou copier la feuille…", ".uno:Move"),
+  sheetHide: u("Masquer la feuille", ".uno:Hide"),
+  sheetShow: u("Afficher une feuille…", ".uno:Show"),
+  sheetColor: u("Couleur d'onglet…", ".uno:SetTabBgColor"),
+  sheetProtect: u("Protéger la feuille…", ".uno:Protect", { icon: "lock" }),
+  bookProtect: u("Protéger la structure du classeur…", ".uno:ToolProtectionDocument"),
+  subtotals: u("Sous-totaux…", ".uno:DataSubTotals"),
+  textToColumns: u("Texte en colonnes…", ".uno:TextToColumns"),
+  consolidate: u("Consolider…", ".uno:DataConsolidate"),
+  goalSeek: u("Recherche de valeur cible…", ".uno:GoalSeekDialog"),
+  group: u("Grouper…", ".uno:Group"),
+  ungroup: u("Dissocier", ".uno:Ungroup"),
+  removeFilter: u("Supprimer le filtre", ".uno:DataFilterRemoveFilter"),
+  specialFilter: u("Filtre spécial…", ".uno:DataFilterSpecialFilter"),
+  dbRange: u("Définir une plage…", ".uno:DefineDBName"),
+  dataForm: u("Formulaire…", ".uno:DataForm"),
+  randomNumbers: u("Nombres aléatoires…", ".uno:RandomNumberGeneratorDialog"),
+  descStats: u("Statistiques descriptives…", ".uno:DescriptiveStatisticsDialog"),
+  recalcHard: u("Recalcul complet", ".uno:CalculateHard"),
+  showDependents: u("Repérer les dépendants", ".uno:ShowDependents"),
+  showPrecedents: u("Repérer les antécédents", ".uno:ShowPrecedents"),
+  clearArrows: u("Supprimer toutes les flèches", ".uno:ClearArrows"),
+  calcTrack: u("Enregistrer les modifications", ".uno:TraceChangeMode", { check: ".uno:TraceChangeMode", icon: "track" }),
+  calcManageChanges: u("Gérer les modifications…", ".uno:AcceptChanges", { icon: "changes" }),
+  printAreaDefine: u("Définir la zone d'impression", ".uno:DefinePrintArea", { icon: "printarea" }),
+  printAreaDelete: u("Effacer la zone d'impression", ".uno:DeletePrintArea"),
+  printAreaEdit: u("Éditer les zones d'impression…", ".uno:EditPrintArea"),
+  // Impress
+  hideSlide: u("Masquer la diapositive", ".uno:HideSlide"),
+  showSlide: u("Afficher la diapositive", ".uno:ShowSlide"),
+  renameSlide: u("Renommer la diapositive…", ".uno:RenamePage"),
+  layoutBlank: u("Vide", ".uno:AssignLayout?WhatLayout:long=20"),
+  layoutTitle: u("Diapositive de titre", ".uno:AssignLayout?WhatLayout:long=0"),
+  layoutContent: u("Titre, contenu", ".uno:AssignLayout?WhatLayout:long=1"),
+  layoutTwo: u("Titre et 2 contenus", ".uno:AssignLayout?WhatLayout:long=3"),
+  layoutTitleOnly: u("Titre seul", ".uno:AssignLayout?WhatLayout:long=19"),
+  area: u("Remplissage…", ".uno:FormatArea"),
+  line: u("Ligne…", ".uno:FormatLine"),
+  textAttrs: u("Attributs du texte…", ".uno:TextAttributes"),
+  toFront: u("Mettre au premier plan", ".uno:BringToFront"),
+  toBack: u("Mettre à l'arrière-plan", ".uno:SendToBack"),
+  slideNumber: u("Numéro de diapositive", ".uno:InsertPageField"),
+  slideDate: u("Date", ".uno:InsertDateFieldFix"),
+  shapeRect: u("Rectangle", ".uno:BasicShapes.rectangle", { icon: "rect" }),
+  shapeEllipse: u("Ellipse", ".uno:BasicShapes.ellipse", { icon: "ellipse" }),
+  shapeLine: u("Ligne", ".uno:Line", { icon: "lineShape" }),
+  shapeArrow: u("Flèche", ".uno:ArrowShapes.right-arrow", { icon: "arrow" }),
+  slideShow: a("Lancer le diaporama", "slideShow", { accel: "F5", icon: "play" }),
+  slideShowHere: a("Diaporama depuis cette diapositive", "slideShowHere", { accel: "Shift+F5" }),
 } satisfies Record<string, Action>;
 
 // --- Barre de menus ----------------------------------------------------------
@@ -171,6 +281,9 @@ const fileMenu: MenuDef = {
     a("Enregistrer", "save", { accel: "CmdOrCtrl+S" }),
     a("Enregistrer sous…", "saveAs", { accel: "CmdOrCtrl+Shift+S" }),
     a("Exporter en PDF…", "exportPdf"),
+    a("Imprimer…", "print", { accel: "CmdOrCtrl+P" }),
+    "-",
+    A.docProps,
     "-",
     a("Fermer le document", "close", { accel: "CmdOrCtrl+W" }),
   ],
@@ -184,48 +297,81 @@ const viewItems = (sheet = false): MenuEntry[] => [
 ];
 
 export function menusFor(type: DocType | null): MenuDef[] {
-  const editBase: MenuEntry[] = [A.undo, A.redo, "-", A.selectAll, "-", A.find];
+  const editBase: MenuEntry[] = [A.undo, A.redo, "-", A.pasteSpecial, A.selectAll, "-", A.find];
+  const language: MenuEntry = {
+    submenu: "Langue",
+    items: [
+      { submenu: "Pour tout le document", items: [A.langDocCa, A.langDocFr, A.langDocEnCa, A.langDocEnUs] },
+      { submenu: "Pour le paragraphe", items: [A.langParCa, A.langParFr, A.langParEn] },
+    ],
+  };
   if (type === "text") {
     return [
       fileMenu,
-      { label: "Édition", items: [...editBase, "-", { submenu: "Suivi des modifications", items: [A.trackChanges, A.manageChanges] }] },
-      { label: "Affichage", items: [...viewItems(), "-", A.formattingMarks] },
+      {
+        label: "Édition",
+        items: [...editBase, A.gotoPage, "-",
+          { submenu: "Suivi des modifications", items: [A.trackChanges, A.showChanges, "-", A.nextChange, A.acceptAll, A.rejectAll, "-", A.manageChanges] },
+          A.deleteComments],
+      },
+      { label: "Affichage", items: [...viewItems(), "-", A.formattingMarks, A.textBoundaries, A.fieldShadings] },
       {
         label: "Insertion",
-        items: [A.pageBreak, A.otherBreak, "-", A.table, A.image, A.chart, "-", A.hyperlink, A.bookmark, A.comment, "-", A.footnote, A.endnote,
-          { submenu: "Champ", items: [A.pageNumber, A.dateField, A.field] }, "-", A.toc, A.section],
+        items: [A.pageBreak, A.otherBreak, A.titlePage, "-", A.table, A.image, A.chart, A.textFrame, A.formula, A.fontwork, A.qrCode, "-",
+          A.specialChar, A.hyperlink, A.bookmark, A.crossRef, A.comment, "-", A.footnote, A.endnote,
+          { submenu: "Champ", items: [A.pageNumber, A.dateField, A.field] }, "-",
+          { submenu: "Table des matières et index", items: [A.toc, A.indexEntry] }, A.section, A.envelope],
       },
       {
         label: "Format",
         items: [A.fontDialog, A.paragraphDialog, A.bullets, A.columns, A.pageStyle, "-",
           { submenu: "Texte", items: [A.bold, A.italic, A.underline, A.strike, "-", A.superscript, A.subscript, "-", A.upper, A.lower, "-", A.grow, A.shrink] },
           { submenu: "Interligne", items: [A.spacing1, A.spacing15, A.spacing2] },
-          A.indentMore, A.indentLess, "-", A.clearFormat, A.editStyle],
+          A.indentMore, A.indentLess, "-", A.cloneFormat, A.clearFormat, "-",
+          { submenu: "Styles", items: [A.editStyle, A.newStyle] }, A.theme],
       },
       {
         label: "Tableau",
-        items: [A.table, "-", A.tableRowsAbove, A.tableRowsBelow, A.tableColsBefore, A.tableColsAfter, "-", A.deleteRows, A.deleteCols, A.deleteTable, "-", A.mergeCells, A.splitCells, "-", A.tableProps],
+        items: [A.table, A.textToTable, "-", A.tableRowsAbove, A.tableRowsBelow, A.tableColsBefore, A.tableColsAfter, "-", A.deleteRows, A.deleteCols, A.deleteTable, "-", A.mergeCells, A.splitCells, "-", A.sortText, A.tableProps],
       },
       {
         label: "Outils",
-        items: [A.spelling, A.autoSpell, A.thesaurus, A.wordCount, "-", A.lineNumbering, A.footnoteSettings, A.chapterNumbering, "-", A.updateAll],
+        items: [A.spelling, A.autoSpell, A.thesaurus, language, A.hyphenate, A.wordCount, "-", A.autoText, A.lineNumbering, A.footnoteSettings, A.chapterNumbering, "-", A.updateAll],
       },
     ];
   }
   if (type === "spreadsheet") {
     return [
       fileMenu,
-      { label: "Édition", items: [...editBase, "-", A.deleteCells] },
+      { label: "Édition", items: [...editBase, "-", A.fillDown, A.fillSeries, "-", A.deleteContents, A.deleteCells, "-", { submenu: "Suivi des modifications", items: [A.calcTrack, A.calcManageChanges] }] },
       { label: "Affichage", items: [...viewItems(true), "-", A.freeze] },
-      { label: "Insertion", items: [A.insertCells, A.rowsAbove, A.rowsBelow, A.colsBefore, A.colsAfter, "-", A.functionWizard, A.autoSum, A.currentDate, "-", A.chart, A.image, A.hyperlink, A.comment] },
+      {
+        label: "Insertion",
+        items: [A.insertCells, A.rowsAbove, A.rowsBelow, A.colsBefore, A.colsAfter, "-", A.functionWizard, A.autoSum, A.currentDate, A.currentTime, "-",
+          A.chart, A.sparkline, A.pivot, A.image, A.qrCode, "-", A.specialChar, A.hyperlink, A.comment],
+      },
       {
         label: "Format",
-        items: [A.cellFormat, A.condFormat, "-", { submenu: "Nombre", items: [A.currency, A.percent, A.dateFormat] }, A.merge, A.wrap, "-",
-          { submenu: "Lignes et colonnes", items: [A.rowHeight, A.colWidth, A.optimalWidth] }, "-", A.fontDialog, A.clearFormat, A.calcPage],
+        items: [A.cellFormat, "-",
+          { submenu: "Nombre", items: [A.numDecimal, A.currency, A.percent, A.dateFormat, A.numTime, A.numScientific, "-", A.incDecimals, A.decDecimals] },
+          { submenu: "Formatage conditionnel", items: [A.condFormat, A.colorScale, A.dataBar, A.iconSet, "-", A.manageCond] },
+          A.merge, A.wrap, A.autoFormatCells, "-",
+          { submenu: "Lignes", items: [A.rowHeight, A.optimalHeight, A.hideRows, A.showRows] },
+          { submenu: "Colonnes", items: [A.colWidth, A.optimalWidth, A.hideCols, A.showCols] }, "-",
+          A.fontDialog, A.clearFormat, A.calcPage,
+          { submenu: "Zones d'impression", items: [A.printAreaDefine, A.printAreaDelete, A.printAreaEdit] }],
       },
-      { label: "Feuille", items: [A.sheetInsert, A.sheetDelete, A.sheetRename, "-", A.deleteRows, A.deleteCols] },
-      { label: "Données", items: [A.sort, A.sortAsc, A.sortDesc, "-", A.autoFilter, A.stdFilter, "-", A.validity, A.names, "-", A.recalc] },
-      { label: "Outils", items: [A.calcSpell] },
+      { label: "Feuille", items: [A.sheetInsert, A.sheetDelete, A.sheetRename, A.sheetMove, "-", A.sheetHide, A.sheetShow, A.sheetColor, "-", A.deleteRows, A.deleteCols] },
+      {
+        label: "Données",
+        items: [A.sort, A.sortAsc, A.sortDesc, "-", A.autoFilter, A.stdFilter, A.specialFilter, A.removeFilter, "-", A.subtotals, A.pivot, A.consolidate, A.textToColumns, "-",
+          { submenu: "Plan", items: [A.group, A.ungroup] }, A.validity, A.dbRange, A.dataForm, A.names, "-",
+          { submenu: "Statistiques", items: [A.randomNumbers, A.descStats] }, "-", A.recalc, A.recalcHard],
+      },
+      {
+        label: "Outils",
+        items: [A.calcSpell, language, "-", A.goalSeek, "-", { submenu: "Audit", items: [A.showPrecedents, A.showDependents, A.clearArrows] }, "-", A.sheetProtect, A.bookProtect],
+      },
     ];
   }
   if (type === "presentation" || type === "drawing") {
@@ -233,9 +379,24 @@ export function menusFor(type: DocType | null): MenuDef[] {
       fileMenu,
       { label: "Édition", items: editBase },
       { label: "Affichage", items: viewItems() },
-      { label: "Insertion", items: [A.newSlide, A.dupSlide, "-", A.textBox, A.image, A.table, A.chart, "-", A.hyperlink, A.comment, A.headerFooter] },
-      { label: "Format", items: [A.fontDialog, A.paragraphDialog, A.outlineBullets, A.transform, "-", A.bold, A.italic, A.underline, A.strike, "-", A.clearFormat] },
-      { label: "Diapositive", items: [A.newSlide, A.dupSlide, A.delSlide, "-", A.slideProps, A.masters] },
+      {
+        label: "Insertion",
+        items: [A.newSlide, A.dupSlide, "-", A.textBox, A.image, A.table, A.chart, A.qrCode, A.fontwork, "-",
+          { submenu: "Formes", items: [A.shapeRect, A.shapeEllipse, A.shapeArrow, A.shapeLine] }, "-",
+          A.specialChar, A.hyperlink, A.comment, { submenu: "Champ", items: [A.slideNumber, A.slideDate] }, A.headerFooter],
+      },
+      {
+        label: "Format",
+        items: [A.fontDialog, A.paragraphDialog, A.outlineBullets, A.textAttrs, "-", A.area, A.line, A.transform, "-",
+          { submenu: "Disposition", items: [A.toFront, A.toBack] }, "-", A.bold, A.italic, A.underline, A.strike, "-", A.clearFormat],
+      },
+      {
+        label: "Diapositive",
+        items: [A.newSlide, A.dupSlide, A.delSlide, A.renameSlide, "-", A.hideSlide, A.showSlide, "-",
+          { submenu: "Mise en page", items: [A.layoutTitle, A.layoutContent, A.layoutTwo, A.layoutTitleOnly, A.layoutBlank] }, A.slideProps, A.masters],
+      },
+      { label: "Diaporama", items: [A.slideShow, A.slideShowHere] },
+      { label: "Outils", items: [A.calcSpell, language] },
     ];
   }
   return [fileMenu];
@@ -257,7 +418,8 @@ export function ribbonFor(type: DocType): RibbonTab[] {
         label: "Insertion",
         groups: [
           { label: "Pages", actions: [A.pageBreak, A.section] },
-          { label: "Objets", actions: [A.table, A.image, A.chart] },
+          { label: "Objets", actions: [A.table, A.image, A.chart, A.textFrame, A.formula] },
+          { label: "Symboles", actions: [A.specialChar, A.qrCode] },
           { label: "Liens", actions: [A.hyperlink, A.bookmark, A.comment] },
           { label: "Notes et champs", actions: [A.footnote, A.pageNumber, A.field, A.toc] },
         ],
@@ -267,7 +429,8 @@ export function ribbonFor(type: DocType): RibbonTab[] {
         groups: [
           { label: "Page", actions: [A.pageStyle, A.columns, A.pageBreak] },
           { label: "Paragraphe", actions: [A.paragraphDialog, A.bullets, A.indentLess, A.indentMore] },
-          { label: "Caractère", actions: [A.fontDialog, A.clearFormat] },
+          { label: "Caractère", actions: [A.fontDialog, A.cloneFormat, A.clearFormat] },
+          { label: "Imprimer", actions: [A.print] },
         ],
       },
       {
@@ -288,7 +451,7 @@ export function ribbonFor(type: DocType): RibbonTab[] {
         groups: [
           { label: "Cellules", actions: [A.rowsAbove, A.colsBefore, A.sheetInsert] },
           { label: "Calcul", actions: [A.autoSum, A.functionWizard] },
-          { label: "Objets", actions: [A.chart, A.image, A.hyperlink, A.comment] },
+          { label: "Objets", actions: [A.chart, A.pivot, A.image, A.hyperlink, A.comment] },
         ],
       },
       {
@@ -296,17 +459,18 @@ export function ribbonFor(type: DocType): RibbonTab[] {
         groups: [
           { label: "Cellules", actions: [A.cellFormat, A.condFormat, A.merge, A.wrap] },
           { label: "Nombre", actions: [A.currency, A.percent] },
-          { label: "Page", actions: [A.calcPage] },
+          { label: "Page", actions: [A.calcPage, A.printAreaDefine, A.print] },
         ],
       },
       {
         label: "Données",
         groups: [
           { label: "Trier et filtrer", actions: [A.sort, A.autoFilter] },
+          { label: "Analyse", actions: [A.subtotals, A.pivot, A.goalSeek] },
           { label: "Outils", actions: [A.validity, A.freeze] },
         ],
       },
-      { label: "Révision", groups: [{ label: "Vérification", actions: [A.calcSpell, A.comment] }] },
+      { label: "Révision", groups: [{ label: "Vérification", actions: [A.calcSpell, A.comment] }, { label: "Suivi", actions: [A.calcTrack, A.calcManageChanges] }, { label: "Protection", actions: [A.sheetProtect] }] },
       { label: "Affichage", groups: [{ label: "Zoom", actions: [A.zoomOut, A.zoomIn] }, { label: "Fenêtre", actions: [A.freeze] }] },
     ];
   }
@@ -317,6 +481,7 @@ export function ribbonFor(type: DocType): RibbonTab[] {
       groups: [
         { label: "Diapositives", actions: [A.newSlide, A.dupSlide] },
         { label: "Objets", actions: [A.textBox, A.image, A.table, A.chart] },
+        { label: "Formes", actions: [A.shapeRect, A.shapeEllipse, A.shapeArrow, A.shapeLine] },
         { label: "Autres", actions: [A.hyperlink, A.headerFooter, A.comment] },
       ],
     },
@@ -328,6 +493,7 @@ export function ribbonFor(type: DocType): RibbonTab[] {
       ],
     },
     { label: "Format", groups: [{ label: "Texte", actions: [A.fontDialog, A.paragraphDialog, A.outlineBullets] }, { label: "Objet", actions: [A.transform] }] },
+    { label: "Diaporama", groups: [{ label: "Présenter", actions: [A.slideShow, A.slideShowHere] }] },
     { label: "Affichage", groups: [{ label: "Zoom", actions: [A.zoomOut, A.zoomIn, A.fitWidth] }] },
   ];
 }

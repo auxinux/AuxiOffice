@@ -139,6 +139,7 @@ function HomeBar({ type, doc, states, command, run }: Props) {
     <div className="toolbar" role="toolbar">
       <div className="group">
         <Btn icon="save" title="Enregistrer (Ctrl+S)" onClick={() => run({ label: "Enregistrer", app: "save" })} />
+        <Btn icon="print" title="Imprimer (Ctrl+P)" onClick={() => run({ label: "Imprimer", app: "print" })} />
         <Btn icon="pdf" title="Exporter en PDF" onClick={() => run({ label: "Exporter en PDF", app: "exportPdf" })} />
         <Btn icon="undo" title="Annuler (Ctrl+Z)" onClick={() => command(".uno:Undo")} disabled={disabled(states, ".uno:Undo")} />
         <Btn icon="redo" title="Rétablir (Ctrl+Y)" onClick={() => command(".uno:Redo")} disabled={disabled(states, ".uno:Redo")} />

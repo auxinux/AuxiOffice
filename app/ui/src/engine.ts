@@ -68,6 +68,22 @@ export const recentFiles = (add?: string) => invoke<string[]>("recent_files", { 
 
 export const startupFile = () => invoke<string | null>("startup_file");
 
+export interface Printer {
+  name: string;
+  default: boolean;
+}
+
+export interface PrintOptions {
+  printer: string;
+  copies: number;
+  sides: string;
+  monochrome: boolean;
+}
+
+export const listPrinters = () => invoke<Printer[]>("printers");
+export const printDocument = (doc: number, title: string, pages: string, options: PrintOptions) => invoke<string>("print_document", { doc, title, pages, options });
+export const printWithSystem = (doc: number, title: string, pages: string) => invoke<void>("print_with_system", { doc, title, pages });
+
 /** Prépare un moteur d'avance (ouverture plus rapide du document suivant). */
 export const warmEngine = () => invoke<void>("warm_engine");
 

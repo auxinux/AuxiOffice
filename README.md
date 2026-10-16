@@ -32,13 +32,17 @@ l'utilisateur.
   numérotation, Colonnes, Table des matières, Format de cellule, Tri, Filtre, Assistant
   fonction, Assistant diagramme, Formatage conditionnel, Propriétés de la diapositive… ;
 - **menu contextuel** (clic droit) de LibreOffice, avec les suggestions d'orthographe ;
+- **impression** (Ctrl+P) : imprimante, pages, copies, recto verso, noir et blanc (CUPS sous
+  macOS et Linux), ou aperçu dans la visionneuse du système ;
+- **diaporama** plein écran (F5), sans animations ni transitions ;
 - AuxiWriter, AuxiSheet, AuxiPresent : mise en forme courante, styles, listes, tableaux,
   images, barre de formule, en-têtes de lignes et colonnes, onglets de feuilles, miniatures
   de diapositives ;
 - documents verrouillés, verrous orphelins ; un moteur par document, et un moteur prêt
   d'avance pour accélérer l'ouverture.
 
-Pas encore fait : paquets, Windows (prévu mais non compilé), diaporama, impression.
+Pas encore fait : paquets, Windows (prévu mais non compilé ; l'impression y passe par la
+visionneuse du système), animations du diaporama.
 
 ## Développement
 

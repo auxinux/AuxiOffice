@@ -2,6 +2,19 @@
 
 ## Non publié
 
+- Impression (Ctrl+P) : imprimante, pages, copies, recto verso, noir et blanc, via CUPS
+  (macOS, Linux) ; « Aperçu du système… » ouvre le PDF dans la visionneuse du système.
+- Une centaine de fonctions de LibreOffice de plus dans les menus et le ruban, chacune
+  vérifiée sur le moteur : collage spécial, propriétés du document, langue du document ou
+  du paragraphe, suivi des modifications, Fontwork, QR code, formules, renvois, index,
+  enveloppes ; dans le tableur, table dynamique, sous-totaux, consolidation, valeur cible,
+  formatage conditionnel, zones d'impression, protection, statistiques, audit ; dans les
+  présentations, mises en page, formes, champs, masquer ou renommer une diapositive.
+- Diaporama plein écran (F5, Maj+F5 depuis la diapositive courante ; flèches, espace,
+  clic, Échap). Les animations et transitions ne sont pas jouées.
+- Un profil LibreOffice par moteur (le moteur prêt d'avance n'en partage plus) ; le dossier
+  `crash` laissé par un plantage, qui bloquait ensuite l'export PDF, est supprimé au
+  démarrage ; les verrous orphelins laissés par un autre moteur d'AuxiOffice sont retirés.
 - Barre de menus native et ruban à onglets, construits depuis un catalogue de commandes
   vérifiées une à une avec LibreOffice (aucune ne fait planter le moteur).
 - Boîtes de dialogue de LibreOffice affichées et pilotées dans AuxiOffice (rendu net sur

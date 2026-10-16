@@ -194,3 +194,40 @@ button, select, input { font: inherit; color: inherit; }
 .about button { margin-top: 8px; background: var(--orange); color: #fff; border: 0; padding: 7px 18px; border-radius: 8px; cursor: pointer; }
 /* Accueil du ruban : passe sur deux lignes si la fenêtre est étroite. */
 .ribbon .toolbar:not(.ribbon-body) { flex-wrap: wrap; overflow: visible; }
+
+/* --- Impression ---------------------------------------------------------- */
+.print-dialog { background: #fff; border-radius: 10px; width: 520px; box-shadow: 0 18px 50px rgba(0,0,0,.35); }
+.print-body { padding: 16px 20px 6px; display: flex; flex-direction: column; gap: 14px; }
+.print-body label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+.print-body label.inline { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; }
+.print-body select, .print-body input[type=number], .print-body input.range { height: 30px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; font-weight: 400; background: #fff; }
+.print-body input.range { width: 140px; }
+.print-body input.range.bad { border-color: #c0392b; background: #fff3f1; }
+.print-body fieldset { border: 1px solid var(--line); border-radius: 8px; display: flex; gap: 18px; padding: 8px 12px; }
+.print-body legend { font-size: 13px; font-weight: 600; padding: 0 4px; }
+.print-row { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 12px; }
+.print-actions { display: flex; gap: 8px; padding: 12px 20px 16px; }
+.print-actions button { border-radius: 8px; padding: 7px 16px; cursor: pointer; border: 1px solid var(--line); background: #fff; }
+.print-actions button.primary { background: var(--orange); color: #fff; border-color: var(--orange); }
+.print-actions button:disabled { opacity: .5; cursor: default; }
+.muted { color: var(--muted); font-weight: 400; }
+
+/* Diaporama */
+.slideshow {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+.slideshow-end { color: #ccc; font-size: 18px; }
+.slideshow-num {
+  position: absolute;
+  right: 16px;
+  bottom: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+}

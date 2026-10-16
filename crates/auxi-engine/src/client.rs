@@ -24,6 +24,10 @@ pub struct EngineConfig {
     pub author: String,
     /// Journal où recopier la sortie d'erreur du moteur (diagnostic).
     pub log_file: Option<PathBuf>,
+    /// Dossier commun des profils de l'application : un verrou de document
+    /// posé depuis l'un d'eux est forcément orphelin (l'application n'ouvre
+    /// jamais deux fois le même fichier).
+    pub profile_root: Option<PathBuf>,
 }
 
 /// Dernières lignes écrites par le moteur sur sa sortie d'erreur.
@@ -58,6 +62,10 @@ impl Engine {
             None => cmd.env_remove("AUXI_ENGINE_PROFILE"),
         };
         cmd.env("AUXI_ENGINE_AUTHOR", &cfg.author);
+        match &cfg.profile_root {
+            Some(r) => cmd.env("AUXI_ENGINE_PROFILE_ROOT", r),
+            None => cmd.env_remove("AUXI_ENGINE_PROFILE_ROOT"),
+        };
         // Aucun accès réseau ni dialogue système depuis le moteur.
         // Langues pour lesquelles LibreOffice active correcteur et césure.
         cmd.env("LOK_ALLOWLIST_LANGUAGES", "fr-FR fr-CA en-US en-GB es-ES de-DE");

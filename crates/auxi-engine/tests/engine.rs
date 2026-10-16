@@ -33,6 +33,7 @@ fn setup(name: &str) -> Option<(Ctx, PathBuf)> {
             lang: "fr-FR".into(),
             author: "Test AuxiOffice".into(),
             log_file: None,
+            profile_root: None,
         },
         Box::new(move |e| ev.lock().unwrap().push(e)),
     )
@@ -253,6 +254,34 @@ fn foreign_lock_is_reported_then_ignored_on_request() {
 }
 
 #[test]
+fn stale_lock_from_a_sibling_profile_is_removed() {
+    let Some(program) = std::env::var_os("AUXI_LO_PROGRAM").map(PathBuf::from) else { return };
+    let fixtures = PathBuf::from(std::env::var_os("AUXI_FIXTURES").unwrap());
+    let root = std::env::temp_dir().join(format!("auxi-engine-test-root-{}", std::process::id()));
+    let sibling = root.join("profil-7");
+    std::fs::create_dir_all(&sibling).unwrap();
+    let doc = root.join("doc.docx");
+    std::fs::copy(fixtures.join("simple.docx"), &doc).unwrap();
+    let sibling_url = url::Url::from_directory_path(sibling.canonicalize().unwrap()).unwrap();
+    std::fs::write(root.join(".~lock.doc.docx#"), format!(",moi,ici,16.10.2026 09:00,{sibling_url};")).unwrap();
+    let engine = Engine::spawn(
+        &EngineConfig {
+            engine_exe: PathBuf::from(env!("CARGO_BIN_EXE_auxi-engine")),
+            program_dir: program,
+            profile_dir: Some(root.join("profil-0")),
+            lang: "fr-FR".into(),
+            author: String::new(),
+            log_file: None,
+            profile_root: Some(root.clone()),
+        },
+        Box::new(|_| {}),
+    )
+    .unwrap();
+    let info = engine.call(json!({"cmd": "load", "path": doc})).unwrap();
+    assert_eq!(info["read_only"], false, "{info}");
+}
+
+#[test]
 fn bad_requests_are_rejected() {
     let Some((ctx, fx)) = setup("errors") else { return };
     assert!(ctx.engine.call(json!({"cmd": "paint", "px_w": 10, "px_h": 10})).is_err());
@@ -320,4 +349,70 @@ fn context_menu_is_described_by_libreoffice() {
         .and_then(|e| serde_json::from_str::<Value>(e["payload"].as_str().unwrap()).ok())
         .expect("menu contextuel");
     assert!(menu["menu"].as_array().is_some_and(|m| m.len() > 3));
+}
+
+#[test]
+fn export_still_works_after_a_previous_engine_crash() {
+    // Un rapport de plantage dans le profil bloquait toute exportation suivante.
+    let Some(program) = std::env::var_os("AUXI_LO_PROGRAM").map(PathBuf::from) else { return };
+    let fixtures = PathBuf::from(std::env::var_os("AUXI_FIXTURES").unwrap());
+    let tmp = std::env::temp_dir().join(format!("auxi-engine-test-crash-{}", std::process::id()));
+    let crash = tmp.join("profil").join("crash");
+    std::fs::create_dir_all(&crash).unwrap();
+    std::fs::write(crash.join("dump.ini"), "[Version]\nProductName=LibreOffice\n").unwrap();
+    std::fs::write(crash.join("rapport.dmp"), [0u8; 64]).unwrap();
+    let engine = Engine::spawn(
+        &EngineConfig {
+            engine_exe: PathBuf::from(env!("CARGO_BIN_EXE_auxi-engine")),
+            program_dir: program,
+            profile_dir: Some(tmp.join("profil")),
+            lang: "fr-FR".into(),
+            author: String::new(),
+            log_file: None,
+            profile_root: None,
+        },
+        Box::new(|_| {}),
+    )
+    .unwrap();
+    let doc = tmp.join("rapport.docx");
+    std::fs::copy(fixtures.join("rapport.docx"), &doc).unwrap();
+    engine.call(json!({"cmd": "load", "path": doc})).unwrap();
+    let pdf = tmp.join("rapport.pdf");
+    engine
+        .request(json!({"cmd": "save", "path": pdf, "format": "pdf"}), &[], Duration::from_secs(30))
+        .expect("export bloqué après un plantage précédent");
+    assert!(std::fs::read(&pdf).unwrap().starts_with(b"%PDF-"));
+    assert!(!crash.join("rapport.dmp").exists(), "rapport de plantage non retiré");
+}
+
+#[test]
+fn pdf_export_honours_page_range() {
+    let Some((ctx, fx)) = setup("range") else { return };
+    ctx.call(json!({"cmd": "load", "path": fx.join("rapport.docx")}));
+    // Objets « /Type /Page » (et non « /Pages »), espaces facultatifs.
+    let count = |p: &PathBuf| {
+        let d = std::fs::read(p).unwrap();
+        let mut n = 0;
+        for i in 0..d.len().saturating_sub(5) {
+            if &d[i..i + 5] == b"/Type" {
+                let mut j = i + 5;
+                while j < d.len() && d[j].is_ascii_whitespace() {
+                    j += 1;
+                }
+                if d[j..].starts_with(b"/Page") && d.get(j + 5) != Some(&b's') {
+                    n += 1;
+                }
+            }
+        }
+        n
+    };
+    let all = ctx.tmp.join("tout.pdf");
+    ctx.call(json!({"cmd": "save", "path": all, "format": "pdf"}));
+    let part = ctx.tmp.join("plage.pdf");
+    let opts = json!({"PageRange": {"type": "string", "value": "2-3"}}).to_string();
+    ctx.call(json!({"cmd": "save", "path": part, "format": "pdf", "filter": opts}));
+    let (n_all, n_part) = (count(&all), count(&part));
+    eprintln!("pages : tout {n_all}, plage 2-3 : {n_part}");
+    assert!(n_all > 5);
+    assert!(n_part < n_all && n_part >= 2, "plage non appliquée ({n_part} sur {n_all})");
 }

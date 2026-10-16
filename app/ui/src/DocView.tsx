@@ -11,6 +11,7 @@ import type { Action, AppAction } from "./actions";
 import { ContextMenu, type LoMenuItem } from "./ContextMenu";
 import { DialogLayer, type DialogLayerHandle } from "./DialogLayer";
 import { Icon } from "./icons";
+import { SlideShow } from "./SlideShow";
 import { Toolbar } from "./Toolbar";
 
 const IS_MAC = navigator.platform.toLowerCase().includes("mac");
@@ -50,6 +51,7 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
   const [zoom, setZoom] = useState(1);
   const [part, setPart] = useState(info.part);
   const [partNames, setPartNames] = useState(info.part_names);
+  const [show, setShow] = useState<number | null>(null);
   const [cellAddress, setCellAddress] = useState("");
   const [formula, setFormula] = useState("");
   const [headers, setHeaders] = useState<Headers>({ cols: [], rows: [] });
@@ -311,6 +313,11 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (composing.current || e.nativeEvent.isComposing) return;
     const primary = IS_MAC ? e.metaKey : e.ctrlKey;
+    if (isSlides && e.key === "F5" && !primary && !e.altKey) {
+      e.preventDefault();
+      startShow(e.shiftKey ? part : 0);
+      return;
+    }
     // Raccourcis gérés par l'application ou le presse-papiers natif.
     if (primary && !e.altKey) {
       const k = e.key.toLowerCase();
@@ -320,6 +327,11 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
         return;
       }
       if (k === "c" || k === "x" || k === "v") return; // événements copy/cut/paste
+      if (k === "p") {
+        e.preventDefault();
+        onAppAction("print");
+        return;
+      }
       if (k === "+" || k === "=") {
         e.preventDefault();
         applyZoom(zoom * 1.1);
@@ -418,6 +430,23 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
     if (typeof path === "string") command(".uno:InsertGraphic", { FileName: { type: "string", value: toFileUrl(path) } });
   }, [command]);
 
+  // Diaporama : la vérification orthographique en direct est suspendue pour
+  // ne pas montrer ses soulignements à l'écran.
+  const spellWasOn = useRef(false);
+  const startShow = useCallback(
+    (from: number) => {
+      spellWasOn.current = states[".uno:SpellOnline"] === "true";
+      if (spellWasOn.current) void uno(doc, ".uno:SpellOnline");
+      setShow(from);
+    },
+    [doc, states],
+  );
+  const endShow = useCallback(() => {
+    if (spellWasOn.current) void uno(doc, ".uno:SpellOnline");
+    spellWasOn.current = false;
+    setShow(null);
+  }, [doc]);
+
   const runAction = useCallback(
     (a: Action) => {
       if (a.uno) {
@@ -444,11 +473,15 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
         case "selectAll":
           command(".uno:SelectAll");
           break;
+        case "slideShow":
+        case "slideShowHere":
+          if (isSlides) startShow(a.app === "slideShow" ? 0 : part);
+          break;
         default:
           if (a.app) onAppAction(a.app);
       }
     },
-    [command, applyZoom, fitWidth, insertImage, onAppAction],
+    [command, applyZoom, fitWidth, insertImage, onAppAction, isSlides, part, startShow],
   );
 
   useEffect(() => {
@@ -466,6 +499,19 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
   return (
     <div className={`docview type-${info.type}`} style={{ display: active ? "flex" : "none" }}>
       <Toolbar type={info.type} doc={doc} states={states} command={command} run={runAction} />
+      {show !== null && (
+        <SlideShow
+          doc={doc}
+          count={partNames.length}
+          start={show}
+          width={info.width}
+          height={info.height}
+          onClose={() => {
+            endShow();
+            focusInput();
+          }}
+        />
+      )}
       {info.read_only && (
         <div className="banner">
           Lecture seule{info.locked_by ? ` — document ouvert par ${info.locked_by.user || "un autre utilisateur"}${info.locked_by.host ? ` (${info.locked_by.host})` : ""}` : ""}.
