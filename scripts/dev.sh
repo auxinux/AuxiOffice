@@ -25,7 +25,14 @@ fi
 # Moteur absent ou d'une autre version que celle épinglée : (re)télécharger.
 wanted=$(python3 -c "import json;print(json.load(open('engine/libreoffice.lock.json'))['version'])")
 installed=$(cat ".engine/$PLATFORM/version" 2>/dev/null || true)
-if [ ! -f ".engine/$PLATFORM/program-dir" ] || [ "$installed" != "$wanted" ]; then
+if [ "$PLATFORM" = macos-aarch64 ]; then
+  # Mac : le LibreOffice officiel ne sait pas dessiner les pages pour un
+  # autre programme ; le moteur est compilé une fois (1 à 3 heures).
+  if [ "$installed" != "$wanted" ] || [ "$(cat .engine/$PLATFORM/variant 2>/dev/null)" != headless ]; then
+    echo "== Moteur LibreOffice $wanted pour Mac : compilation (une seule fois, 1 à 3 heures)"
+    scripts/build-engine-macos.sh
+  fi
+elif [ ! -f ".engine/$PLATFORM/program-dir" ] || [ "$installed" != "$wanted" ]; then
   echo "== Moteur LibreOffice $wanted"
   scripts/fetch-engine.sh
 fi

@@ -5,8 +5,11 @@
 - Moteur LibreOffice 26.8.1 (le rendu par tuiles sous macOS n'existe qu'à partir de 26.8) ;
   liaison `lok-sys` réalignée sur les tables de fonctions de 26.8 et contrôle de leur taille
   au démarrage.
-- macOS : LibreOffice tourne sur le fil principal du moteur (mode « unipoll », requêtes
-  confiées par Grand Central Dispatch), moteur retiré du Dock.
+- macOS : le LibreOffice officiel ne peut pas dessiner les pages pour un autre programme
+  (pas de module svp) ; `scripts/build-engine-macos.sh` compile le moteur avec
+  `--enable-headless`, qui fonctionne alors comme sous Linux. Le moteur ne reçoit plus
+  d'arguments (LibreOffice lit ceux du processus sous macOS).
+- Diagnostic : `scripts/diagnose.sh`, erreurs de démarrage du moteur détaillées, journal.
 - « Enregistrer » ne bloque plus le moteur : réponse différée à la fin de `.uno:Save`.
 - `fetch-engine.sh` : reprise des téléchargements coupés, modules de langue facultatifs,
   réinstallation propre ; `dev.sh` retélécharge le moteur quand la version épinglée change.

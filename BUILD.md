@@ -17,13 +17,17 @@ rapides.
 
 1. Outils Apple : `xcode-select --install` ou, avec Xcode déjà installé ailleurs,
    `sudo xcode-select -s /chemin/vers/Xcode.app`.
-2. Rust : `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`.
-3. Node.js 22 ou plus récent (nodejs.org ou `brew install node`).
-4. `scripts/dev.sh`.
+2. Homebrew (https://brew.sh) ; le script installe lui-même autoconf, automake, libtool,
+   pkg-config, GNU make, bison, flex, gperf et nasm.
+3. Rust : `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`.
+4. Node.js 22 ou plus récent (nodejs.org ou `brew install node`).
+5. `scripts/dev.sh`.
 
-Le moteur est la `LibreOffice.app` officielle, copiée depuis son image disque dans
-`.engine/macos-aarch64/` (aucune installation dans `/Applications`). La version Mac n'a pas
-encore été essayée : si le moteur refuse de démarrer, le terminal affiche la cause.
+Le LibreOffice officiel pour Mac ne peut pas servir de moteur (il ne sait pas dessiner les
+pages pour un autre programme, voir ARCHITECTURE.md). Au premier lancement, `dev.sh` appelle
+donc `scripts/build-engine-macos.sh`, qui compile LibreOffice 26.8.1 depuis ses sources
+officielles avec `--enable-headless` : **1 à 3 heures et ~40 Go d'espace disque, une seule
+fois** (une relance reprend la compilation). Le résultat est dans `.engine/macos-aarch64/`.
 
 ## Prérequis
 
@@ -39,7 +43,8 @@ Windows : WebView2 (fourni avec Windows 10/11). macOS : Xcode (outils en ligne d
 ## Moteur LibreOffice
 
 ```sh
-scripts/fetch-engine.sh      # Linux x86_64 ou macOS arm64 → .engine/<plateforme>/
+scripts/fetch-engine.sh      # Linux x86_64 → .engine/linux-x86_64/
+scripts/build-engine-macos.sh  # Mac Apple Silicon → .engine/macos-aarch64/ (compilation)
 ```
 
 Le script télécharge les fichiers listés dans `engine/libreoffice.lock.json`, vérifie leur

@@ -463,9 +463,6 @@ fn main() {
         }
     };
     let out: Out = Arc::new(Mutex::new(BufWriter::new(protocol_output())));
-    // macOS : LibreOffice doit tourner sur le fil principal (voir `run`).
-    #[cfg(target_os = "macos")]
-    std::env::set_var("SAL_LOK_OPTIONS", "unipoll");
 
     let profile_url = args.profile.as_ref().map(|p| {
         let _ = std::fs::create_dir_all(p);
@@ -525,10 +522,16 @@ fn main() {
     run(engine, out, ready);
 }
 
-/// Linux, Windows : LibreOffice fait tourner sa boucle d'événements dans son
-/// propre fil ; ce fil-ci lit les requêtes et appelle LibreOfficeKit.
-#[cfg(not(target_os = "macos"))]
-fn run(mut engine: Engine, out: Out, ready: Value) -> ! {
+/// LibreOffice fait tourner sa boucle d'événements dans son propre fil
+/// (module d'affichage « svp », sans écran, sur toutes les plateformes —
+/// sous macOS, LibreOffice est compilé avec --enable-headless, voir
+/// scripts/build-engine-macos.sh) ; ce fil-ci lit les requêtes et appelle
+/// LibreOfficeKit.
+fn run(engine: Engine, out: Out, ready: Value) -> ! {
+    run_threaded(engine, out, ready)
+}
+
+fn run_threaded(mut engine: Engine, out: Out, ready: Value) -> ! {
     send(&out, &ready, &[]);
     let mut input = BufReader::new(std::io::stdin().lock());
     loop {
@@ -546,122 +549,6 @@ fn run(mut engine: Engine, out: Out, ready: Value) -> ! {
         }
     }
     engine.shutdown()
-}
-
-/// macOS : LibreOffice utilise AppKit, qui n'accepte que le fil principal.
-/// Le moteur démarre donc en mode « unipoll » (pas de fil LibreOffice
-/// séparé) : le fil principal exécute la boucle d'événements de LibreOffice
-/// (runLoop), et chaque requête lue par un fil secondaire y est confiée via
-/// la file principale de Grand Central Dispatch, servie par cette boucle.
-#[cfg(target_os = "macos")]
-fn run(engine: Engine, out: Out, ready: Value) -> ! {
-    use std::cell::RefCell;
-    thread_local! {
-        static ENGINE: RefCell<Option<Engine>> = const { RefCell::new(None) };
-    }
-    let kit = engine.office.raw();
-    ENGINE.with(|e| *e.borrow_mut() = Some(engine));
-
-    // « Prêt » une fois la boucle de LibreOffice réellement en marche ; on en
-    // profite pour retirer le moteur du Dock.
-    let ready_out = out.clone();
-    mac::on_main(Box::new(move || {
-        mac::hide_from_dock();
-        eprintln!("auxi-engine : prêt");
-        send(&ready_out, &ready, &[]);
-    }));
-
-    std::thread::Builder::new()
-        .name("auxi-engine-stdin".into())
-        .spawn(move || {
-            let mut input = BufReader::new(std::io::stdin().lock());
-            while let Ok(Some(frame)) = read_frame(&mut input) {
-                mac::on_main(Box::new(move || {
-                    let quit = ENGINE.with(|e| e.borrow_mut().as_mut().map(|eng| eng.process(frame)).unwrap_or(true));
-                    if quit {
-                        if let Some(eng) = ENGINE.with(|e| e.borrow_mut().take()) {
-                            eng.shutdown();
-                        }
-                        std::process::exit(0);
-                    }
-                }));
-            }
-            mac::on_main(Box::new(|| {
-                if let Some(eng) = ENGINE.with(|e| e.borrow_mut().take()) {
-                    eng.shutdown();
-                }
-                std::process::exit(0);
-            }));
-        })
-        .expect("fil de lecture");
-
-    unsafe extern "C" fn poll(_data: *mut std::ffi::c_void, _timeout_us: std::ffi::c_int) -> std::ffi::c_int {
-        0
-    }
-    unsafe extern "C" fn wake(_data: *mut std::ffi::c_void) {}
-    eprintln!("auxi-engine : boucle de LibreOffice sur le fil principal (unipoll)");
-    unsafe {
-        match (*(*kit).pClass).runLoop {
-            Some(run_loop) => run_loop(kit, poll, wake, std::ptr::null_mut()),
-            None => {
-                send(&out, &json!({"event": "fatal", "error": "runLoop absent de LibreOfficeKit"}), &[]);
-            }
-        }
-    }
-    eprintln!("auxi-engine : la boucle de LibreOffice s'est terminée");
-    std::process::exit(0);
-}
-
-#[cfg(target_os = "macos")]
-mod mac {
-    use std::ffi::{c_char, c_void};
-
-    #[repr(C)]
-    pub struct DispatchQueue {
-        _private: [u8; 0],
-    }
-
-    extern "C" {
-        static _dispatch_main_q: DispatchQueue;
-        fn dispatch_async_f(queue: *const DispatchQueue, context: *mut c_void, work: extern "C" fn(*mut c_void));
-    }
-
-    #[link(name = "objc")]
-    extern "C" {
-        fn objc_getClass(name: *const c_char) -> *mut c_void;
-        fn sel_registerName(name: *const c_char) -> *mut c_void;
-        fn objc_msgSend();
-    }
-
-    type Job = Box<dyn FnOnce() + Send>;
-
-    extern "C" fn trampoline(ctx: *mut c_void) {
-        let job = unsafe { Box::from_raw(ctx as *mut Job) };
-        job();
-    }
-
-    /// Exécute `job` sur le fil principal, depuis la boucle d'événements.
-    pub fn on_main(job: Job) {
-        let ctx = Box::into_raw(Box::new(job)) as *mut c_void;
-        unsafe { dispatch_async_f(&_dispatch_main_q, ctx, trampoline) }
-    }
-
-    /// Le moteur n'a pas de fenêtre : pas d'icône dans le Dock ni de menu
-    /// (NSApplicationActivationPolicyProhibited).
-    pub fn hide_from_dock() {
-        unsafe {
-            let class = objc_getClass(c"NSApplication".as_ptr());
-            if class.is_null() {
-                return;
-            }
-            let send0: extern "C" fn(*mut c_void, *mut c_void) -> *mut c_void = std::mem::transmute(objc_msgSend as *const ());
-            let send1: extern "C" fn(*mut c_void, *mut c_void, isize) -> i8 = std::mem::transmute(objc_msgSend as *const ());
-            let app = send0(class, sel_registerName(c"sharedApplication".as_ptr()));
-            if !app.is_null() {
-                send1(app, sel_registerName(c"setActivationPolicy:".as_ptr()), 2);
-            }
-        }
-    }
 }
 
 fn office_ptr(o: &Office) -> usize {

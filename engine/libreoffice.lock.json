@@ -40,5 +40,16 @@
       "sha256": "66deb03547ef4c93939819f3b1149d7b6338ecdda2395c63e527ca36428fd4b8",
       "optional": true
     }
-  ]
+  ],
+  "source-extra": [
+    {
+      "url": "https://download.documentfoundation.org/libreoffice/src/26.8.1/libreoffice-dictionaries-26.8.1.1.tar.xz",
+      "sha256": "ce366c50178f5bdf6df1c6df4a0146899cf27a0017734190d00d90f0c5acac61"
+    },
+    {
+      "url": "https://download.documentfoundation.org/libreoffice/src/26.8.1/libreoffice-translations-26.8.1.1.tar.xz",
+      "sha256": "789519befa409d7eec24043cea41ddd318d9f1212f555d8b28d4982e35693bfc"
+    }
+  ],
+  "macos-aarch64-note": "Le LibreOffice officiel pour Mac ne peut pas servir de moteur : il n'a pas le module svp, seul à savoir dessiner dans un tampon (SetSizeUsingBuffer). Sous macOS, le moteur est compilé depuis « source » avec --enable-headless par scripts/build-engine-macos.sh ; les DMG ci-dessous ne sont plus utilisés."
 }

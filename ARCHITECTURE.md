@@ -80,22 +80,21 @@ Les rappels de LibreOffice (`invalidate_tiles`, `invalidate_visible_cursor`,
 - Le rendu par tuiles n'existe sous macOS qu'à partir de LibreOffice 26.8 (`doc_paintTile`
   l'excluait auparavant).
 
-## macOS : LibreOffice sur le fil principal
+## macOS : moteur compilé avec le module « svp »
 
-Sous macOS, LibreOffice n'a pas de mode sans affichage (`svp`) : il utilise son module AppKit,
-qui n'accepte que le fil principal. Le moteur y fonctionne donc en mode « unipoll »
-(`SAL_LOK_OPTIONS=unipoll`) :
+Le LibreOffice officiel pour Mac **ne peut pas** servir de moteur : il n'inclut que le module
+d'affichage AppKit, et seul le module sans écran « svp » sait dessiner les pages dans un tampon
+mémoire (`SalVirtualDevice::SetSizeUsingBuffer` : « Only the headless/svp virtual device has an
+implementation »). Essais écartés, pour mémoire :
 
-1. LibreOffice est initialisé sur le fil principal, qui exécute ensuite sa boucle d'événements
-   (`runLoop`) ;
-2. un fil secondaire lit les requêtes et les confie au fil principal par la file principale de
-   Grand Central Dispatch, que la boucle d'AppKit sert entre deux événements ;
-3. aucune requête ne bloque le fil principal : « Enregistrer » répond de façon différée, quand
-   LibreOffice signale la fin de `.uno:Save` ;
-4. le moteur se retire du Dock (`NSApplicationActivationPolicyProhibited`) ;
-5. le moteur ne reçoit **aucun argument** (configuration par variables `AUXI_ENGINE_*`) :
-   sous macOS, LibreOffice lit les arguments du processus hôte, prend ceux qu'il ne connaît
-   pas pour une erreur, affiche son aide et arrête sa boucle aussitôt.
+- mode threadé : AppKit refuse de tourner hors du fil principal (exception au démarrage) ;
+- mode « unipoll » : `runLoop` ressort aussitôt (`ImplSVMain` s'arrête si VCL est déjà
+  initialisé), `Desktop::Main` ne tourne jamais et `loadComponentFromURL` plante
+  (`SfxApplication::GetFilterMatcher`) — reproduit sous Linux ;
+- dans tous les cas, le rendu resterait vide faute de `SetSizeUsingBuffer`.
 
-Sous Linux et Windows, LibreOffice fait tourner sa boucle dans son propre fil et le moteur
-appelle LibreOfficeKit depuis le fil qui lit les requêtes.
+Sous macOS, `scripts/build-engine-macos.sh` compile donc LibreOffice (sources officielles
+épinglées, **non modifiées**) avec `--enable-headless` ; le moteur fonctionne alors exactement
+comme sous Linux (fil LibreOffice séparé, module svp). Le moteur ne reçoit aucun argument
+(configuration par variables `AUXI_ENGINE_*`) : sous macOS, LibreOffice lit les arguments du
+processus hôte.

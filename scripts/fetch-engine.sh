@@ -18,6 +18,11 @@ case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) PLATFORM=macos-aarch64 ;;
   *) echo "Plateforme non prise en charge : $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
+if [ "$PLATFORM" = macos-aarch64 ]; then
+  echo "Sous macOS, le LibreOffice officiel ne convient pas comme moteur (pas de module svp)." >&2
+  echo "Compilez-le une fois avec : scripts/build-engine-macos.sh" >&2
+  exit 1
+fi
 OUT="$ROOT/.engine/$PLATFORM"
 # Repartir d'un dossier vide : une ancienne version ne doit pas rester à côté
 # (les téléchargements, eux, restent dans le cache).

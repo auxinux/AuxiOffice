@@ -12,7 +12,9 @@ case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) PLATFORM=macos-aarch64 ;;
   *) echo "Plateforme non prise en charge" >&2; exit 1 ;;
 esac
-[ -f ".engine/$PLATFORM/program-dir" ] || scripts/fetch-engine.sh || exit 1
+if [ ! -f ".engine/$PLATFORM/program-dir" ]; then
+  if [ "$PLATFORM" = macos-aarch64 ]; then scripts/build-engine-macos.sh || exit 1; else scripts/fetch-engine.sh || exit 1; fi
+fi
 doc=${1:-$ROOT/app/src-tauri/templates/vierge.docx}
 cargo build -q -p auxi-engine --bins --example probe || exit 1
 mkdir -p target
