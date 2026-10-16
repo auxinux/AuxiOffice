@@ -86,36 +86,42 @@ fi
 [ -f "$SRC/autogen.sh" ] || die "sources incomplètes dans $SRC"
 
 cd "$SRC"
-# Le module svp a besoin de fontconfig, freetype et cairo : macOS ne les
-# fournit pas, on fait compiler les versions internes de LibreOffice.
-if [ ! -f config.status ] || ! grep -q -- '--without-system-fontconfig' config.status 2>/dev/null; then
+# Options de compilation. Le module svp a besoin de fontconfig, freetype et
+# cairo : macOS ne les fournit pas, on fait compiler les versions internes.
+# Ne pas désactiver Skia : le code macOS de LibreOffice l'exige
+# (vcl/osx/salframeview.mm, « macos requires skia »).
+OPTIONS=(
+  --enable-headless
+  --without-system-fontconfig
+  --without-system-freetype
+  --with-lang="fr en-US"
+  --with-myspell-dicts
+  --with-parallelism="$(sysctl -n hw.ncpu)"
+  --with-external-tar="$BUILD/external"
+  --without-java
+  --without-help
+  --without-doxygen
+  --enable-python=no
+  --disable-cups
+  --disable-dbus
+  --disable-gstreamer-1-0
+  --disable-sdremote
+  --disable-online-update
+  --disable-extension-update
+  --disable-report-builder
+  --disable-lpsolve
+  --disable-coinmp
+  --disable-firebird-sdbc
+  --disable-mariadb-sdbc
+  --disable-postgresql-sdbc
+  --disable-ccache
+)
+# Reconfigurer si les options ont changé depuis la dernière fois.
+printf '%s\n' "${OPTIONS[@]}" > "$BUILD/options.new"
+if [ ! -f config.status ] || ! cmp -s "$BUILD/options.new" "$BUILD/options.done"; then
   say "Configuration (module svp, sans interface graphique de LibreOffice)"
-  ./autogen.sh \
-    --enable-headless \
-    --without-system-fontconfig \
-    --without-system-freetype \
-    --with-lang="fr en-US" \
-    --with-myspell-dicts \
-    --with-parallelism="$(sysctl -n hw.ncpu)" \
-    --with-external-tar="$BUILD/external" \
-    --without-java \
-    --without-help \
-    --without-doxygen \
-    --enable-python=no \
-    --disable-skia \
-    --disable-cups \
-    --disable-dbus \
-    --disable-gstreamer-1-0 \
-    --disable-sdremote \
-    --disable-online-update \
-    --disable-extension-update \
-    --disable-report-builder \
-    --disable-lpsolve \
-    --disable-coinmp \
-    --disable-firebird-sdbc \
-    --disable-mariadb-sdbc \
-    --disable-postgresql-sdbc \
-    --disable-ccache
+  ./autogen.sh "${OPTIONS[@]}"
+  mv "$BUILD/options.new" "$BUILD/options.done"
 fi
 
 say "Compilation (longue : 1 à 3 heures la première fois)"
