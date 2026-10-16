@@ -124,8 +124,32 @@ if [ ! -f config.status ] || ! cmp -s "$BUILD/options.new" "$BUILD/options.done"
   mv "$BUILD/options.new" "$BUILD/options.done"
 fi
 
-say "Compilation (longue : 1 à 3 heures la première fois)"
-make
+say "Compilation (longue : 1 à 3 heures la première fois) — journal : $BUILD/make.log"
+# make écrit dans un journal et non dans le terminal : sous macOS, un outil de la
+# compilation laisse parfois le terminal en mode non bloquant et make échoue alors
+# sur « write error: stdout » alors que la compilation a réussi.
+unblock_tty() { python3 -c 'import fcntl,os
+for fd in (0,1,2):
+    try: fcntl.fcntl(fd,fcntl.F_SETFL,fcntl.fcntl(fd,fcntl.F_GETFL)&~os.O_NONBLOCK)
+    except OSError: pass' 2>/dev/null || true; }
+unblock_tty
+LOG="$BUILD/make.log"
+: > "$LOG"
+( tail -n 0 -f "$LOG" 2>/dev/null || true ) &
+TAILPID=$!
+set +e
+make </dev/null >>"$LOG" 2>&1
+status=$?
+set -e
+sleep 1
+kill "$TAILPID" 2>/dev/null || true
+wait "$TAILPID" 2>/dev/null || true
+unblock_tty
+if [ "$status" -ne 0 ]; then
+  echo "--- fin du journal ($LOG) ---"
+  tail -n 60 "$LOG"
+  die "la compilation de LibreOffice a échoué (code $status)"
+fi
 
 say "Installation du moteur dans .engine/macos-aarch64"
 app=$(ls -d "$SRC"/instdir/*.app 2>/dev/null | head -n1)
