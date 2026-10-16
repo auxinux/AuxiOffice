@@ -2,13 +2,16 @@
 //
 // Transcription en Rust des en-têtes C de LibreOfficeKit
 // (include/LibreOfficeKit/LibreOfficeKit.h, LibreOfficeKitEnums.h,
-// LibreOfficeKitInit.h de LibreOffice 26.2), sous Mozilla Public License 2.0.
+// LibreOfficeKitInit.h de LibreOffice 26.8), sous Mozilla Public License 2.0.
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //
 // L'ordre des champs des tables de fonctions DOIT suivre exactement celui des
-// en-têtes : LibreOffice lit ces structures par position. Les entrées dont
+// en-têtes : LibreOffice lit ces structures par position. Attention : la partie
+// « instable » de l'API change d'une version à l'autre (LibreOffice 26.8 a
+// retiré sendDialogEvent et setAllowChangeComments au milieu des tables) ;
+// `check_layout` refuse donc toute version dont la taille des tables diffère. Les entrées dont
 // AuxiOffice ne se sert pas sont déclarées `Slot` (même taille qu'un pointeur
 // de fonction) avec le nom d'origine en commentaire.
 
@@ -19,6 +22,9 @@ use std::path::{Path, PathBuf};
 
 pub type LibreOfficeKitCallback =
     unsafe extern "C" fn(n_type: c_int, payload: *const c_char, data: *mut c_void);
+
+pub type LibreOfficeKitPollCallback = unsafe extern "C" fn(data: *mut c_void, timeout_us: c_int) -> c_int;
+pub type LibreOfficeKitWakeCallback = unsafe extern "C" fn(data: *mut c_void);
 
 /// Entrée de table non utilisée : sert uniquement à conserver la disposition.
 pub type Slot = Option<unsafe extern "C" fn()>;
@@ -32,24 +38,22 @@ pub struct LibreOfficeKit {
 pub struct LibreOfficeKitClass {
     pub nSize: usize,
     pub destroy: Option<unsafe extern "C" fn(*mut LibreOfficeKit)>,
-    pub documentLoad:
-        Option<unsafe extern "C" fn(*mut LibreOfficeKit, *const c_char) -> *mut LibreOfficeKitDocument>,
+    pub documentLoad: Option<unsafe extern "C" fn(*mut LibreOfficeKit, *const c_char) -> *mut LibreOfficeKitDocument>,
     pub getError: Option<unsafe extern "C" fn(*mut LibreOfficeKit) -> *mut c_char>,
     pub documentLoadWithOptions: Option<
         unsafe extern "C" fn(*mut LibreOfficeKit, *const c_char, *const c_char) -> *mut LibreOfficeKitDocument,
     >,
     pub freeError: Option<unsafe extern "C" fn(*mut c_char)>,
-    pub registerCallback:
-        Option<unsafe extern "C" fn(*mut LibreOfficeKit, LibreOfficeKitCallback, *mut c_void)>,
+    pub registerCallback: Option<unsafe extern "C" fn(*mut LibreOfficeKit, LibreOfficeKitCallback, *mut c_void)>,
     pub getFilterTypes: Option<unsafe extern "C" fn(*mut LibreOfficeKit) -> *mut c_char>,
     pub setOptionalFeatures: Option<unsafe extern "C" fn(*mut LibreOfficeKit, c_ulonglong)>,
-    pub setDocumentPassword:
-        Option<unsafe extern "C" fn(*mut LibreOfficeKit, *const c_char, *const c_char)>,
+    pub setDocumentPassword: Option<unsafe extern "C" fn(*mut LibreOfficeKit, *const c_char, *const c_char)>,
     pub getVersionInfo: Option<unsafe extern "C" fn(*mut LibreOfficeKit) -> *mut c_char>,
     pub runMacro: Slot,
     pub signDocument: Slot,
-    pub runLoop: Slot,
-    pub sendDialogEvent: Slot,
+    pub runLoop: Option<
+        unsafe extern "C" fn(*mut LibreOfficeKit, LibreOfficeKitPollCallback, LibreOfficeKitWakeCallback, *mut c_void),
+    >,
     pub setOption: Option<unsafe extern "C" fn(*mut LibreOfficeKit, *const c_char, *const c_char)>,
     pub dumpState: Slot,
     pub extractRequest: Slot,
@@ -62,6 +66,7 @@ pub struct LibreOfficeKitClass {
     pub extractDocumentStructureRequest: Slot,
     pub registerAnyInputCallback: Slot,
     pub getDocsCount: Slot,
+    pub registerFileSaveDialogCallback: Slot,
 }
 
 #[repr(C)]
@@ -106,8 +111,7 @@ pub struct LibreOfficeKitDocumentClass {
     pub getViewsCount: Option<unsafe extern "C" fn(Doc) -> c_int>,
     pub renderFont: Slot,
     pub getPartHash: Option<unsafe extern "C" fn(Doc, c_int) -> *mut c_char>,
-    pub paintPartTile:
-        Option<unsafe extern "C" fn(Doc, *mut c_uchar, c_int, c_int, c_int, c_int, c_int, c_int, c_int, c_int)>,
+    pub paintPartTile: Option<unsafe extern "C" fn(Doc, *mut c_uchar, c_int, c_int, c_int, c_int, c_int, c_int, c_int, c_int)>,
     pub getViewIds: Slot,
     pub setOutlineState: Slot,
     pub paintWindow: Slot,
@@ -131,7 +135,6 @@ pub struct LibreOfficeKitDocumentClass {
     pub setClipboard: Slot,
     pub getSelectionType: Option<unsafe extern "C" fn(Doc) -> c_int>,
     pub removeTextContext: Slot,
-    pub sendDialogEvent: Slot,
     pub renderFontOrientation: Slot,
     pub paintWindowForView: Slot,
     pub completeFunction: Slot,
@@ -148,20 +151,54 @@ pub struct LibreOfficeKitDocumentClass {
     pub getA11yFocusedParagraph: Slot,
     pub getA11yCaretPosition: Slot,
     pub setViewReadOnly: Slot,
-    pub setAllowChangeComments: Slot,
     pub getPresentationInfo: Slot,
     pub createSlideRenderer: Slot,
     pub postSlideshowCleanup: Slot,
     pub renderNextSlideLayer: Slot,
     pub setViewOption: Option<unsafe extern "C" fn(Doc, *const c_char, *const c_char)>,
     pub setColorPreviewState: Slot,
-    pub setAllowManageRedlines: Slot,
 }
 
 /// Vrai si la table `class` (de taille annoncée `n_size`) contient le champ
 /// situé à `offset` — équivalent de LIBREOFFICEKIT_HAS_MEMBER.
 pub fn has_member(n_size: usize, offset: usize) -> bool {
     offset < n_size
+}
+
+/// Version de LibreOffice dont ces tables sont la transcription.
+pub const LAYOUT_VERSION: &str = "26.8";
+
+/// Vérifie que la table annoncée par LibreOffice (`nSize`) a exactement la
+/// taille transcrite ici. Une différence signifie une autre version de
+/// l'API : appeler une fonction par sa position pourrait alors en appeler une
+/// autre, d'où un refus net plutôt qu'un plantage imprévisible.
+pub fn check_layout(what: &str, announced: usize, expected: usize) -> Result<(), String> {
+    if announced == expected || std::env::var_os("AUXI_LOK_ANY_LAYOUT").is_some() {
+        Ok(())
+    } else {
+        Err(format!(
+            "LibreOfficeKit incompatible ({what} : {announced} octets annoncés, {expected} attendus pour LibreOffice {LAYOUT_VERSION})"
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    const P: usize = std::mem::size_of::<usize>();
+
+    #[test]
+    fn tables_match_libreoffice_26_8() {
+        // 27 et 79 entrées (nSize compris) dans les en-têtes de LibreOffice 26.8.
+        assert_eq!(std::mem::size_of::<LibreOfficeKitClass>(), 27 * P);
+        assert_eq!(std::mem::size_of::<LibreOfficeKitDocumentClass>(), 79 * P);
+    }
+
+    #[test]
+    fn layout_check() {
+        assert!(check_layout("x", 8, 8).is_ok());
+        assert!(check_layout("x", 16, 8).is_err());
+    }
 }
 
 // --- LibreOfficeKitEnums.h -------------------------------------------------

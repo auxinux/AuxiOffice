@@ -5,7 +5,7 @@
 //!                [--profile <dossier>] [--lang fr-FR] [--author <nom>]`
 
 use auxi_engine::lok::{Document, Office};
-use auxi_engine::protocol::{callback_name, read_frame, write_frame};
+use auxi_engine::protocol::{callback_name, read_frame, write_frame, Frame};
 use lok_sys as sys;
 use serde_json::{json, Value};
 use std::fs::File;
@@ -189,28 +189,20 @@ struct Engine {
     out: Out,
     args: Args,
     password: Arc<Mutex<Option<String>>>,
-    /// Résultats des commandes UNO lancées avec notification, pour les
-    /// requêtes qui doivent attendre leur fin (enregistrement).
-    uno_results: Arc<(Mutex<Vec<Value>>, std::sync::Condvar)>,
+    /// Réponses différées : requêtes qui attendent le résultat d'une commande
+    /// UNO (enregistrement). Le rappel de LibreOffice envoie la réponse ; on ne
+    /// bloque donc jamais le fil qui fait tourner LibreOffice (indispensable
+    /// sous macOS, où il s'agit du fil principal).
+    deferred: Arc<Mutex<Vec<(Value, String)>>>,
+    /// Identifiant de la requête en cours de traitement.
+    current_id: Value,
     profile_url: Option<String>,
 }
 
-impl Engine {
-    fn wait_uno_result(&self, command: &str, timeout: std::time::Duration) -> Result<Value, String> {
-        let (lock, cv) = &*self.uno_results;
-        let deadline = std::time::Instant::now() + timeout;
-        let mut results = lock.lock().unwrap();
-        loop {
-            if let Some(i) = results.iter().position(|r| r["commandName"] == command) {
-                return Ok(results.remove(i));
-            }
-            let now = std::time::Instant::now();
-            if now >= deadline {
-                return Err(format!("{command} : pas de réponse de LibreOffice"));
-            }
-            results = cv.wait_timeout(results, deadline - now).unwrap().0;
-        }
-    }
+/// Réponse d'une requête : immédiate, ou envoyée plus tard par un rappel.
+enum Reply {
+    Now(Value, Vec<u8>),
+    Deferred,
 }
 
 impl Engine {
@@ -218,10 +210,10 @@ impl Engine {
         self.doc.as_ref().ok_or_else(|| "aucun document chargé".to_string())
     }
 
-    fn handle(&mut self, req: &Value, bin: Vec<u8>) -> Result<(Value, Vec<u8>), String> {
+    fn handle(&mut self, req: &Value, bin: Vec<u8>) -> Result<Reply, String> {
         let cmd = string(req, "cmd").ok_or("champ cmd manquant")?;
         let none = Vec::new();
-        Ok(match cmd {
+        let (v, b) = match cmd {
             "hello" => (
                 json!({
                     "engine": env!("CARGO_PKG_VERSION"),
@@ -251,13 +243,22 @@ impl Engine {
                 let opts = format!("Language={}", self.args.lang);
                 let mut doc = self.office.load(&url, &opts)?;
                 let out = self.out.clone();
-                let results = self.uno_results.clone();
+                let deferred = self.deferred.clone();
                 doc.register_callback(Box::new(move |t, payload| {
                     if t == sys::LOK_CALLBACK_UNO_COMMAND_RESULT {
-                        if let Ok(v) = serde_json::from_str::<Value>(&payload) {
-                            let (lock, cv) = &*results;
-                            lock.lock().unwrap().push(v);
-                            cv.notify_all();
+                        if let Ok(r) = serde_json::from_str::<Value>(&payload) {
+                            let waiting = {
+                                let mut d = deferred.lock().unwrap();
+                                d.iter().position(|(_, c)| r["commandName"] == c.as_str()).map(|i| d.remove(i))
+                            };
+                            if let Some((id, _)) = waiting {
+                                let reply = if r["success"] == json!(true) {
+                                    json!({"id": id, "ok": true})
+                                } else {
+                                    json!({"id": id, "ok": false, "error": format!("échec de l'enregistrement : {}", r.get("result").unwrap_or(&Value::Null))})
+                                };
+                                send(&out, &reply, &[]);
+                            }
                         }
                     }
                     send(&out, &json!({"event": "callback", "type": t, "name": callback_name(t), "payload": payload}), &[]);
@@ -382,20 +383,16 @@ impl Engine {
                 (json!({}), none)
             }
             "save_in_place" => {
-                // Enregistrement dans le fichier d'origine et son format, comme
-                // Fichier > Enregistrer ; on attend la confirmation de LibreOffice.
+                // Fichier > Enregistrer, dans le fichier d'origine et son format.
+                // La réponse part quand LibreOffice confirme (réponse différée).
                 let d = self.doc()?;
-                self.uno_results.0.lock().unwrap().retain(|r| r["commandName"] != ".uno:Save");
                 let args = json!({
                     "DontTerminateEdit": {"type": "boolean", "value": true},
                     "DontSaveIfUnmodified": {"type": "boolean", "value": false},
                 });
+                self.deferred.lock().unwrap().push((self.current_id.clone(), ".uno:Save".into()));
                 d.uno(".uno:Save", Some(&args.to_string()), true);
-                let r = self.wait_uno_result(".uno:Save", std::time::Duration::from_secs(300))?;
-                if r["success"] != json!(true) {
-                    return Err(format!("échec de l'enregistrement : {}", r.get("result").unwrap_or(&Value::Null)));
-                }
-                (json!({}), none)
+                return Ok(Reply::Deferred);
             }
             "save_as_location" => {
                 // Fichier > Enregistrer sous : avec l'option TakeOwnership,
@@ -421,7 +418,33 @@ impl Engine {
                 (json!({"bye": true}), none)
             }
             other => return Err(format!("commande inconnue : {other}")),
-        })
+        };
+        Ok(Reply::Now(v, b))
+    }
+
+    /// Traite une trame reçue et envoie la réponse. Retourne vrai pour quitter.
+    fn process(&mut self, frame: Frame) -> bool {
+        let id = frame.json.get("id").cloned().unwrap_or(Value::Null);
+        let quit = string(&frame.json, "cmd") == Some("quit");
+        self.current_id = id.clone();
+        match self.handle(&frame.json, frame.bin) {
+            Ok(Reply::Now(mut v, bin)) => {
+                v["id"] = id;
+                v["ok"] = json!(true);
+                send(&self.out, &v, &bin);
+            }
+            Ok(Reply::Deferred) => {}
+            Err(e) => send(&self.out, &json!({"id": id, "ok": false, "error": e}), &[]),
+        }
+        quit
+    }
+
+    fn shutdown(mut self) -> ! {
+        self.doc = None;
+        let _ = self.out.lock().map(|mut w| w.flush());
+        // La destruction complète de LibreOffice peut être longue ; le
+        // document est déjà fermé, on quitte directement.
+        std::process::exit(0);
     }
 }
 
@@ -434,6 +457,9 @@ fn main() {
         }
     };
     let out: Out = Arc::new(Mutex::new(BufWriter::new(protocol_output())));
+    // macOS : LibreOffice doit tourner sur le fil principal (voir `run`).
+    #[cfg(target_os = "macos")]
+    std::env::set_var("SAL_LOK_OPTIONS", "unipoll");
 
     let profile_url = args.profile.as_ref().map(|p| {
         let _ = std::fs::create_dir_all(p);
@@ -448,7 +474,7 @@ fn main() {
         }
     };
     // Ne pas activer LOK_FEATURE_NO_TILED_ANNOTATIONS : avec LibreOffice
-    // 26.2, il vide entièrement le rendu des présentations.
+    // 26.2 et 26.8, il vide entièrement le rendu des présentations.
     office.set_optional_features(
         sys::LOK_FEATURE_DOCUMENT_PASSWORD
             | sys::LOK_FEATURE_DOCUMENT_PASSWORD_TO_MODIFY
@@ -474,39 +500,154 @@ fn main() {
         }));
     }
 
-    send(&out, &json!({"event": "ready", "libreoffice": office.version_info()}), &[]);
+    let ready = json!({"event": "ready", "libreoffice": office.version_info()});
+    let engine = Engine {
+        office,
+        doc: None,
+        out: out.clone(),
+        args,
+        password,
+        deferred: Arc::new(Mutex::new(Vec::new())),
+        current_id: Value::Null,
+        profile_url,
+    };
+    run(engine, out, ready);
+}
 
-    let uno_results = Arc::new((Mutex::new(Vec::new()), std::sync::Condvar::new()));
-    let mut engine = Engine { office, doc: None, out: out.clone(), args, password, uno_results, profile_url };
+/// Linux, Windows : LibreOffice fait tourner sa boucle d'événements dans son
+/// propre fil ; ce fil-ci lit les requêtes et appelle LibreOfficeKit.
+#[cfg(not(target_os = "macos"))]
+fn run(mut engine: Engine, out: Out, ready: Value) -> ! {
+    send(&out, &ready, &[]);
     let mut input = BufReader::new(std::io::stdin().lock());
     loop {
-        let frame = match read_frame(&mut input) {
-            Ok(Some(f)) => f,
+        match read_frame(&mut input) {
+            Ok(Some(frame)) => {
+                if engine.process(frame) {
+                    break;
+                }
+            }
             Ok(None) => break,
             Err(e) => {
                 eprintln!("auxi-engine: flux d'entrée invalide : {e}");
                 break;
             }
-        };
-        let id = frame.json.get("id").cloned().unwrap_or(Value::Null);
-        let quit = string(&frame.json, "cmd") == Some("quit");
-        match engine.handle(&frame.json, frame.bin) {
-            Ok((mut v, bin)) => {
-                v["id"] = id;
-                v["ok"] = json!(true);
-                send(&out, &v, &bin);
-            }
-            Err(e) => send(&out, &json!({"id": id, "ok": false, "error": e}), &[]),
-        }
-        if quit {
-            break;
         }
     }
-    engine.doc = None;
-    let _ = out.lock().map(|mut w| w.flush());
-    // La destruction complète de LibreOffice peut être longue ; le document
-    // est déjà fermé, on quitte directement.
+    engine.shutdown()
+}
+
+/// macOS : LibreOffice utilise AppKit, qui n'accepte que le fil principal.
+/// Le moteur démarre donc en mode « unipoll » (pas de fil LibreOffice
+/// séparé) : le fil principal exécute la boucle d'événements de LibreOffice
+/// (runLoop), et chaque requête lue par un fil secondaire y est confiée via
+/// la file principale de Grand Central Dispatch, servie par cette boucle.
+#[cfg(target_os = "macos")]
+fn run(engine: Engine, out: Out, ready: Value) -> ! {
+    use std::cell::RefCell;
+    thread_local! {
+        static ENGINE: RefCell<Option<Engine>> = const { RefCell::new(None) };
+    }
+    let kit = engine.office.raw();
+    ENGINE.with(|e| *e.borrow_mut() = Some(engine));
+
+    // « Prêt » une fois la boucle de LibreOffice réellement en marche ; on en
+    // profite pour retirer le moteur du Dock.
+    let ready_out = out.clone();
+    mac::on_main(Box::new(move || {
+        mac::hide_from_dock();
+        send(&ready_out, &ready, &[]);
+    }));
+
+    std::thread::Builder::new()
+        .name("auxi-engine-stdin".into())
+        .spawn(move || {
+            let mut input = BufReader::new(std::io::stdin().lock());
+            while let Ok(Some(frame)) = read_frame(&mut input) {
+                mac::on_main(Box::new(move || {
+                    let quit = ENGINE.with(|e| e.borrow_mut().as_mut().map(|eng| eng.process(frame)).unwrap_or(true));
+                    if quit {
+                        if let Some(eng) = ENGINE.with(|e| e.borrow_mut().take()) {
+                            eng.shutdown();
+                        }
+                        std::process::exit(0);
+                    }
+                }));
+            }
+            mac::on_main(Box::new(|| {
+                if let Some(eng) = ENGINE.with(|e| e.borrow_mut().take()) {
+                    eng.shutdown();
+                }
+                std::process::exit(0);
+            }));
+        })
+        .expect("fil de lecture");
+
+    unsafe extern "C" fn poll(_data: *mut std::ffi::c_void, _timeout_us: std::ffi::c_int) -> std::ffi::c_int {
+        0
+    }
+    unsafe extern "C" fn wake(_data: *mut std::ffi::c_void) {}
+    unsafe {
+        match (*(*kit).pClass).runLoop {
+            Some(run_loop) => run_loop(kit, poll, wake, std::ptr::null_mut()),
+            None => {
+                send(&out, &json!({"event": "fatal", "error": "runLoop absent de LibreOfficeKit"}), &[]);
+            }
+        }
+    }
     std::process::exit(0);
+}
+
+#[cfg(target_os = "macos")]
+mod mac {
+    use std::ffi::{c_char, c_void};
+
+    #[repr(C)]
+    pub struct DispatchQueue {
+        _private: [u8; 0],
+    }
+
+    extern "C" {
+        static _dispatch_main_q: DispatchQueue;
+        fn dispatch_async_f(queue: *const DispatchQueue, context: *mut c_void, work: extern "C" fn(*mut c_void));
+    }
+
+    #[link(name = "objc")]
+    extern "C" {
+        fn objc_getClass(name: *const c_char) -> *mut c_void;
+        fn sel_registerName(name: *const c_char) -> *mut c_void;
+        fn objc_msgSend();
+    }
+
+    type Job = Box<dyn FnOnce() + Send>;
+
+    extern "C" fn trampoline(ctx: *mut c_void) {
+        let job = unsafe { Box::from_raw(ctx as *mut Job) };
+        job();
+    }
+
+    /// Exécute `job` sur le fil principal, depuis la boucle d'événements.
+    pub fn on_main(job: Job) {
+        let ctx = Box::into_raw(Box::new(job)) as *mut c_void;
+        unsafe { dispatch_async_f(&_dispatch_main_q, ctx, trampoline) }
+    }
+
+    /// Le moteur n'a pas de fenêtre : pas d'icône dans le Dock ni de menu
+    /// (NSApplicationActivationPolicyProhibited).
+    pub fn hide_from_dock() {
+        unsafe {
+            let class = objc_getClass(c"NSApplication".as_ptr());
+            if class.is_null() {
+                return;
+            }
+            let send0: extern "C" fn(*mut c_void, *mut c_void) -> *mut c_void = std::mem::transmute(objc_msgSend as *const ());
+            let send1: extern "C" fn(*mut c_void, *mut c_void, isize) -> i8 = std::mem::transmute(objc_msgSend as *const ());
+            let app = send0(class, sel_registerName(c"sharedApplication".as_ptr()));
+            if !app.is_null() {
+                send1(app, sel_registerName(c"setActivationPolicy:".as_ptr()), 2);
+            }
+        }
+    }
 }
 
 fn office_ptr(o: &Office) -> usize {

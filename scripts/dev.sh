@@ -22,7 +22,13 @@ if [ -n "$missing" ]; then
   exit 1
 fi
 
-[ -f ".engine/$PLATFORM/program-dir" ] || scripts/fetch-engine.sh
+# Moteur absent ou d'une autre version que celle épinglée : (re)télécharger.
+wanted=$(python3 -c "import json;print(json.load(open('engine/libreoffice.lock.json'))['version'])")
+installed=$(cat ".engine/$PLATFORM/version" 2>/dev/null || true)
+if [ ! -f ".engine/$PLATFORM/program-dir" ] || [ "$installed" != "$wanted" ]; then
+  echo "== Moteur LibreOffice $wanted"
+  scripts/fetch-engine.sh
+fi
 
 echo "== Interface"
 (cd app && { [ -d node_modules ] || npm install --no-audit --no-fund; } && npm run --silent build)

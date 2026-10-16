@@ -9,7 +9,7 @@ scripts/dev.sh                 # moteur + interface + compilation + lancement
 scripts/dev.sh ~/Documents/rapport.docx
 ```
 
-Au premier lancement, `scripts/dev.sh` télécharge LibreOffice 26.2.6 (vérifié par SHA-256)
+Au premier lancement, `scripts/dev.sh` télécharge LibreOffice 26.8.1 (vérifié par SHA-256)
 dans `.engine/`, installe les dépendances npm et compile ; les lancements suivants sont
 rapides.
 

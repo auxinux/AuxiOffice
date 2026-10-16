@@ -15,7 +15,7 @@
 ┌───────────────▼──────────────┐
 │ crates/lok-sys (MPL 2.0)     │  transcription des en-têtes C de LibreOfficeKit
 ├──────────────────────────────┤
-│ LibreOffice 26.2.6 (MPL 2.0) │  binaires officiels non modifiés (engine/)
+│ LibreOffice 26.8.1 (MPL 2.0) │  binaires officiels non modifiés (engine/)
 └──────────────────────────────┘
 ```
 
@@ -59,7 +59,7 @@ Les rappels de LibreOffice (`invalidate_tiles`, `invalidate_visible_cursor`,
 
 ## Particularités de LibreOfficeKit à connaître
 
-- Ne pas activer `LOK_FEATURE_NO_TILED_ANNOTATIONS` : avec LibreOffice 26.2, il vide
+- Ne pas activer `LOK_FEATURE_NO_TILED_ANNOTATIONS` : avec LibreOffice 26.2 et 26.8, il vide
   entièrement le rendu des présentations.
 - La saisie de texte passe par `postWindowExtTextInputEvent` (comme Collabora Online) ; les
   touches de caractères envoyées par `postKeyEvent` ne sont pas fiables.
@@ -72,3 +72,27 @@ Les rappels de LibreOffice (`invalidate_tiles`, `invalidate_visible_cursor`,
 - LibreOffice peut écrire sur stdout : le moteur réserve le descripteur d'origine au
   protocole et redirige stdout vers stderr.
 - `LOK_ALLOWLIST_LANGUAGES` doit lister les langues pour activer correcteur et césure.
+- La partie « instable » de l'API (`LOK_USE_UNSTABLE_API`) **change de disposition d'une
+  version à l'autre** : LibreOffice 26.8 a retiré `sendDialogEvent` et `setAllowChangeComments`
+  au milieu des tables de fonctions. `lok-sys` transcrit exactement la version épinglée et le
+  moteur refuse de démarrer si la taille des tables annoncée par LibreOffice diffère
+  (`check_layout`). Changer de version de LibreOffice impose donc de vérifier `lok-sys`.
+- Le rendu par tuiles n'existe sous macOS qu'à partir de LibreOffice 26.8 (`doc_paintTile`
+  l'excluait auparavant).
+
+## macOS : LibreOffice sur le fil principal
+
+Sous macOS, LibreOffice n'a pas de mode sans affichage (`svp`) : il utilise son module AppKit,
+qui n'accepte que le fil principal. Le moteur y fonctionne donc en mode « unipoll »
+(`SAL_LOK_OPTIONS=unipoll`) :
+
+1. LibreOffice est initialisé sur le fil principal, qui exécute ensuite sa boucle d'événements
+   (`runLoop`) ;
+2. un fil secondaire lit les requêtes et les confie au fil principal par la file principale de
+   Grand Central Dispatch, que la boucle d'AppKit sert entre deux événements ;
+3. aucune requête ne bloque le fil principal : « Enregistrer » répond de façon différée, quand
+   LibreOffice signale la fin de `.uno:Save` ;
+4. le moteur se retire du Dock (`NSApplicationActivationPolicyProhibited`).
+
+Sous Linux et Windows, LibreOffice fait tourner sa boucle dans son propre fil et le moteur
+appelle LibreOfficeKit depuis le fil qui lit les requêtes.

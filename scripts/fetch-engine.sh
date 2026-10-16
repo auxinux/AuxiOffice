@@ -19,6 +19,9 @@ case "$(uname -s)-$(uname -m)" in
   *) echo "Plateforme non prise en charge : $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
 OUT="$ROOT/.engine/$PLATFORM"
+# Repartir d'un dossier vide : une ancienne version ne doit pas rester à côté
+# (les téléchargements, eux, restent dans le cache).
+rm -rf "$OUT"
 mkdir -p "$OUT" "$CACHE"
 
 sets="$PLATFORM"
@@ -131,5 +134,6 @@ case "$PLATFORM" in
 esac
 [ -n "$program" ] && [ -d "$program" ] || { echo "Dossier du moteur introuvable" >&2; exit 1; }
 echo "$program" > "$OUT/program-dir"
+python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['version'])" "$LOCK" > "$OUT/version"
 echo "Moteur prêt : $program"
 echo "export AUXI_LO_PROGRAM=\"$program\""

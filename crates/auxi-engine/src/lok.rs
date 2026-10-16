@@ -47,6 +47,8 @@ impl Office {
     /// Démarre LibreOffice depuis son dossier `program/`.
     pub fn init(program_dir: &Path, profile_url: Option<&str>) -> Result<Office, String> {
         let (lib, kit) = unsafe { sys::lok_init_2(program_dir, profile_url)? };
+        let announced = unsafe { (*(*kit).pClass).nSize };
+        sys::check_layout("LibreOfficeKitClass", announced, std::mem::size_of::<sys::LibreOfficeKitClass>())?;
         Ok(Office { kit, _lib: lib, callback: None })
     }
 
@@ -109,7 +111,10 @@ impl Office {
         if doc.is_null() {
             return Err(self.error());
         }
-        Ok(Document { doc, callback: None })
+        let announced = unsafe { (*(*doc).pClass).nSize };
+        let document = Document { doc, callback: None };
+        sys::check_layout("LibreOfficeKitDocumentClass", announced, std::mem::size_of::<sys::LibreOfficeKitDocumentClass>())?;
+        Ok(document)
     }
 }
 
