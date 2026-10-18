@@ -492,8 +492,16 @@ impl Engine {
     fn shutdown(mut self) -> ! {
         self.doc = None;
         let _ = self.out.lock().map(|mut w| w.flush());
-        // La destruction complète de LibreOffice peut être longue ; le
-        // document est déjà fermé, on quitte directement.
+        // Le document est fermé : on quitte sans détruire LibreOffice ni
+        // exécuter ses fonctions de fin de programme (atexit). Sous macOS,
+        // celles-ci interrompent le processus (« Unspecified Application
+        // Error ») ; ailleurs elles sont seulement longues.
+        let _ = std::io::stderr().flush();
+        #[cfg(unix)]
+        unsafe {
+            libc::_exit(0)
+        }
+        #[cfg(not(unix))]
         std::process::exit(0);
     }
 }

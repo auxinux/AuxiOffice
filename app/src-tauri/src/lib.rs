@@ -358,6 +358,7 @@ pub fn run() {
                 if let Some((spare, _, _)) = engines.spare.lock().unwrap().take() {
                     all.push(Arc::new(spare));
                 }
+                eprintln!("AuxiOffice : fermeture, arrêt de {} moteur(s)", all.len());
                 for e in all {
                     e.shutdown();
                 }
