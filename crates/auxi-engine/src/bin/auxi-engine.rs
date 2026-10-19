@@ -341,6 +341,11 @@ impl Engine {
                 }
                 let scale = req.get("scale").and_then(Value::as_f64).unwrap_or(1.0).clamp(1.0, 3.0);
                 let (px, pw, ph) = d.paint_window(int(req, "window") as u32, int(req, "x"), int(req, "y"), w, h, scale);
+                // Fenêtre inconnue de LibreOffice : il laisse le tampon vide et
+                // le signale seulement par getError.
+                if let Some(e) = self.office.last_error() {
+                    return Err(format!("rendu de la fenêtre {} : {e}", int(req, "window")));
+                }
                 (json!({"px_w": pw, "px_h": ph}), px)
             }
             "window_mouse" => {
@@ -371,6 +376,9 @@ impl Engine {
             }
             "window_close" => {
                 self.doc()?.close_window(int(req, "window") as u32);
+                if let Some(e) = self.office.last_error() {
+                    return Err(format!("fermeture de la fenêtre {} : {e}", int(req, "window")));
+                }
                 (json!({}), none)
             }
             "uno" => {
@@ -506,6 +514,50 @@ impl Engine {
     }
 }
 
+/// Nom du produit dans les messages et boîtes de dialogue de LibreOffice
+/// (« %PRODUCTNAME ») : AuxiOffice et non LibreOffice. Réglage écrit dans la
+/// couche utilisateur de la configuration (`user/registrymodifications.xcu`),
+/// lue au démarrage de LibreOffice.
+const PRODUCT_ITEMS: &[(&str, &str, &str)] = &[
+    ("/org.openoffice.Setup/Product", "ooName", "AuxiOffice"),
+    ("/org.openoffice.Setup/Product", "ooVendor", "Projet AuxiNux"),
+];
+
+fn brand_profile(profile: &Path) -> std::io::Result<()> {
+    let user = profile.join("user");
+    std::fs::create_dir_all(&user)?;
+    let file = user.join("registrymodifications.xcu");
+    let mut xml = std::fs::read_to_string(&file).unwrap_or_default();
+    if !xml.contains("</oor:items>") {
+        xml = concat!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
+            "<oor:items xmlns:oor=\"http://openoffice.org/2001/registry\" xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n",
+            "</oor:items>\n"
+        )
+        .to_string();
+    }
+    let mut changed = false;
+    for (path, prop, value) in PRODUCT_ITEMS {
+        let item = format!("<item oor:path=\"{path}\"><prop oor:name=\"{prop}\" oor:op=\"fuse\"><value>{value}</value></prop></item>");
+        if xml.contains(&item) {
+            continue;
+        }
+        // Retirer une ancienne valeur de cette propriété, puis ajouter la nôtre.
+        let head = format!("<item oor:path=\"{path}\"><prop oor:name=\"{prop}\"");
+        while let Some(start) = xml.find(&head) {
+            let Some(len) = xml[start..].find("</item>") else { break };
+            xml.replace_range(start..start + len + "</item>".len(), "");
+        }
+        let at = xml.rfind("</oor:items>").unwrap_or(xml.len());
+        xml.insert_str(at, &format!("{item}\n"));
+        changed = true;
+    }
+    if changed {
+        std::fs::write(&file, xml)?;
+    }
+    Ok(())
+}
+
 fn main() {
     let args = match parse_args() {
         Ok(a) => a,
@@ -526,6 +578,9 @@ fn main() {
         if crash.exists() {
             eprintln!("auxi-engine : rapport de plantage précédent retiré du profil");
             let _ = std::fs::remove_dir_all(&crash);
+        }
+        if let Err(e) = brand_profile(p) {
+            eprintln!("auxi-engine : nom du produit non appliqué au profil : {e}");
         }
         url::Url::from_directory_path(p.canonicalize().unwrap_or(p.clone())).map(|u| u.to_string()).unwrap_or_default()
     });

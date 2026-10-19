@@ -77,6 +77,9 @@ export interface Launch {
   new_doc: boolean;
 }
 
+/** Écrit dans `interface.log` (dossier de données) et dans le terminal. */
+export const uiLog = (message: string) => void invoke("ui_log", { message }).catch(() => undefined);
+
 export const appInfo = () => invoke<AppInfo>("app_info");
 export const takeLaunches = () => invoke<Launch[]>("take_launches");
 /** Ouvre une autre application (AuxiSheet…), avec des fichiers ou un document vierge. */

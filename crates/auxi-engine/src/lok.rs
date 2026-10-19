@@ -90,6 +90,22 @@ impl Office {
         }
     }
 
+    /// Message laissé par le dernier appel (vide s'il a réussi).
+    pub fn last_error(&self) -> Option<String> {
+        unsafe {
+            let class = &*(*self.kit).pClass;
+            let p = class.getError.map(|f| f(self.kit)).unwrap_or(std::ptr::null_mut());
+            if p.is_null() {
+                return None;
+            }
+            let s = CStr::from_ptr(p).to_string_lossy().into_owned();
+            if let Some(free) = class.freeError {
+                free(p);
+            }
+            Some(s).filter(|s| !s.is_empty())
+        }
+    }
+
     fn error(&self) -> String {
         unsafe {
             let class = &*(*self.kit).pClass;

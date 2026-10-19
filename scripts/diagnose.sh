@@ -2,7 +2,8 @@
 # Diagnostic du moteur d'AuxiOffice, sans l'interface :
 #   scripts/diagnose.sh [document]
 # Démarre le moteur, ouvre le document (par défaut le modèle vierge DOCX),
-# rend la première page, saisit du texte, enregistre et exporte en PDF.
+# rend la première page, saisit du texte, enregistre, exporte en PDF, puis
+# ouvre, dessine (échelles 1 et 2) et ferme une boîte de dialogue de LibreOffice.
 # Le journal complet est aussi écrit dans target/diagnostic.log.
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -25,4 +26,4 @@ mkdir -p target
   echo "== code de sortie : $?"
 } 2>&1 | tee target/diagnostic.log
 echo
-echo "Journal : $ROOT/target/diagnostic.log   Image : $ROOT/target/diagnostic.png"
+echo "Journal : $ROOT/target/diagnostic.log   Images : $ROOT/target/diagnostic.png, $ROOT/target/diagnostic-dialogue.png"

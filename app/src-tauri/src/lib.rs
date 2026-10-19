@@ -418,6 +418,20 @@ fn warm_engine(app: AppHandle) {
     prepare_spare(&app);
 }
 
+/// Journal de l'interface (erreurs JavaScript, rendus refusés) :
+/// `interface.log` dans le dossier de données, à côté de `moteur.log`.
+#[tauri::command]
+fn ui_log(state: State<'_, AppState>, message: String) {
+    use std::io::Write;
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let line = format!("[{stamp}] {} : {}\n", state.kind.name(), message.chars().take(2000).collect::<String>());
+    eprint!("interface : {line}");
+    let _ = std::fs::create_dir_all(&state.data_dir);
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(state.data_dir.join("interface.log")) {
+        let _ = f.write_all(line.as_bytes());
+    }
+}
+
 /// Application lancée.
 #[tauri::command]
 fn app_info(state: State<'_, AppState>) -> Value {
@@ -543,6 +557,7 @@ pub fn run() {
             new_document,
             recent_files,
             app_info,
+            ui_log,
             take_launches,
             launch_app,
             route_files,

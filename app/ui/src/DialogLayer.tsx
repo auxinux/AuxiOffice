@@ -5,7 +5,7 @@
 // fenêtre parente.
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
-import { call, paintWindow } from "./engine";
+import { call, paintWindow, uiLog } from "./engine";
 import { lokKeyFor, parseRects, type Rect } from "./lok";
 
 const IS_MAC = navigator.platform.toLowerCase().includes("mac");
@@ -60,14 +60,22 @@ export const DialogLayer = forwardRef<DialogLayerHandle, Props>(function DialogL
       const r = area === "all" ? { x: 0, y: 0, w: win.w, h: win.h } : clip(area, win);
       if (r.w <= 0 || r.h <= 0) continue;
       const scale = dpr();
-      void paintWindow(doc, { window: id, x: r.x, y: r.y, w: r.w, h: r.h, scale }).then((px) => {
-        const c = canvases.current.get(id);
-        if (!c) return;
-        const pw = Math.round(r.w * scale);
-        const ph = Math.round(r.h * scale);
-        if (px.length !== pw * ph * 4) return;
-        c.getContext("2d")!.putImageData(new ImageData(px, pw, ph), Math.round(r.x * scale), Math.round(r.y * scale));
-      });
+      const t0 = performance.now();
+      void paintWindow(doc, { window: id, x: r.x, y: r.y, w: r.w, h: r.h, scale })
+        .then((px) => {
+          const c = canvases.current.get(id);
+          if (!c) return;
+          const pw = Math.round(r.w * scale);
+          const ph = Math.round(r.h * scale);
+          if (px.length !== pw * ph * 4) {
+            uiLog(`boîte ${id} : rendu de ${px.length} octets au lieu de ${pw * ph * 4} (${r.w}×${r.h} à l'échelle ${scale})`);
+            return;
+          }
+          c.getContext("2d")!.putImageData(new ImageData(px, pw, ph), Math.round(r.x * scale), Math.round(r.y * scale));
+          const ms = performance.now() - t0;
+          if (ms > 3000) uiLog(`boîte ${id} : rendu lent (${Math.round(ms)} ms)`);
+        })
+        .catch((e) => uiLog(`boîte ${id} : rendu impossible : ${e}`));
     }
   }, [doc]);
 
@@ -230,7 +238,7 @@ export const DialogLayer = forwardRef<DialogLayerHandle, Props>(function DialogL
           onPointerUp={() => (drag.current = null)}
         >
           <span>{top.title}</span>
-          <button title="Fermer" onClick={() => void call(doc, "window_close", { window: top.id })}>
+          <button title="Fermer" onClick={() => void call(doc, "window_close", { window: top.id }).catch((e) => uiLog(`boîte ${top.id} : fermeture impossible : ${e}`))}>
             ×
           </button>
         </div>

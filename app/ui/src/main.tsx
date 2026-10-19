@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { uiLog } from "./engine";
 import "./styles.css";
 
 // Erreur imprévue de l'interface : l'afficher plutôt qu'une fenêtre vide.
@@ -8,6 +9,7 @@ function showFatal(text: string) {
   pre.className = "fatal";
   pre.textContent = `Erreur de l'interface d'AuxiOffice :\n${text}`;
   document.body.appendChild(pre);
+  uiLog(text);
 }
 window.addEventListener("error", (e) => showFatal(`${e.message}\n${e.error?.stack ?? ""}`));
 window.addEventListener("unhandledrejection", (e) => showFatal(`${e.reason}\n${e.reason?.stack ?? ""}`));
