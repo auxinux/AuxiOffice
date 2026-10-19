@@ -45,8 +45,21 @@ export const DialogLayer = forwardRef<DialogLayerHandle, Props>(function DialogL
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
   const lastMove = useRef(0);
+  const painted = useRef(new Set<number>());
 
   const dpr = () => window.devicePixelRatio || 1;
+
+  // Fenêtre que LibreOffice ne connaît plus (fermeture manquée) : la retirer.
+  const forget = useCallback(
+    (id: number) => {
+      setWins((ws) => {
+        const rest = ws.filter((o) => o.id !== id && o.parentId !== id);
+        if (rest.length !== ws.length && !rest.some((o) => o.type === "dialog")) window.setTimeout(onClosed, 0);
+        return rest;
+      });
+    },
+    [onClosed],
+  );
 
   // Rendu : les zones invalidées sont regroupées par image et par fenêtre.
   const flush = useCallback(() => {
@@ -73,11 +86,19 @@ export const DialogLayer = forwardRef<DialogLayerHandle, Props>(function DialogL
           }
           c.getContext("2d")!.putImageData(new ImageData(px, pw, ph), Math.round(r.x * scale), Math.round(r.y * scale));
           const ms = performance.now() - t0;
+          if (!painted.current.has(id)) {
+            painted.current.add(id);
+            const ink = px.reduce((n, v, i) => (i % 4 === 3 || v > 240 ? n : n + 1), 0);
+            uiLog(`boîte ${id} : premier rendu ${r.w}×${r.h} à l'échelle ${scale} en ${Math.round(ms)} ms, toile ${c.width}×${c.height}, ${ink > 0 ? "contenu présent" : "IMAGE VIDE"}`);
+          }
           if (ms > 3000) uiLog(`boîte ${id} : rendu lent (${Math.round(ms)} ms)`);
         })
-        .catch((e) => uiLog(`boîte ${id} : rendu impossible : ${e}`));
+        .catch((e) => {
+          uiLog(`boîte ${id} : rendu impossible : ${e}`);
+          if (String(e).includes("window not found")) forget(id);
+        });
     }
-  }, [doc]);
+  }, [doc, forget]);
 
   const invalidate = useCallback(
     (id: number, rect: Rect | "all") => {
@@ -228,6 +249,9 @@ export const DialogLayer = forwardRef<DialogLayerHandle, Props>(function DialogL
         <div
           className="lo-title"
           onPointerDown={(e) => {
+            // Pas de déplacement depuis le bouton Fermer : la capture du pointeur
+            // par la barre de titre empêcherait son clic d'arriver.
+            if ((e.target as HTMLElement).closest("button")) return;
             drag.current = { sx: e.clientX, sy: e.clientY, ox: offset.x, oy: offset.y };
             (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
           }}
@@ -238,7 +262,10 @@ export const DialogLayer = forwardRef<DialogLayerHandle, Props>(function DialogL
           onPointerUp={() => (drag.current = null)}
         >
           <span>{top.title}</span>
-          <button title="Fermer" onClick={() => void call(doc, "window_close", { window: top.id }).catch((e) => uiLog(`boîte ${top.id} : fermeture impossible : ${e}`))}>
+          <button title="Fermer" onClick={() => void call(doc, "window_close", { window: top.id }).catch((e) => {
+                uiLog(`boîte ${top.id} : fermeture impossible : ${e}`);
+                if (String(e).includes("window not found")) forget(top.id);
+              })}>
             ×
           </button>
         </div>
