@@ -19,6 +19,10 @@ struct Ctx {
 }
 
 fn setup(name: &str) -> Option<(Ctx, PathBuf)> {
+    setup_with(name, None)
+}
+
+fn setup_with(name: &str, grammar_url: Option<String>) -> Option<(Ctx, PathBuf)> {
     let program = std::env::var_os("AUXI_LO_PROGRAM").map(PathBuf::from)?;
     let fixtures = PathBuf::from(std::env::var_os("AUXI_FIXTURES").expect("AUXI_FIXTURES manquant"));
     let tmp = std::env::temp_dir().join(format!("auxi-engine-test-{name}-{}", std::process::id()));
@@ -34,6 +38,7 @@ fn setup(name: &str) -> Option<(Ctx, PathBuf)> {
             author: "Test AuxiOffice".into(),
             log_file: None,
             profile_root: None,
+            grammar_url,
         },
         Box::new(move |e| ev.lock().unwrap().push(e)),
     )
@@ -273,6 +278,7 @@ fn stale_lock_from_a_sibling_profile_is_removed() {
             author: String::new(),
             log_file: None,
             profile_root: Some(root.clone()),
+            grammar_url: None,
         },
         Box::new(|_| {}),
     )
@@ -370,6 +376,7 @@ fn export_still_works_after_a_previous_engine_crash() {
             author: String::new(),
             log_file: None,
             profile_root: None,
+            grammar_url: None,
         },
         Box::new(|_| {}),
     )
@@ -415,4 +422,61 @@ fn pdf_export_honours_page_range() {
     eprintln!("pages : tout {n_all}, plage 2-3 : {n_part}");
     assert!(n_all > 5);
     assert!(n_part < n_all && n_part >= 2, "plage non appliquée ({n_part} sur {n_all})");
+}
+
+/// AuxiCorrect : avec l'adresse d'un serveur de correction, LibreOffice
+/// l'interroge (protocole LanguageTool) pour le français du Canada, et son
+/// propre dictionnaire n'est plus utilisé pour le français.
+#[test]
+fn french_is_checked_by_the_grammar_server() {
+    use std::io::{BufRead, BufReader, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let seen: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let s2 = seen.clone();
+    std::thread::spawn(move || {
+        for mut c in listener.incoming().flatten() {
+            let mut r = BufReader::new(c.try_clone().unwrap());
+            let (mut line, mut len) = (String::new(), 0usize);
+            r.read_line(&mut line).unwrap();
+            loop {
+                let mut h = String::new();
+                if r.read_line(&mut h).unwrap() == 0 || h.trim().is_empty() {
+                    break;
+                }
+                if let Some(v) = h.to_ascii_lowercase().strip_prefix("content-length:") {
+                    len = v.trim().parse().unwrap_or(0);
+                }
+            }
+            let mut body = vec![0; len];
+            r.read_exact(&mut body).unwrap();
+            s2.lock().unwrap().push(format!("{} {}", line.trim(), String::from_utf8_lossy(&body)));
+            let out = r#"{"matches":[]}"#;
+            let _ = write!(c, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{out}", out.len());
+        }
+    });
+    let Some((ctx, _)) = setup_with("grammaire", Some(format!("http://127.0.0.1:{port}/secret/v2"))) else { return };
+    let doc = ctx.tmp.join("vierge.docx");
+    std::fs::copy(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../app/src-tauri/templates/vierge.docx"), &doc).unwrap();
+    ctx.call(json!({"cmd": "load", "path": doc}));
+    ctx.settle();
+    // Saisie en deux temps, comme au clavier : chaque modification relance la
+    // vérification du paragraphe.
+    ctx.type_text("Je suis allé au magazin hier.");
+    let start = Instant::now();
+    let mut again = false;
+    while start.elapsed() < Duration::from_secs(25) && !seen.lock().unwrap().iter().any(|r| r.contains("magazin")) {
+        std::thread::sleep(Duration::from_millis(200));
+        if !again && start.elapsed() > Duration::from_secs(3) {
+            ctx.type_text(" Encore.");
+            again = true;
+        }
+    }
+    let reqs = seen.lock().unwrap().clone();
+    let r = reqs.iter().find(|r| r.contains("magazin")).unwrap_or_else(|| panic!("serveur non interrogé : {reqs:?}"));
+    assert!(r.starts_with("POST /secret/v2/check"), "{r}");
+    assert!(r.contains("language=fr-CA"), "langue du modèle vierge : {r}");
+    let xcu = std::fs::read_to_string(ctx.tmp.join("profil/user/registrymodifications.xcu")).unwrap();
+    assert!(xcu.contains(r#"SpellCheckerList"><prop oor:name="fr-CA""#), "dictionnaire LibreOffice retiré pour fr-CA");
+    ctx.engine.shutdown();
 }

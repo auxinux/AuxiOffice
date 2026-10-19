@@ -128,3 +128,35 @@ export function onEngineEvent(doc: number, fn: Listener): () => void {
     if (set!.size === 0) listeners.delete(doc);
   };
 }
+
+// --- AuxiCorrect -------------------------------------------------------------
+
+export interface AuxiCorrectOptions {
+  enabled: boolean;
+  international: boolean;
+  variant: "toutes" | "classique" | "1990";
+  style: boolean;
+  regional: boolean;
+}
+
+export interface AuxiCorrectStatus {
+  /** Réglage commun d'AuxiCorrect trouvé (AuxiCorrect installé). */
+  installed: boolean;
+  /** AuxiOffice activé dans AuxiCorrect → Paramètres → Intégration. */
+  enabledForAuxiOffice: boolean;
+  version: string | null;
+  hasApp: boolean;
+  settingsFile: string;
+  /** Serveur de correction démarré (AuxiWriter). */
+  running: boolean;
+  /** Les documents ouverts maintenant sont corrigés par AuxiCorrect. */
+  active: boolean;
+  /** Application autre qu'AuxiWriter (pas de soulignements AuxiCorrect). */
+  writerOnly: boolean;
+  options: AuxiCorrectOptions;
+}
+
+export const auxiCorrectStatus = () => invoke<AuxiCorrectStatus>("auxicorrect_status");
+export const setAuxiCorrectOptions = (options: AuxiCorrectOptions) => invoke<AuxiCorrectStatus>("auxicorrect_set_options", { options });
+export const openAuxiCorrect = () => invoke<void>("auxicorrect_open_app");
+export const auxiCorrectLookup = (what: "definir" | "synonymes" | "antonymes" | "conjuguer", word: string) => invoke<string>("auxicorrect_lookup", { what, word });

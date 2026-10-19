@@ -28,6 +28,9 @@ pub struct EngineConfig {
     /// posé depuis l'un d'eux est forcément orphelin (l'application n'ouvre
     /// jamais deux fois le même fichier).
     pub profile_root: Option<PathBuf>,
+    /// Serveur de correction du français (AuxiCorrect, protocole LanguageTool)
+    /// que LibreOffice doit interroger ; None : correcteur de LibreOffice.
+    pub grammar_url: Option<String>,
 }
 
 /// Dernières lignes écrites par le moteur sur sa sortie d'erreur.
@@ -65,6 +68,10 @@ impl Engine {
         match &cfg.profile_root {
             Some(r) => cmd.env("AUXI_ENGINE_PROFILE_ROOT", r),
             None => cmd.env_remove("AUXI_ENGINE_PROFILE_ROOT"),
+        };
+        match &cfg.grammar_url {
+            Some(u) => cmd.env("AUXI_ENGINE_GRAMMAR_URL", u),
+            None => cmd.env_remove("AUXI_ENGINE_GRAMMAR_URL"),
         };
         // Aucun accès réseau ni dialogue système depuis le moteur.
         // Langues pour lesquelles LibreOffice active correcteur et césure.

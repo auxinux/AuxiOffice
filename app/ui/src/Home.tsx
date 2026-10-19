@@ -2,7 +2,9 @@
 // un fichier, tous les documents récents. Dans AuxiWriter, AuxiSheet ou
 // AuxiPresent : un document vierge, ouvrir, les documents récents de ce type.
 
+import { useEffect, useState } from "react";
 import { APP_DOC, APP_NAMES, type AppKind } from "./actions";
+import { auxiCorrectStatus, type AuxiCorrectStatus } from "./engine";
 import { Icon } from "./icons";
 import { fileName } from "./lok";
 
@@ -14,6 +16,7 @@ interface Props {
   onNew: (kind: DocKind) => void;
   onOpen: () => void;
   onOpenPath: (path: string) => void;
+  onAuxiCorrect: () => void;
 }
 
 const KINDS = [
@@ -41,9 +44,13 @@ export function recentsFor(app: AppKind, recents: string[]) {
   return recents.filter((p) => (k.exts as readonly string[]).includes(extOf(p)) || (doc === "text" && !others.includes(extOf(p))));
 }
 
-export function Home({ app, recents, onNew, onOpen, onOpenPath }: Props) {
+export function Home({ app, recents, onNew, onOpen, onOpenPath, onAuxiCorrect }: Props) {
   const own = KINDS.find((k) => k.kind === APP_DOC[app]);
   const list = recentsFor(app, recents);
+  const [ac, setAc] = useState<AuxiCorrectStatus | null>(null);
+  useEffect(() => {
+    void auxiCorrectStatus().then(setAc).catch(() => setAc(null));
+  }, []);
   return (
     <div className={`home app-${app}`}>
       <header>
@@ -94,7 +101,10 @@ export function Home({ app, recents, onNew, onOpen, onOpenPath }: Props) {
         )}
       </section>
       <footer>
-        {APP_NAMES[app]} · <a href="https://office.auxinux.ca" target="_blank" rel="noreferrer">office.auxinux.ca</a> · Moteur de documents : LibreOffice
+        {APP_NAMES[app]} · <a href="https://office.auxinux.ca" target="_blank" rel="noreferrer">office.auxinux.ca</a> · Moteur de documents : LibreOffice ·{" "}
+        <button className="link" onClick={onAuxiCorrect}>
+          Correction : {ac?.enabledForAuxiOffice ? `AuxiCorrect ${ac.version ?? ""}${ac.options.enabled ? "" : " (désactivé)"}` : "LibreOffice"}
+        </button>
       </footer>
     </div>
   );

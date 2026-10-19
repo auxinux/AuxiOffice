@@ -56,6 +56,7 @@ fn main() {
                 author: "Diagnostic".into(),
                 log_file: None,
                 profile_root: None,
+                grammar_url: None,
             },
             Box::new(move |e: Value| {
                 if std::env::var_os("PROBE_EVENTS").is_some() {

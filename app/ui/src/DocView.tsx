@@ -3,7 +3,7 @@
 // feuilles) et à la présentation (panneau des diapositives).
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { call, onEngineEvent, paint, uno, type DocInfo, type EngineEvent } from "./engine";
+import { auxiCorrectStatus, call, onEngineEvent, paint, uno, type AuxiCorrectStatus, type DocInfo, type EngineEvent } from "./engine";
 import { lokKeyFor, parseInvalidation, parseRects, parseState, toFileUrl, TWIPS_PER_PX, type Rect } from "./lok";
 import { TileView } from "./TileView";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -52,6 +52,13 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
   const [part, setPart] = useState(info.part);
   const [partNames, setPartNames] = useState(info.part_names);
   const [show, setShow] = useState<number | null>(null);
+  // AuxiCorrect : état au moment de l'ouverture (il vaut pour tout le document).
+  const [ac, setAc] = useState<AuxiCorrectStatus | null>(null);
+  useEffect(() => {
+    void auxiCorrectStatus()
+      .then((s) => setAc(s.enabledForAuxiOffice ? s : null))
+      .catch(() => setAc(null));
+  }, []);
   const [cellAddress, setCellAddress] = useState("");
   const [formula, setFormula] = useState("");
   const [headers, setHeaders] = useState<Headers>({ cols: [], rows: [] });
@@ -624,6 +631,11 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
       <div className="statusbar">
         <span>{pageInfo || (isSlides ? `Diapositive ${part + 1} sur ${partNames.length}` : isSheet ? partNames[part] : "")}</span>
         <span className="spacer-flex" />
+        {ac && info.type === "text" && (
+          <button className={`ac-badge ${ac.active ? "" : "off"}`} title="Options d'AuxiCorrect" onClick={() => onAppAction("auxicorrectOptions")}>
+            {ac.active ? "✓ AuxiCorrect" : "AuxiCorrect désactivé"}
+          </button>
+        )}
         <span>{states[".uno:LanguageStatus"]?.split(";")[0] ?? ""}</span>
         <span>{states[".uno:StateWordCount"] ?? ""}</span>
         <span className="zoombox">

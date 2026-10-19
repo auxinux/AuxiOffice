@@ -23,7 +23,9 @@ export type AppAction =
   | "selectAll"
   | "slideShow"
   | "slideShowHere"
-  | "about";
+  | "about"
+  | "auxicorrectOptions"
+  | "auxicorrectDictionary";
 
 export interface Action {
   label: string;
@@ -176,6 +178,10 @@ export const A = {
   langParCa: u("Français (Canada)", ".uno:LanguageStatus?Language:string=Paragraph_Français (Canada)"),
   langParEn: u("Anglais (Canada)", ".uno:LanguageStatus?Language:string=Paragraph_Anglais (Canada)"),
   print: a("Imprimer…", "print", { icon: "print" }),
+  // AuxiCorrect (correcteur du français de l'écosystème AuxiNux)
+  acCheck: u("Vérifier le document…", ".uno:SpellingAndGrammarDialog", { icon: "spell" }),
+  acDictionary: a("Dictionnaire…", "auxicorrectDictionary", { icon: "thesaurus" }),
+  acOptions: a("Options d'AuxiCorrect…", "auxicorrectOptions", { icon: "auxicorrect" }),
   // Writer
   gotoPage: u("Aller à la page…", ".uno:GotoPage"),
   acceptAll: u("Accepter toutes les modifications", ".uno:AcceptAllTrackedChanges"),
@@ -360,7 +366,7 @@ export function menusFor(type: DocType | null, app: AppKind = "office"): MenuDef
       },
       {
         label: "Outils",
-        items: [A.spelling, A.autoSpell, A.thesaurus, language, A.hyphenate, A.wordCount, "-", A.autoText, A.lineNumbering, A.footnoteSettings, A.chapterNumbering, "-", A.updateAll],
+        items: [{ submenu: "AuxiCorrect", items: [A.acCheck, A.acDictionary, "-", A.acOptions] }, "-", A.spelling, A.autoSpell, A.thesaurus, language, A.hyphenate, A.wordCount, "-", A.autoText, A.lineNumbering, A.footnoteSettings, A.chapterNumbering, "-", A.updateAll],
       },
     ];
   }
@@ -394,7 +400,7 @@ export function menusFor(type: DocType | null, app: AppKind = "office"): MenuDef
       },
       {
         label: "Outils",
-        items: [A.calcSpell, language, "-", A.goalSeek, "-", { submenu: "Audit", items: [A.showPrecedents, A.showDependents, A.clearArrows] }, "-", A.sheetProtect, A.bookProtect],
+        items: [{ submenu: "AuxiCorrect", items: [A.acDictionary, A.acOptions] }, "-", A.calcSpell, language, "-", A.goalSeek, "-", { submenu: "Audit", items: [A.showPrecedents, A.showDependents, A.clearArrows] }, "-", A.sheetProtect, A.bookProtect],
       },
     ];
   }
@@ -420,7 +426,7 @@ export function menusFor(type: DocType | null, app: AppKind = "office"): MenuDef
           { submenu: "Mise en page", items: [A.layoutTitle, A.layoutContent, A.layoutTwo, A.layoutTitleOnly, A.layoutBlank] }, A.slideProps, A.masters],
       },
       { label: "Diaporama", items: [A.slideShow, A.slideShowHere] },
-      { label: "Outils", items: [A.calcSpell, language] },
+      { label: "Outils", items: [{ submenu: "AuxiCorrect", items: [A.acDictionary, A.acOptions] }, "-", A.calcSpell, language] },
     ];
   }
   return [fileMenu];
@@ -460,7 +466,8 @@ export function ribbonFor(type: DocType): RibbonTab[] {
       {
         label: "Révision",
         groups: [
-          { label: "Vérification", actions: [A.spelling, A.thesaurus, A.wordCount] },
+          { label: "AuxiCorrect", actions: [A.acCheck, A.acDictionary, A.acOptions] },
+          { label: "Vérification", actions: [A.thesaurus, A.wordCount] },
           { label: "Suivi", actions: [A.trackChanges, A.manageChanges, A.comment] },
         ],
       },

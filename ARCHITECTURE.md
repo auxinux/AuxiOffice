@@ -33,6 +33,28 @@
 - Profils LibreOffice séparés par application (`moteur/<app>/profil-N`) : deux applications
   ouvertes ne partagent jamais un profil. Les documents récents sont communs.
 
+## AuxiCorrect (correction du français)
+
+- AuxiCorrect est un programme séparé (GPL-3.0) : AuxiOffice ne lie pas son code, il appelle
+  son outil `auxicorrect-cli` (contrat : `INTEGRATION.md` d'AuxiCorrect). L'activation se lit
+  dans `auxicorrect.json` (écrit par AuxiCorrect, Paramètres → Intégration) ; la constante
+  `auxicorrect.json` reste en clair dans l'exécutable, AuxiCorrect la cherche pour savoir si la
+  version installée le prend en charge.
+- AuxiWriter tient un serveur HTTP local (`127.0.0.1`, chemin secret) au protocole de
+  LanguageTool (`POST …/check`, `text` et `language`) ; chaque paragraphe est vérifié par
+  `auxicorrect-cli verifier - --json` (≈ 0,2 s) et les remarques sont converties (positions en
+  unités UTF-16, catégorie → couleur du soulignement).
+- Le moteur reçoit l'adresse (`AUXI_ENGINE_GRAMMAR_URL`) et l'écrit dans son profil : correcteur
+  « LanguageTool » de LibreOffice activé pour le français, dictionnaire de LibreOffice retiré
+  pour le français (liste `SpellCheckerList` vide, marqué « déjà vu » dans
+  `LastFoundSpellCheckers` pour ne pas être réactivé). Sans l'adresse, ces réglages sont
+  retirés.
+- LibreOffice ne vérifie la grammaire que dans les documents texte : AuxiSheet et AuxiPresent
+  gardent le correcteur de LibreOffice ; le dictionnaire d'AuxiCorrect y est disponible.
+- Options d'AuxiOffice : `auxicorrect-options.json` (dossier de données). Profil, variante,
+  style et régional valent dès la vérification suivante ; activer ou désactiver vaut pour les
+  documents ouverts ensuite.
+
 ## Choix structurants
 
 - **Moteur LibreOffice via LibreOfficeKit.** Il apporte la mise en page, le calcul, le rendu

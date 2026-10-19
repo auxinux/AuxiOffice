@@ -39,6 +39,8 @@ l'utilisateur.
 - **impression** (Ctrl+P) : imprimante, pages, copies, recto verso, noir et blanc (CUPS sous
   macOS et Linux), ou aperçu dans la visionneuse du système ;
 - **diaporama** plein écran (F5), sans animations ni transitions ;
+- **AuxiCorrect** corrige le français dans AuxiWriter quand il est installé (orthographe,
+  grammaire, typographie, français québécois), avec son dictionnaire et ses options ;
 - AuxiWriter, AuxiSheet, AuxiPresent : mise en forme courante, styles, listes, tableaux,
   images, barre de formule, en-têtes de lignes et colonnes, onglets de feuilles, miniatures
   de diapositives ;

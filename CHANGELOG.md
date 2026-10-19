@@ -2,6 +2,19 @@
 
 ## Non publié
 
+- **AuxiCorrect dans AuxiWriter** : quand AuxiCorrect est installé et AuxiOffice activé dans
+  son onglet Intégration (`auxicorrect.json`), c'est lui qui corrige le français, à la place
+  du correcteur de LibreOffice : soulignements (orthographe en rouge, grammaire, typographie
+  et particularités régionales en orange, style en bleu), message et suggestions au clic
+  droit, boîte « Vérifier le document ». Outils → AuxiCorrect et onglet Révision : Vérifier
+  le document, Dictionnaire (définitions, synonymes, antonymes, conjugaison), Options
+  (profil québécois ou international, variante orthographique, particularités régionales,
+  style). Indicateur « ✓ AuxiCorrect » dans la barre d'état.
+- Documents vierges et langue par défaut en français du Canada (les modèles étaient en
+  anglais : le français était vérifié avec le dictionnaire anglais).
+- Messages et boîtes de LibreOffice au nom d'AuxiOffice ; la croix des boîtes de dialogue
+  les ferme ; AuxiOffice ouvre AuxiWriter, AuxiSheet et AuxiPresent installés dans
+  ~/Applications même lancé par `scripts/dev.sh`.
 - **Quatre applications** : AuxiOffice (gestionnaire) et AuxiWriter, AuxiSheet, AuxiPresent,
   chacune avec sa fenêtre, son icône, son accueil, ses documents récents et ses menus ; un
   document d'un autre type part dans son application ; une seule instance par application

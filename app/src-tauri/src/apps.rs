@@ -180,7 +180,7 @@ pub fn listen(dir: &Path, kind: AppKind, on_launch: impl Fn(Launch) + Send + 'st
     Ok(())
 }
 
-fn new_token() -> String {
+pub fn new_token() -> String {
     use std::collections::hash_map::RandomState;
     use std::hash::{BuildHasher, Hasher};
     let mut out = String::new();
@@ -246,15 +246,25 @@ fn spawn(mut c: Command) -> Result<(), String> {
     c.spawn().map(|_| ()).map_err(|e| format!("lancement impossible : {e}"))
 }
 
+/// Paquet `AuxiWriter.app`… : à côté du nôtre, puis dans ~/Applications et
+/// /Applications (AuxiOffice lancé hors paquet, par `scripts/dev.sh`).
 #[cfg(target_os = "macos")]
 fn sibling_bundle(exe: &Path, kind: AppKind) -> Option<PathBuf> {
+    let name = format!("{}.app", kind.name());
+    let mut dirs: Vec<PathBuf> = vec![];
     // …/AuxiOffice.app/Contents/MacOS/AuxiOffice
-    let app = exe.parent()?.parent()?.parent()?;
-    if app.extension()? != "app" {
-        return None;
+    if let Some(app) = exe.parent().and_then(Path::parent).and_then(Path::parent) {
+        if app.extension().is_some_and(|e| e == "app") {
+            if let Some(d) = app.parent() {
+                dirs.push(d.to_path_buf());
+            }
+        }
     }
-    let b = app.parent()?.join(format!("{}.app", kind.name()));
-    b.is_dir().then_some(b)
+    if let Some(home) = std::env::var_os("HOME") {
+        dirs.push(PathBuf::from(home).join("Applications"));
+    }
+    dirs.push(PathBuf::from("/Applications"));
+    dirs.into_iter().map(|d| d.join(&name)).find(|b| b.join("Contents/Info.plist").is_file())
 }
 
 fn sibling_exe(exe: &Path, kind: AppKind) -> Option<PathBuf> {

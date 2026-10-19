@@ -9,6 +9,7 @@ import { APP_DOC, APP_NAMES, type Action, type AppAction, type AppKind } from ".
 import { DocView, type DocHandle } from "./DocView";
 import { installMenus, updateMenuChecks } from "./menus";
 import { PrintDialog } from "./PrintDialog";
+import { AuxiCorrectDictionary, AuxiCorrectOptionsDialog } from "./AuxiCorrect";
 import { appInfo, call, closeDocument, launchApp, newDocument, onLaunch, openDocument, recentFiles, routeFiles, takeLaunches, warmEngine, type DocInfo, type Launch } from "./engine";
 import { Home } from "./Home";
 import { fileName, isUntitled } from "./lok";
@@ -255,6 +256,27 @@ export function App() {
   }, []);
 
   const [about, setAbout] = useState(false);
+  const [acOptions, setAcOptions] = useState(false);
+  const [acWord, setAcWord] = useState<string | null>(null);
+
+  /** Dictionnaire d'AuxiCorrect sur le mot sélectionné (ou sous le curseur). */
+  const openDictionary = useCallback(async (doc: number) => {
+    let word = "";
+    if (doc) {
+      try {
+        const sel = await call<{ text: string }>(doc, "selection");
+        word = (sel.text ?? "").trim();
+        if (!word) {
+          await call(doc, "uno", { command: ".uno:SelectWord" });
+          word = ((await call<{ text: string }>(doc, "selection")).text ?? "").trim();
+        }
+      } catch {
+        word = "";
+      }
+    }
+    // Un seul mot (ou une locution courte).
+    setAcWord(word.split(/\s+/).length <= 4 ? word.replace(/[.,;:!?«»"()]+/g, "").trim() : "");
+  }, []);
   const [printing, setPrinting] = useState<number | null>(null);
 
   /** Actions de l'application ; `doc` = document concerné (0 = aucun). */
@@ -275,6 +297,10 @@ export function App() {
           return void createNew("presentation");
         case "open":
           return void openDialog();
+        case "auxicorrectOptions":
+          return setAcOptions(true);
+        case "auxicorrectDictionary":
+          return void openDictionary(doc);
         case "about":
           return setAbout(true);
         case "save":
@@ -289,7 +315,7 @@ export function App() {
           return doc ? void closeTab(doc) : undefined;
       }
     },
-    [createNew, openDialog, saveDocument, exportPdf, closeTab],
+    [createNew, openDialog, saveDocument, exportPdf, closeTab, openDictionary],
   );
 
   // Barre de menus : reconstruite quand le type du document actif change ;
@@ -367,7 +393,7 @@ export function App() {
       )}
 
       <div className="content">
-        {active === 0 && <Home app={app} recents={recents} onNew={createNew} onOpen={openDialog} onOpenPath={(p) => void openFiles([p])} />}
+        {active === 0 && <Home app={app} recents={recents} onNew={createNew} onOpen={openDialog} onOpenPath={(p) => void openFiles([p])} onAuxiCorrect={() => setAcOptions(true)} />}
         {tabs.map((t) =>
           t.lost ? (
             active === t.info.doc && (
@@ -418,6 +444,8 @@ export function App() {
           onMessage={notify}
         />
       )}
+      {acOptions && <AuxiCorrectOptionsDialog onClose={() => setAcOptions(false)} onMessage={notify} />}
+      {acWord !== null && <AuxiCorrectDictionary initialWord={acWord} onClose={() => setAcWord(null)} />}
       {about && (
         <div className="dialog-backdrop" onClick={() => setAbout(false)}>
           <div className="about" onClick={(e) => e.stopPropagation()}>

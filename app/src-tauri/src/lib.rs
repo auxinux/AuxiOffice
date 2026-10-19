@@ -2,6 +2,7 @@
 //! `auxi-engine` par document ouvert) et pont vers l'interface.
 
 mod apps;
+mod auxicorrect;
 mod print;
 
 use apps::{AppKind, Launch};
@@ -20,6 +21,53 @@ struct AppState {
     kind: AppKind,
     data_dir: PathBuf,
     pending: Mutex<Vec<Launch>>,
+}
+
+/// AuxiCorrect : réglage commun (lu au démarrage), options d'AuxiOffice et
+/// serveur local de correction (adresse transmise aux moteurs d'AuxiWriter).
+struct Corrector {
+    shared: auxicorrect::Shared,
+    options_file: PathBuf,
+    checker: Option<Arc<auxicorrect::Checker>>,
+    url: Option<String>,
+}
+
+impl Corrector {
+    /// Le serveur ne sert qu'à AuxiWriter (LibreOffice ne vérifie la
+    /// grammaire que dans les documents texte).
+    fn start(data_dir: &Path, kind: AppKind) -> Corrector {
+        let shared = auxicorrect::read_shared(&auxicorrect::shared_settings_path());
+        let options_file = data_dir.join("auxicorrect-options.json");
+        let options = auxicorrect::read_options(&options_file);
+        let mut c = Corrector { shared, options_file, checker: None, url: None };
+        if let (true, true, Some(cli)) = (kind == AppKind::Writer, c.shared.enabled, c.shared.cli.clone()) {
+            let checker = Arc::new(auxicorrect::Checker { cli, options: Mutex::new(options) });
+            match auxicorrect::serve(checker.clone()) {
+                Ok(url) => {
+                    c.checker = Some(checker);
+                    c.url = Some(url);
+                }
+                Err(e) => eprintln!("AuxiCorrect : serveur local impossible ({e})"),
+            }
+        }
+        c
+    }
+
+    fn options(&self) -> auxicorrect::Options {
+        match &self.checker {
+            Some(c) => c.options.lock().unwrap().clone(),
+            None => auxicorrect::read_options(&self.options_file),
+        }
+    }
+
+    /// Adresse à donner au moteur : documents texte, AuxiCorrect activé des
+    /// deux côtés (AuxiCorrect → Intégration, et options d'AuxiOffice).
+    fn engine_url(&self, kind: AppKind) -> Option<String> {
+        if kind != AppKind::Writer || !self.options().enabled {
+            return None;
+        }
+        self.url.clone()
+    }
 }
 
 #[derive(Default)]
@@ -234,6 +282,7 @@ fn engine_config(app: &AppHandle, slot: usize) -> Result<EngineConfig, String> {
     let profile_root = data_dir.as_ref().map(|d| d.join("moteur").join(kind.slug()));
     let profile_dir = profile_root.as_ref().map(|d| d.join(format!("profil-{slot}")));
     let log_file = data_dir.as_ref().map(|d| d.join("moteur.log"));
+    let grammar_url = app.state::<Mutex<Corrector>>().lock().unwrap().engine_url(kind);
     Ok(EngineConfig {
         engine_exe,
         program_dir,
@@ -242,6 +291,7 @@ fn engine_config(app: &AppHandle, slot: usize) -> Result<EngineConfig, String> {
         author: user_name(),
         log_file,
         profile_root,
+        grammar_url,
     })
 }
 
@@ -432,6 +482,72 @@ fn ui_log(state: State<'_, AppState>, message: String) {
     }
 }
 
+/// État d'AuxiCorrect pour l'interface.
+fn corrector_status(c: &Corrector, kind: AppKind) -> Value {
+    json!({
+        "installed": c.shared.found,
+        "enabledForAuxiOffice": c.shared.enabled,
+        "version": c.shared.version,
+        "hasApp": c.shared.app.is_some(),
+        "settingsFile": c.shared.file,
+        "running": c.url.is_some(),
+        "active": c.engine_url(kind).is_some(),
+        "writerOnly": kind != AppKind::Writer,
+        "options": c.options(),
+    })
+}
+
+#[tauri::command]
+fn auxicorrect_status(state: State<'_, AppState>, corrector: State<'_, Mutex<Corrector>>) -> Value {
+    corrector_status(&corrector.lock().unwrap(), state.kind)
+}
+
+/// Enregistre les options. Profil, variante, style et régional valent tout
+/// de suite pour les paragraphes vérifiés ensuite ; activer ou désactiver
+/// AuxiCorrect vaut pour les documents ouverts ensuite (le moteur de réserve
+/// est remplacé).
+#[tauri::command]
+fn auxicorrect_set_options(app: AppHandle, state: State<'_, AppState>, corrector: State<'_, Mutex<Corrector>>, options: auxicorrect::Options) -> Result<Value, String> {
+    let c = corrector.lock().unwrap();
+    let was = c.options().enabled;
+    auxicorrect::write_options(&c.options_file, &options)?;
+    if let Some(ch) = &c.checker {
+        *ch.options.lock().unwrap() = options.clone();
+    }
+    let status = corrector_status(&c, state.kind);
+    drop(c);
+    if was != options.enabled {
+        let engines = app.state::<Engines>();
+        if let Some((spare, _, slot)) = engines.spare.lock().unwrap().take() {
+            spare.shutdown();
+            engines.free_slot(slot);
+        }
+        prepare_spare(&app);
+    }
+    Ok(status)
+}
+
+/// Ouvre l'application AuxiCorrect (ses paramètres complets).
+#[tauri::command]
+fn auxicorrect_open_app(corrector: State<'_, Mutex<Corrector>>) -> Result<(), String> {
+    let app = corrector.lock().unwrap().shared.app.clone().ok_or("AuxiCorrect n'est pas installé")?;
+    let mut c = if cfg!(target_os = "macos") && app.extension().is_some_and(|e| e == "app") {
+        let mut c = std::process::Command::new("open");
+        c.arg("-a").arg(&app);
+        c
+    } else {
+        std::process::Command::new(&app)
+    };
+    c.stdin(std::process::Stdio::null()).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
+/// Dictionnaire d'AuxiCorrect : définition, synonymes, antonymes, conjugaison.
+#[tauri::command]
+async fn auxicorrect_lookup(corrector: State<'_, Mutex<Corrector>>, what: String, word: String) -> Result<String, String> {
+    let cli = corrector.lock().unwrap().shared.cli.clone().ok_or("AuxiCorrect n'est pas installé ou pas activé pour AuxiOffice")?;
+    tauri::async_runtime::spawn_blocking(move || auxicorrect::lookup(&cli, &what, &word)).await.map_err(|e| e.to_string())?
+}
+
 /// Application lancée.
 #[tauri::command]
 fn app_info(state: State<'_, AppState>) -> Value {
@@ -535,6 +651,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Engines::default())
+        .manage(Mutex::new(Corrector::start(&data_dir, kind)))
         .manage(AppState { kind, data_dir: data_dir.clone(), pending: Mutex::new(initial) })
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -558,6 +675,10 @@ pub fn run() {
             recent_files,
             app_info,
             ui_log,
+            auxicorrect_status,
+            auxicorrect_set_options,
+            auxicorrect_open_app,
+            auxicorrect_lookup,
             take_launches,
             launch_app,
             route_files,

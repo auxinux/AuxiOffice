@@ -3,7 +3,9 @@
 //!
 //! Utilisation : variables `AUXI_ENGINE_PROGRAM_DIR` (dossier program/ de
 //! LibreOffice, obligatoire), `AUXI_ENGINE_PROFILE`, `AUXI_ENGINE_LANG`,
-//! `AUXI_ENGINE_AUTHOR` ; aucun argument (voir `parse_args`).
+//! `AUXI_ENGINE_AUTHOR`, `AUXI_ENGINE_PROFILE_ROOT`, `AUXI_ENGINE_DOC_LANG`
+//! (langue par défaut des documents, fr-CA), `AUXI_ENGINE_GRAMMAR_URL`
+//! (serveur AuxiCorrect) ; aucun argument (voir `parse_args`).
 
 use auxi_engine::lok::{Document, Office};
 use auxi_engine::protocol::{callback_name, read_frame, write_frame, Frame};
@@ -22,6 +24,8 @@ struct Args {
     lang: String,
     author: String,
     profile_root: Option<PathBuf>,
+    doc_lang: String,
+    grammar_url: Option<String>,
 }
 
 /// Configuration lue dans l'environnement (`AUXI_ENGINE_PROGRAM_DIR`,
@@ -45,9 +49,11 @@ fn parse_args() -> Result<Args, String> {
         lang: var("AUXI_ENGINE_LANG").unwrap_or_else(|| "fr-FR".into()),
         author: var("AUXI_ENGINE_AUTHOR").unwrap_or_default(),
         profile_root: var("AUXI_ENGINE_PROFILE_ROOT").map(PathBuf::from),
+        doc_lang: var("AUXI_ENGINE_DOC_LANG").unwrap_or_else(|| "fr-CA".into()),
+        grammar_url: var("AUXI_ENGINE_GRAMMAR_URL"),
     };
     // Ne pas transmettre ces variables aux composants de LibreOffice.
-    for k in ["AUXI_ENGINE_PROGRAM_DIR", "AUXI_ENGINE_PROFILE", "AUXI_ENGINE_LANG", "AUXI_ENGINE_AUTHOR", "AUXI_ENGINE_PROFILE_ROOT"] {
+    for k in ["AUXI_ENGINE_PROGRAM_DIR", "AUXI_ENGINE_PROFILE", "AUXI_ENGINE_LANG", "AUXI_ENGINE_AUTHOR", "AUXI_ENGINE_PROFILE_ROOT", "AUXI_ENGINE_DOC_LANG", "AUXI_ENGINE_GRAMMAR_URL"] {
         std::env::remove_var(k);
     }
     Ok(a)
@@ -514,20 +520,76 @@ impl Engine {
     }
 }
 
-/// Nom du produit dans les messages et boîtes de dialogue de LibreOffice
-/// (« %PRODUCTNAME ») : AuxiOffice et non LibreOffice. Réglage écrit dans la
-/// couche utilisateur de la configuration (`user/registrymodifications.xcu`),
-/// lue au démarrage de LibreOffice.
-const PRODUCT_ITEMS: &[(&str, &str, &str)] = &[
-    ("/org.openoffice.Setup/Product", "ooName", "AuxiOffice"),
-    ("/org.openoffice.Setup/Product", "ooVendor", "Projet AuxiNux"),
-];
+/// Réglages écrits dans la couche utilisateur de la configuration de
+/// LibreOffice (`user/registrymodifications.xcu`), lue à son démarrage.
+///
+/// - Nom du produit (« %PRODUCTNAME » des messages et boîtes) : AuxiOffice.
+/// - Langue par défaut des documents : `AUXI_ENGINE_DOC_LANG` (fr-CA).
+/// - Correcteur AuxiCorrect, si `AUXI_ENGINE_GRAMMAR_URL` est fourni : le
+///   correcteur « LanguageTool » de LibreOffice interroge ce serveur local
+///   (tenu par AuxiOffice) pour le français, et le dictionnaire de
+///   LibreOffice ne souligne plus le français (AuxiCorrect s'en charge).
+///   Sans l'adresse, ces réglages sont retirés.
+struct Item {
+    path: &'static str,
+    prop: String,
+    /// Valeur XML (`<value>…</value>`) ; None : retirer l'élément.
+    value: Option<String>,
+    list: bool,
+}
 
-fn brand_profile(profile: &Path) -> std::io::Result<()> {
+const FRENCH: [&str; 6] = ["fr-CA", "fr-FR", "fr-BE", "fr-CH", "fr-LU", "fr-MC"];
+
+fn profile_items(doc_lang: &str, grammar_url: Option<&str>) -> Vec<Item> {
+    let text = |v: &str| Some(format!("<value>{}</value>", xml_escape(v)));
+    let mut items = vec![
+        Item { path: "/org.openoffice.Setup/Product", prop: "ooName".into(), value: text("AuxiOffice"), list: false },
+        Item { path: "/org.openoffice.Setup/Product", prop: "ooVendor".into(), value: text("Projet AuxiNux"), list: false },
+        Item { path: "/org.openoffice.Office.Linguistic/General", prop: "DefaultLocale".into(), value: text(doc_lang), list: false },
+    ];
+    const LT: &str = "/org.openoffice.Office.Linguistic/GrammarChecking/LanguageTool";
+    const LT_LOCALES: &str = "/org.openoffice.Office.Linguistic/ServiceManager/GrammarCheckers/org.openoffice.lingu.LanguageToolGrammarChecker";
+    const SPELL: &str = "/org.openoffice.Office.Linguistic/ServiceManager/SpellCheckerList";
+    const SPELL_FOUND: &str = "/org.openoffice.Office.Linguistic/ServiceManager/LastFoundSpellCheckers";
+    let on = grammar_url.is_some();
+    items.push(Item { path: LT, prop: "IsEnabled".into(), value: Some(format!("<value>{on}</value>")), list: false });
+    items.push(Item { path: LT, prop: "BaseURL".into(), value: grammar_url.and_then(text), list: false });
+    items.push(Item { path: LT, prop: "SSLCertVerify".into(), value: on.then(|| "<value>false</value>".to_string()), list: false });
+    items.push(Item { path: LT_LOCALES, prop: "Locales".into(), value: on.then(|| format!("<value>fr {}</value>", FRENCH.join(" "))), list: false });
+    const GRAMMAR: &str = "/org.openoffice.Office.Linguistic/ServiceManager/GrammarCheckerList";
+    const GRAMMAR_FOUND: &str = "/org.openoffice.Office.Linguistic/ServiceManager/LastFoundGrammarCheckers";
+    let lt = "<value><it>org.openoffice.lingu.LanguageToolGrammarChecker</it></value>".to_string();
+    for loc in FRENCH {
+        // Correcteur grammatical du français écrit d'avance : sinon LibreOffice
+        // ne le choisit qu'après un premier calcul différé, et les paragraphes
+        // vérifiés avant ne sont jamais envoyés.
+        items.push(Item { path: GRAMMAR, prop: loc.into(), value: on.then(|| lt.clone()), list: true });
+        items.push(Item { path: GRAMMAR_FOUND, prop: loc.into(), value: on.then(|| lt.clone()), list: true });
+    }
+    for loc in FRENCH {
+        // Liste vide : pas de dictionnaire LibreOffice pour le français ; le
+        // dictionnaire est déclaré « déjà vu » pour ne pas être réactivé.
+        items.push(Item { path: SPELL, prop: loc.into(), value: on.then(|| "<value></value>".to_string()), list: true });
+        items.push(Item {
+            path: SPELL_FOUND,
+            prop: loc.into(),
+            value: on.then(|| "<value><it>org.openoffice.lingu.MySpellSpellChecker</it></value>".to_string()),
+            list: true,
+        });
+    }
+    items
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
+
+fn configure_profile(profile: &Path, items: &[Item]) -> std::io::Result<()> {
     let user = profile.join("user");
     std::fs::create_dir_all(&user)?;
     let file = user.join("registrymodifications.xcu");
-    let mut xml = std::fs::read_to_string(&file).unwrap_or_default();
+    let before = std::fs::read_to_string(&file).unwrap_or_default();
+    let mut xml = before.clone();
     if !xml.contains("</oor:items>") {
         xml = concat!(
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
@@ -536,23 +598,25 @@ fn brand_profile(profile: &Path) -> std::io::Result<()> {
         )
         .to_string();
     }
-    let mut changed = false;
-    for (path, prop, value) in PRODUCT_ITEMS {
-        let item = format!("<item oor:path=\"{path}\"><prop oor:name=\"{prop}\" oor:op=\"fuse\"><value>{value}</value></prop></item>");
-        if xml.contains(&item) {
-            continue;
-        }
-        // Retirer une ancienne valeur de cette propriété, puis ajouter la nôtre.
-        let head = format!("<item oor:path=\"{path}\"><prop oor:name=\"{prop}\"");
+    for it in items {
+        // Retirer toute valeur existante de cette propriété (la nôtre ou celle
+        // écrite par LibreOffice), puis ajouter la nôtre.
+        let head = format!("<item oor:path=\"{}\"><prop oor:name=\"{}\"", it.path, it.prop);
         while let Some(start) = xml.find(&head) {
             let Some(len) = xml[start..].find("</item>") else { break };
-            xml.replace_range(start..start + len + "</item>".len(), "");
+            let mut end = start + len + "</item>".len();
+            if xml[end..].starts_with('\n') {
+                end += 1;
+            }
+            xml.replace_range(start..end, "");
         }
-        let at = xml.rfind("</oor:items>").unwrap_or(xml.len());
-        xml.insert_str(at, &format!("{item}\n"));
-        changed = true;
+        if let Some(v) = &it.value {
+            let ty = if it.list { " oor:type=\"oor:string-list\"" } else { "" };
+            let at = xml.rfind("</oor:items>").unwrap_or(xml.len());
+            xml.insert_str(at, &format!("{head} oor:op=\"fuse\"{ty}>{v}</prop></item>\n"));
+        }
     }
-    if changed {
+    if xml != before {
         std::fs::write(&file, xml)?;
     }
     Ok(())
@@ -579,8 +643,12 @@ fn main() {
             eprintln!("auxi-engine : rapport de plantage précédent retiré du profil");
             let _ = std::fs::remove_dir_all(&crash);
         }
-        if let Err(e) = brand_profile(p) {
-            eprintln!("auxi-engine : nom du produit non appliqué au profil : {e}");
+        let items = profile_items(&args.doc_lang, args.grammar_url.as_deref());
+        if let Err(e) = configure_profile(p, &items) {
+            eprintln!("auxi-engine : réglages non appliqués au profil : {e}");
+        }
+        if args.grammar_url.is_some() {
+            eprintln!("auxi-engine : correction du français par AuxiCorrect");
         }
         url::Url::from_directory_path(p.canonicalize().unwrap_or(p.clone())).map(|u| u.to_string()).unwrap_or_default()
     });

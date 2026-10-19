@@ -45,6 +45,7 @@ const P: Record<string, string> = {
   lineShape: "M3 17L17 3",
   arrow: "M2 7h10V3l6 7-6 7v-4H2z",
   play: "M5 3l12 7-12 7z",
+  auxicorrect: "M3 14l3-10 3 10M4 11h4M11 12l2.5 2.5L18 8M3 18h14",
   search: "M8.5 3a5.5 5.5 0 110 11 5.5 5.5 0 010-11zM12.5 12.5L17 17",
   clear: "M4 16h7M9 4l-4 9M9 4l4 9M6.5 10h5M14 12l4 4M18 12l-4 4",
   font: "M3 17L8 3h1l5 14M5 12h7M15 17h3",

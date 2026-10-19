@@ -239,3 +239,28 @@ button, select, input { font: inherit; color: inherit; }
 }
 .about .app-title { display: flex; justify-content: center; align-items: center; gap: 10px; }
 .about .app-title span { font-size: 26px; font-weight: 700; }
+
+/* AuxiCorrect */
+.auxicorrect-dialog { background: #fff; border-radius: 12px; padding: 22px 26px; width: 560px; max-width: calc(100vw - 40px); box-shadow: 0 18px 50px rgba(0,0,0,.3); }
+.auxicorrect-dialog h2 { margin: 0 0 8px; font-size: 20px; }
+.auxicorrect-dialog h2 .version { font-size: 13px; color: var(--muted); font-weight: 400; }
+.auxicorrect-dialog .ac-state { padding: 8px 10px; border-radius: 8px; font-size: 13px; background: #f3f3f1; }
+.auxicorrect-dialog .ac-state.on { background: #e7f4ec; color: #1e5f39; }
+.auxicorrect-dialog fieldset { border: 0; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 10px; }
+.auxicorrect-dialog fieldset:disabled { opacity: .5; }
+.auxicorrect-dialog .row { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.auxicorrect-dialog .row .label { min-width: 90px; color: var(--muted); }
+.auxicorrect-dialog .note { font-size: 12px; color: var(--muted); }
+.auxicorrect-dialog .buttons { display: flex; gap: 8px; margin-top: 12px; }
+.auxicorrect-dialog button { border: 1px solid var(--line); background: var(--panel); padding: 6px 14px; border-radius: 8px; cursor: pointer; }
+.auxicorrect-dialog button.primary { background: var(--orange); color: #fff; border-color: var(--orange); }
+.auxicorrect-dialog.dictionary { width: 680px; }
+.auxicorrect-dialog.dictionary input { flex: 1; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+.auxicorrect-dialog .tabs { display: flex; gap: 4px; margin: 12px 0 6px; }
+.auxicorrect-dialog .tabs button.active { background: var(--graphite); color: #fff; border-color: var(--graphite); }
+.auxicorrect-dialog .result { white-space: pre-wrap; font-family: inherit; font-size: 13px; line-height: 1.45; max-height: 50vh; overflow: auto; background: #fafaf8; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0; }
+.auxicorrect-dialog .result.error { color: #a33; }
+.statusbar .ac-badge { border: 0; background: transparent; cursor: pointer; font-size: 12px; color: #1e7a45; padding: 0; }
+.statusbar .ac-badge.off { color: var(--muted); }
+.statusbar .ac-badge:hover { color: var(--orange); }
+.home footer .link { border: 0; background: transparent; padding: 0; color: var(--orange-dark); cursor: pointer; font: inherit; text-decoration: underline; }
