@@ -1,8 +1,10 @@
 //! Coque AuxiOffice : fenêtre Tauri, gestion des moteurs (un processus
 //! `auxi-engine` par document ouvert) et pont vers l'interface.
 
+mod apps;
 mod print;
 
+use apps::{AppKind, Launch};
 use auxi_engine::client::{Engine, EngineConfig};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -11,6 +13,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
+
+/// Application lancée (AuxiOffice, AuxiWriter…) et lancements reçus que
+/// l'interface n'a pas encore traités (fichiers à ouvrir, document vierge).
+struct AppState {
+    kind: AppKind,
+    data_dir: PathBuf,
+    pending: Mutex<Vec<Launch>>,
+}
 
 #[derive(Default)]
 struct Engines {
@@ -120,24 +130,110 @@ impl Engines {
     }
 }
 
-/// Emplacements du moteur. Ordre de recherche :
-/// 1. variables `AUXI_ENGINE_EXE` / `AUXI_LO_PROGRAM` (développement, tests) ;
-/// 2. à côté de l'exécutable : `auxi-engine` et `engine/program/` (paquets).
-fn engine_config(app: &AppHandle, slot: usize) -> Result<EngineConfig, String> {
-    let exe_dir = std::env::current_exe().map_err(|e| e.to_string())?.parent().map(Path::to_path_buf).unwrap_or_default();
+/// Où chercher `auxi-engine`, LibreOffice et les modèles, dans l'ordre :
+/// 1. variables `AUXI_ENGINE_EXE`, `AUXI_LO_PROGRAM`, `AUXI_TEMPLATES` ;
+/// 2. l'application elle-même (paquets) : à côté de l'exécutable
+///    (`engine/program/`, `templates/`) ou, sous macOS, dans `Contents/Resources`
+///    (`engine/*.app`, `templates/`) ;
+/// 3. sous macOS, le paquet `AuxiOffice.app` voisin (AuxiWriter.app… n'embarquent
+///    pas LibreOffice) ;
+/// 4. l'arbre de développement : fichier `dev-root` dans les ressources, ou
+///    exécutable dans `target/<profil>/` du dépôt (`.engine/<plateforme>/program-dir`).
+struct Locations {
+    engine_exe: PathBuf,
+    program_dir: PathBuf,
+    templates: PathBuf,
+}
+
+fn locate() -> Result<Locations, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_dir = exe.parent().map(Path::to_path_buf).unwrap_or_default();
     let engine_name = if cfg!(windows) { "auxi-engine.exe" } else { "auxi-engine" };
-    let engine_exe = std::env::var_os("AUXI_ENGINE_EXE").map(PathBuf::from).unwrap_or_else(|| exe_dir.join(engine_name));
-    let program_dir = std::env::var_os("AUXI_LO_PROGRAM").map(PathBuf::from).unwrap_or_else(|| exe_dir.join("engine").join("program"));
+    // Racines candidates : (dossier de l'exécutable, dossier des ressources).
+    let mut roots: Vec<(PathBuf, PathBuf)> = vec![];
+    let resources = if cfg!(target_os = "macos") { exe_dir.join("../Resources") } else { exe_dir.clone() };
+    roots.push((exe_dir.clone(), resources.clone()));
+    if cfg!(target_os = "macos") {
+        if let Some(apps) = exe_dir.parent().and_then(Path::parent).and_then(Path::parent) {
+            let main = apps.join("AuxiOffice.app/Contents");
+            roots.push((main.join("MacOS"), main.join("Resources")));
+        }
+    }
+    let mut dev: Vec<PathBuf> = vec![];
+    if let Ok(r) = std::fs::read_to_string(resources.join("dev-root")) {
+        dev.push(PathBuf::from(r.trim()));
+    }
+    if let Some(repo) = exe_dir.parent().and_then(Path::parent) {
+        dev.push(repo.to_path_buf());
+    }
+    let program_in = |res: &Path| -> Option<PathBuf> {
+        let p = res.join("engine").join("program");
+        if p.is_dir() {
+            return Some(p);
+        }
+        // macOS : engine/LibreOffice*.app/Contents/Frameworks
+        std::fs::read_dir(res.join("engine")).ok()?.flatten().map(|e| e.path().join("Contents/Frameworks")).find(|p| p.is_dir())
+    };
+    let mut found: Option<Locations> = None;
+    for (bin, res) in &roots {
+        if let (true, Some(program_dir)) = (bin.join(engine_name).is_file(), program_in(res)) {
+            found = Some(Locations { engine_exe: bin.join(engine_name), program_dir, templates: res.join("templates") });
+            break;
+        }
+    }
+    if found.is_none() {
+        for repo in &dev {
+            let Some(platform) = dev_platform() else { break };
+            let Ok(program) = std::fs::read_to_string(repo.join(".engine").join(platform).join("program-dir")) else { continue };
+            let profile = if exe_dir.ends_with("debug") { "debug" } else { "release" };
+            let engine = [exe_dir.join(engine_name), repo.join("target").join(profile).join(engine_name)].into_iter().find(|p| p.is_file());
+            if let Some(engine_exe) = engine {
+                found = Some(Locations { engine_exe, program_dir: PathBuf::from(program.trim()), templates: repo.join("app/src-tauri/templates") });
+                break;
+            }
+        }
+    }
+    let mut loc = found.unwrap_or_else(|| Locations {
+        engine_exe: exe_dir.join(engine_name),
+        program_dir: exe_dir.join("engine").join("program"),
+        templates: resources.join("templates"),
+    });
+    if let Some(v) = std::env::var_os("AUXI_ENGINE_EXE") {
+        loc.engine_exe = v.into();
+    }
+    if let Some(v) = std::env::var_os("AUXI_LO_PROGRAM") {
+        loc.program_dir = v.into();
+    }
+    if let Some(v) = std::env::var_os("AUXI_TEMPLATES") {
+        loc.templates = v.into();
+    }
+    Ok(loc)
+}
+
+fn dev_platform() -> Option<&'static str> {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("linux", "x86_64") => Some("linux-x86_64"),
+        ("macos", "aarch64") => Some("macos-aarch64"),
+        ("windows", "x86_64") => Some("windows-x86_64"),
+        _ => None,
+    }
+}
+
+fn engine_config(app: &AppHandle, slot: usize) -> Result<EngineConfig, String> {
+    let Locations { engine_exe, program_dir, .. } = locate()?;
     if !engine_exe.exists() {
         return Err(format!("moteur introuvable : {}", engine_exe.display()));
     }
     if !program_dir.exists() {
         return Err(format!("LibreOffice introuvable : {}", program_dir.display()));
     }
+    // Profils propres à chaque application : AuxiWriter et AuxiSheet tournent
+    // dans des processus distincts et ne doivent pas se partager un profil.
     let data_dir = app.path().app_data_dir().ok();
-    let profile_dir = data_dir.as_ref().map(|d| d.join("moteur").join(format!("profil-{slot}")));
+    let kind = app.state::<AppState>().kind;
+    let profile_root = data_dir.as_ref().map(|d| d.join("moteur").join(kind.slug()));
+    let profile_dir = profile_root.as_ref().map(|d| d.join(format!("profil-{slot}")));
     let log_file = data_dir.as_ref().map(|d| d.join("moteur.log"));
-    let profile_root = data_dir.as_ref().map(|d| d.join("moteur"));
     Ok(EngineConfig {
         engine_exe,
         program_dir,
@@ -240,11 +336,8 @@ fn new_document(app: AppHandle, kind: String) -> Result<String, String> {
     Ok(target.to_string_lossy().into_owned())
 }
 
-fn templates_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    if let Some(d) = std::env::var_os("AUXI_TEMPLATES") {
-        return Ok(PathBuf::from(d));
-    }
-    app.path().resource_dir().map(|d| d.join("templates")).map_err(|e| e.to_string())
+fn templates_dir(_app: &AppHandle) -> Result<PathBuf, String> {
+    locate().map(|l| l.templates)
 }
 
 /// Fichiers récents (simple liste JSON dans le dossier de données).
@@ -325,17 +418,123 @@ fn warm_engine(app: AppHandle) {
     prepare_spare(&app);
 }
 
-/// Fichier passé en argument de la ligne de commande (« Ouvrir avec »).
+/// Application lancée.
 #[tauri::command]
-fn startup_file() -> Option<String> {
-    std::env::args().skip(1).find(|a| !a.starts_with('-') && Path::new(a).is_file())
+fn app_info(state: State<'_, AppState>) -> Value {
+    json!({"kind": state.kind, "name": state.kind.name()})
+}
+
+/// Lancements en attente (ligne de commande, Finder, second lancement) ;
+/// l'interface les demande au démarrage et à chaque événement `launch`.
+#[tauri::command]
+fn take_launches(state: State<'_, AppState>) -> Vec<Launch> {
+    std::mem::take(&mut *state.pending.lock().unwrap())
+}
+
+/// Ouvre une autre application (AuxiSheet pour un classeur…) : lui transmet
+/// les fichiers si elle est déjà ouverte, sinon la démarre.
+#[tauri::command]
+fn launch_app(state: State<'_, AppState>, kind: AppKind, files: Vec<String>, new_doc: bool) -> Result<(), String> {
+    apps::launch(&state.data_dir, kind, &Launch { files, new_doc })
+}
+
+/// Répartit des fichiers entre les applications : retourne ceux que celle-ci
+/// ouvre et confie les autres à la bonne (un classeur ouvert depuis
+/// AuxiWriter part dans AuxiSheet ; AuxiOffice confie tout).
+#[tauri::command]
+fn route_files(state: State<'_, AppState>, files: Vec<String>) -> Result<Vec<String>, String> {
+    let mut mine = Vec::new();
+    let mut others: Vec<(AppKind, Vec<String>)> = Vec::new();
+    for f in files {
+        let k = AppKind::for_path(&f);
+        if k == state.kind {
+            mine.push(f);
+        } else if let Some(o) = others.iter_mut().find(|(o, _)| *o == k) {
+            o.1.push(f);
+        } else {
+            others.push((k, vec![f]));
+        }
+    }
+    for (k, files) in others {
+        apps::launch(&state.data_dir, k, &Launch { files, new_doc: false })?;
+    }
+    Ok(mine)
+}
+
+fn queue_launch(app: &AppHandle, l: Launch) {
+    app.state::<AppState>().pending.lock().unwrap().push(l);
+    let _ = app.emit("launch", ());
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+/// Avant les applications séparées, les profils étaient rangés directement
+/// sous `moteur/` (`profil-N`, `user`, `crash`) : on les retire.
+fn remove_old_profiles(data_dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(data_dir.join("moteur")) else { return };
+    for e in entries.flatten() {
+        let n = e.file_name().to_string_lossy().into_owned();
+        let old = n == "user" || n == "crash" || n.strip_prefix("profil-").is_some_and(|d| d.chars().all(|c| c.is_ascii_digit()));
+        if old && e.path().is_dir() {
+            let _ = std::fs::remove_dir_all(e.path());
+        }
+    }
+}
+
+/// Dossier de données (le même pour les quatre applications), calculé avant
+/// le démarrage de Tauri pour l'instance unique.
+fn data_dir_for(identifier: &str) -> PathBuf {
+    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+    let base = if cfg!(target_os = "macos") {
+        home.join("Library").join("Application Support")
+    } else if cfg!(windows) {
+        std::env::var_os("APPDATA").map(PathBuf::from).unwrap_or_else(|| home.join("AppData").join("Roaming"))
+    } else {
+        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).filter(|p| p.is_absolute()).unwrap_or_else(|| home.join(".local").join("share"))
+    };
+    base.join(identifier)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    let data_dir = data_dir_for(&context.config().identifier);
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    // Nom d'appel d'abord : un lien `auxiwriter` → `auxioffice` (Linux) lance AuxiWriter.
+    let argv0 = PathBuf::from(std::env::args().next().unwrap_or_default());
+    let exe = if argv0.file_stem().and_then(|s| s.to_str()).and_then(AppKind::parse).is_some() {
+        argv0
+    } else {
+        std::env::current_exe().unwrap_or_default()
+    };
+    let (kind, launch) = apps::parse_args(&args, &exe, std::env::var("AUXI_APP").ok().as_deref());
+    // Application déjà ouverte : lui confier les fichiers et s'arrêter.
+    if apps::forward(&data_dir, kind, &launch) {
+        eprintln!("{} est déjà ouvert : demande transmise à sa fenêtre. Pour lancer une nouvelle version, fermez-le d'abord.", kind.name());
+        return;
+    }
+    remove_old_profiles(&data_dir);
+    let initial = if launch == Launch::default() { vec![] } else { vec![launch] };
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Engines::default())
+        .manage(AppState { kind, data_dir: data_dir.clone(), pending: Mutex::new(initial) })
+        .setup(move |app| {
+            let handle = app.handle().clone();
+            if let Err(e) = apps::listen(&data_dir, kind, move |l| queue_launch(&handle, l)) {
+                eprintln!("{} : instance unique indisponible ({e})", kind.name());
+            }
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_title(kind.name());
+                if let Ok(icon) = tauri::image::Image::from_bytes(kind.icon_png()) {
+                    let _ = w.set_icon(icon);
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             doc_open,
             doc_call,
@@ -343,16 +542,29 @@ pub fn run() {
             doc_close,
             new_document,
             recent_files,
-            startup_file,
+            app_info,
+            take_launches,
+            launch_app,
+            route_files,
             warm_engine,
             printers,
             print_document,
             print_with_system
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("démarrage d'AuxiOffice")
         .run(|app, event| {
+            // macOS : documents ouverts depuis le Finder (double-clic, « Ouvrir avec »).
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                let files: Vec<String> = urls.iter().filter_map(|u| u.to_file_path().ok()).map(|p| p.to_string_lossy().into_owned()).collect();
+                if !files.is_empty() {
+                    queue_launch(app, Launch { files, new_doc: false });
+                }
+            }
             if let tauri::RunEvent::Exit = event {
+                let st = app.state::<AppState>();
+                apps::unlisten(&st.data_dir, st.kind);
                 let engines = app.state::<Engines>();
                 let mut all: Vec<_> = engines.docs.lock().unwrap().drain().map(|(_, e)| e).collect();
                 if let Some((spare, _, _)) = engines.spare.lock().unwrap().take() {

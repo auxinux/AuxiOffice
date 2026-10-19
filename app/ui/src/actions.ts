@@ -272,10 +272,30 @@ export const A = {
 } satisfies Record<string, Action>;
 
 // --- Barre de menus ----------------------------------------------------------
-const fileMenu: MenuDef = {
+/** Application en cours : le gestionnaire AuxiOffice ou une application d'un type de document. */
+export type AppKind = "office" | "writer" | "sheet" | "present";
+
+export const APP_NAMES: Record<AppKind, string> = { office: "AuxiOffice", writer: "AuxiWriter", sheet: "AuxiSheet", present: "AuxiPresent" };
+
+/** Type de document de chaque application. */
+export const APP_DOC: Record<AppKind, "text" | "spreadsheet" | "presentation" | null> = { office: null, writer: "text", sheet: "spreadsheet", present: "presentation" };
+
+/** « Nouveau » : le type de l'application d'abord (Ctrl+N), les autres ensuite (ils ouvrent leur application). */
+function newMenu(app: AppKind): MenuEntry {
+  const all = [
+    { kind: "writer" as const, item: (accel?: string) => a("Document texte", "newText", { accel }) },
+    { kind: "sheet" as const, item: (accel?: string) => a("Classeur", "newSheet", { accel }) },
+    { kind: "present" as const, item: (accel?: string) => a("Présentation", "newSlides", { accel }) },
+  ];
+  const own = all.find((x) => x.kind === app);
+  const items: MenuEntry[] = own ? [own.item("CmdOrCtrl+N"), "-", ...all.filter((x) => x !== own).map((x) => x.item())] : all.map((x, i) => x.item(i === 0 ? "CmdOrCtrl+N" : undefined));
+  return { submenu: "Nouveau", items };
+}
+
+const fileMenu_ = (app: AppKind): MenuDef => ({
   label: "Fichier",
   items: [
-    { submenu: "Nouveau", items: [a("Document texte", "newText", { accel: "CmdOrCtrl+N" }), a("Classeur", "newSheet"), a("Présentation", "newSlides")] },
+    newMenu(app),
     a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" }),
     "-",
     a("Enregistrer", "save", { accel: "CmdOrCtrl+S" }),
@@ -287,7 +307,10 @@ const fileMenu: MenuDef = {
     "-",
     a("Fermer le document", "close", { accel: "CmdOrCtrl+W" }),
   ],
-};
+});
+
+/** Menu Fichier sans document ouvert (accueil). */
+const homeFileMenu = (app: AppKind): MenuDef => ({ label: "Fichier", items: [newMenu(app), a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" })] });
 
 const viewItems = (sheet = false): MenuEntry[] => [
   A.zoomIn,
@@ -296,7 +319,8 @@ const viewItems = (sheet = false): MenuEntry[] => [
   ...(sheet ? [] : [A.fitWidth]),
 ];
 
-export function menusFor(type: DocType | null): MenuDef[] {
+export function menusFor(type: DocType | null, app: AppKind = "office"): MenuDef[] {
+  const fileMenu = type ? fileMenu_(app) : homeFileMenu(app);
   const editBase: MenuEntry[] = [A.undo, A.redo, "-", A.pasteSpecial, A.selectAll, "-", A.find];
   const language: MenuEntry = {
     submenu: "Langue",

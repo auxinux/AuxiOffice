@@ -4,8 +4,12 @@
 l'écosystème AuxiNux : traitement de texte, tableur et présentations, hors ligne, sans compte
 et sans télémétrie, pour Linux, Windows et macOS.
 
+Quatre applications, chacune avec sa fenêtre, son icône et son entrée dans les Applications
+(macOS) ou le menu de démarrage (Linux, Windows) :
+
 | Application | Rôle | Formats |
 |---|---|---|
+| **AuxiOffice** | gestionnaire : créer, ouvrir, documents récents ; chaque document part dans son application | — |
 | **AuxiWriter** | traitement de texte | DOCX, DOC, ODT, RTF, TXT ; export PDF |
 | **AuxiSheet** | tableur | XLSX, XLS, ODS, CSV ; export PDF |
 | **AuxiPresent** | présentations | PPTX, PPT, ODP ; export PDF |
@@ -49,6 +53,8 @@ visionneuse du système), animations du diaporama.
 Voir [BUILD.md](BUILD.md). En bref (Linux x86_64 ou Mac Apple Silicon) :
 
 ```sh
-scripts/dev.sh                   # moteur LibreOffice, compilation, lancement
+scripts/dev.sh                   # moteur LibreOffice, compilation, lancement d'AuxiOffice
+scripts/dev.sh --app writer      # … ou directement AuxiWriter (sheet, present)
+scripts/install-apps.sh          # les quatre applications dans le Finder / le menu des applications
 scripts/test.sh                  # tests de l'interface, du moteur et d'intégration
 ```

@@ -3,7 +3,7 @@
 // reconstruite quand le type du document actif change.
 
 import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
-import { menusFor, type Action, type MenuEntry } from "./actions";
+import { APP_NAMES, menusFor, type Action, type AppKind, type MenuEntry } from "./actions";
 import type { DocType } from "./engine";
 
 const IS_MAC = navigator.platform.toLowerCase().includes("mac");
@@ -28,23 +28,24 @@ async function entry(e: MenuEntry, run: (a: Action) => void, checks: Map<string,
 }
 
 /** Installe la barre de menus pour le type de document actif (null = Accueil). */
-export async function installMenus(type: DocType | null, run: (a: Action) => void) {
-  const key = type ?? "home";
+export async function installMenus(type: DocType | null, run: (a: Action) => void, app: AppKind = "office") {
+  const key = `${app}:${type ?? "home"}`;
   if (current?.key === key) return;
   const checks = new Map<string, CheckMenuItem[]>();
-  const defs = menusFor(type);
+  const defs = menusFor(type, app);
+  const name = APP_NAMES[app];
   const subs: Submenu[] = [];
   if (IS_MAC) {
     subs.push(
       await Submenu.new({
-        text: "AuxiOffice",
+        text: name,
         items: [
-          await MenuItem.new({ text: "À propos d'AuxiOffice", action: () => run({ label: "À propos", app: "about" }) }),
+          await MenuItem.new({ text: `À propos d'${name}`, action: () => run({ label: "À propos", app: "about" }) }),
           await PredefinedMenuItem.new({ item: "Separator" }),
-          await PredefinedMenuItem.new({ item: "Hide", text: "Masquer AuxiOffice" }),
+          await PredefinedMenuItem.new({ item: "Hide", text: `Masquer ${name}` }),
           await PredefinedMenuItem.new({ item: "HideOthers", text: "Masquer les autres" }),
           await PredefinedMenuItem.new({ item: "Separator" }),
-          await PredefinedMenuItem.new({ item: "Quit", text: "Quitter AuxiOffice" }),
+          await PredefinedMenuItem.new({ item: "Quit", text: `Quitter ${name}` }),
         ],
       }),
     );
@@ -65,7 +66,7 @@ export async function installMenus(type: DocType | null, run: (a: Action) => voi
     subs.push(await Submenu.new({ text: def.label, items }));
   }
   if (!IS_MAC) {
-    subs.push(await Submenu.new({ text: "Aide", items: [await MenuItem.new({ text: "À propos d'AuxiOffice", action: () => run({ label: "À propos", app: "about" }) })] }));
+    subs.push(await Submenu.new({ text: "Aide", items: [await MenuItem.new({ text: `À propos d'${name}`, action: () => run({ label: "À propos", app: "about" }) })] }));
   }
   const menu = await Menu.new({ items: subs });
   await menu.setAsAppMenu();

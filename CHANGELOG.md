@@ -2,6 +2,14 @@
 
 ## Non publié
 
+- **Quatre applications** : AuxiOffice (gestionnaire) et AuxiWriter, AuxiSheet, AuxiPresent,
+  chacune avec sa fenêtre, son icône, son accueil, ses documents récents et ses menus ; un
+  document d'un autre type part dans son application ; une seule instance par application
+  (un second lancement est transmis à la fenêtre ouverte) ; fichiers ouverts depuis le Finder.
+  `scripts/install-apps.sh` les installe dans `~/Applications` (macOS) ou le menu des
+  applications (Linux). L'exécutable trouve seul le moteur du dépôt.
+- Fermeture de la fenêtre corrigée (permission manquante) ; le moteur quitte sans
+  « Unspecified Application Error » ; `make` du moteur macOS écrit dans un journal.
 - Impression (Ctrl+P) : imprimante, pages, copies, recto verso, noir et blanc, via CUPS
   (macOS, Linux) ; « Aperçu du système… » ouvre le PDF dans la visionneuse du système.
 - Une centaine de fonctions de LibreOffice de plus dans les menus et le ruban, chacune

@@ -66,7 +66,26 @@ export const newDocument = (kind: "text" | "spreadsheet" | "presentation") => in
 
 export const recentFiles = (add?: string) => invoke<string[]>("recent_files", { add: add ?? null });
 
-export const startupFile = () => invoke<string | null>("startup_file");
+export interface AppInfo {
+  kind: "office" | "writer" | "sheet" | "present";
+  name: string;
+}
+
+/** Lancement reçu : fichiers à ouvrir et/ou document vierge. */
+export interface Launch {
+  files: string[];
+  new_doc: boolean;
+}
+
+export const appInfo = () => invoke<AppInfo>("app_info");
+export const takeLaunches = () => invoke<Launch[]>("take_launches");
+/** Ouvre une autre application (AuxiSheet…), avec des fichiers ou un document vierge. */
+export const launchApp = (kind: AppInfo["kind"], files: string[] = [], newDoc = false) => invoke<void>("launch_app", { kind, files, newDoc });
+/** Confie à leur application les fichiers d'un autre type ; retourne ceux à ouvrir ici. */
+export const routeFiles = (files: string[]) => invoke<string[]>("route_files", { files });
+
+/** Prévient quand un lancement arrive (second lancement, Finder). */
+export const onLaunch = (fn: () => void) => listen("launch", () => fn());
 
 export interface Printer {
   name: string;

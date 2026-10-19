@@ -68,16 +68,40 @@ Sans `custom-protocol`, la coque charge l'interface depuis le serveur Vite
 ## Lancer en développement
 
 ```sh
-export AUXI_ENGINE_EXE=$PWD/target/debug/auxi-engine
-export AUXI_LO_PROGRAM=$(cat .engine/*/program-dir)
-export AUXI_TEMPLATES=$PWD/app/src-tauri/templates
-target/debug/auxioffice [document]
+target/release/auxioffice [--app office|writer|sheet|present] [--new] [document…]
 ```
+
+Lancé depuis `target/<profil>/`, l'exécutable trouve seul `auxi-engine`, le LibreOffice de
+`.engine/` et les modèles du dépôt. Les variables ci-dessous remplacent ces emplacements.
+
+L'application est choisie par `--app`, par la variable `AUXI_APP`, ou par le nom de
+l'exécutable (`auxiwriter`, `AuxiSheet.app`…). `--new` ouvre un document vierge. Chaque
+application n'a qu'une instance : la relancer transmet ses fichiers à la fenêtre ouverte.
+
+## Installer les applications (développement)
+
+```sh
+scripts/install-apps.sh            # compile puis installe AuxiOffice, AuxiWriter, AuxiSheet, AuxiPresent
+scripts/install-apps.sh --remove
+```
+
+- macOS : `~/Applications/Auxi*.app` (Finder, Launchpad, Dock, « Ouvrir avec »). Chaque paquet
+  contient une copie de l'exécutable et le fichier `Resources/dev-root` qui désigne le dépôt
+  (moteur et LibreOffice) : relancer le script après une recompilation.
+- Linux : entrées `ca.auxinux.*.desktop` du menu des applications (Bureautique), icônes, et
+  liens `target/release/auxiwriter`… vers `auxioffice` (classe de fenêtre propre à chaque
+  application pour la barre des tâches).
+- Windows (paquets à venir) : un raccourci par application, `AuxiOffice.exe --app writer`, ou une
+  copie nommée `AuxiWriter.exe`.
+
+Dans un paquet, `AuxiOffice.app` (ou le dossier d'installation) contient le moteur ; sous macOS,
+`AuxiWriter.app`, `AuxiSheet.app` et `AuxiPresent.app` le cherchent dans `AuxiOffice.app` voisin.
 
 | Variable | Rôle | Par défaut (paquets) |
 |---|---|---|
+| `AUXI_APP` | application : `office`, `writer`, `sheet`, `present` | d'après `--app` ou le nom de l'exécutable |
 | `AUXI_ENGINE_EXE` | exécutable `auxi-engine` | à côté de `auxioffice` |
-| `AUXI_LO_PROGRAM` | dossier `program/` de LibreOffice | `engine/program/` à côté de `auxioffice` |
+| `AUXI_LO_PROGRAM` | dossier `program/` de LibreOffice | `engine/program/` à côté de `auxioffice` (macOS : `Resources/engine/*.app`) |
 | `AUXI_TEMPLATES` | modèles vierges | ressources de l'application (`templates/`) |
 | `AUXI_LANG` | langue du moteur | `fr-FR` |
 | `AUXI_AUTHOR` | auteur des modifications et commentaires | nom de session |

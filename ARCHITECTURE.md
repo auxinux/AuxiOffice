@@ -19,6 +19,20 @@
 └──────────────────────────────┘
 ```
 
+## Quatre applications, un exécutable
+
+- **AuxiOffice** est le gestionnaire : créer, ouvrir, documents récents. Il n'ouvre aucun
+  document lui-même (aucun moteur) : il les confie à **AuxiWriter**, **AuxiSheet** ou
+  **AuxiPresent**, qui ont chacune leur fenêtre, leur icône, leur accueil, leurs documents
+  récents et leurs menus. Un fichier d'un autre type ouvert dans l'une part dans la bonne.
+- Même exécutable, application choisie au lancement (`app/src-tauri/src/apps.rs`) : `--app`,
+  `AUXI_APP` ou nom de l'exécutable / du paquet `.app`.
+- **Instance unique par application** : la première écoute sur `127.0.0.1` (port et jeton
+  secret dans `instances/<app>.json`, droits 0600) ; un second lancement lui transmet ses
+  fichiers et quitte. Sous macOS, les fichiers du Finder arrivent par `RunEvent::Opened`.
+- Profils LibreOffice séparés par application (`moteur/<app>/profil-N`) : deux applications
+  ouvertes ne partagent jamais un profil. Les documents récents sont communs.
+
 ## Choix structurants
 
 - **Moteur LibreOffice via LibreOfficeKit.** Il apporte la mise en page, le calcul, le rendu

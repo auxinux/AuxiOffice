@@ -48,6 +48,12 @@ button, select, input { font: inherit; color: inherit; }
 /* --- Accueil ------------------------------------------------------------ */
 .home { flex: 1; overflow: auto; padding: 32px 48px; }
 .home header .logo { height: 64px; }
+.home .app-title { display: flex; align-items: center; gap: 14px; height: 64px; }
+.home .app-title img { width: 56px; height: 56px; }
+.home .app-title span { font-size: 34px; font-weight: 700; letter-spacing: -.01em; }
+.home.app-writer .app-title span { color: #2456AD; }
+.home.app-sheet .app-title span { color: #1E7A45; }
+.home.app-present .app-title span { color: #B9452A; }
 .home h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 32px 0 12px; }
 .new-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; max-width: 900px; }
 .new-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .15s, transform .15s; }
@@ -231,3 +237,5 @@ button, select, input { font: inherit; color: inherit; }
   color: rgba(255, 255, 255, 0.35);
   font-size: 12px;
 }
+.about .app-title { display: flex; justify-content: center; align-items: center; gap: 10px; }
+.about .app-title span { font-size: 26px; font-weight: 700; }

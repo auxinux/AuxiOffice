@@ -1,13 +1,15 @@
-// Fenêtre principale : onglet Accueil et un onglet par document ouvert.
+// Fenêtre principale. AuxiOffice (le gestionnaire) : accueil seul, chaque
+// document part dans son application. AuxiWriter, AuxiSheet, AuxiPresent :
+// onglet Accueil et un onglet par document de leur type.
 
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Action, AppAction } from "./actions";
+import { APP_DOC, APP_NAMES, type Action, type AppAction, type AppKind } from "./actions";
 import { DocView, type DocHandle } from "./DocView";
 import { installMenus, updateMenuChecks } from "./menus";
 import { PrintDialog } from "./PrintDialog";
-import { call, closeDocument, newDocument, openDocument, recentFiles, startupFile, warmEngine, type DocInfo } from "./engine";
+import { appInfo, call, closeDocument, launchApp, newDocument, onLaunch, openDocument, recentFiles, routeFiles, takeLaunches, warmEngine, type DocInfo, type Launch } from "./engine";
 import { Home } from "./Home";
 import { fileName, isUntitled } from "./lok";
 
@@ -18,13 +20,22 @@ interface Tab {
   lost: boolean;
 }
 
-const OPEN_FILTERS = [
-  { name: "Documents pris en charge", extensions: ["docx", "doc", "odt", "rtf", "txt", "dotx", "xlsx", "xls", "ods", "csv", "xlsm", "pptx", "ppt", "odp", "ppsx", "odg"] },
-  { name: "Textes", extensions: ["docx", "doc", "odt", "rtf", "txt", "dotx"] },
-  { name: "Classeurs", extensions: ["xlsx", "xls", "ods", "csv", "xlsm"] },
-  { name: "Présentations", extensions: ["pptx", "ppt", "odp", "ppsx"] },
-  { name: "Tous les fichiers", extensions: ["*"] },
-];
+const TYPE_FILTERS = {
+  text: { name: "Textes", extensions: ["docx", "doc", "odt", "rtf", "txt", "dotx"] },
+  spreadsheet: { name: "Classeurs", extensions: ["xlsx", "xls", "ods", "csv", "xlsm"] },
+  presentation: { name: "Présentations", extensions: ["pptx", "ppt", "odp", "ppsx", "odg"] },
+};
+const ALL_FILTER = { name: "Documents pris en charge", extensions: Object.values(TYPE_FILTERS).flatMap((f) => f.extensions) };
+
+/** Filtres d'ouverture : ceux de l'application d'abord. */
+function openFilters(app: AppKind) {
+  const own = APP_DOC[app];
+  const types = Object.entries(TYPE_FILTERS);
+  const ordered = own ? [TYPE_FILTERS[own], ALL_FILTER, ...types.filter(([k]) => k !== own).map(([, f]) => f)] : [ALL_FILTER, ...types.map(([, f]) => f)];
+  return [...ordered, { name: "Tous les fichiers", extensions: ["*"] }];
+}
+
+const APP_FOR_DOC = { text: "writer", spreadsheet: "sheet", presentation: "present" } as const;
 
 const SAVE_FILTERS: Record<string, { name: string; extensions: string[] }[]> = {
   text: [
@@ -48,6 +59,8 @@ const SAVE_FILTERS: Record<string, { name: string; extensions: string[] }[]> = {
 };
 
 export function App() {
+  const [app, setApp] = useState<AppKind | null>(null);
+  const appRef = useRef<AppKind>("office");
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [active, setActive] = useState<number>(0); // 0 = Accueil
   const [recents, setRecents] = useState<string[]>([]);
@@ -62,22 +75,15 @@ export function App() {
     window.setTimeout(() => setToast((t) => (t?.text === text ? null : t)), kind === "error" ? 7000 : 3500);
   }, []);
 
-  useEffect(() => {
-    void recentFiles().then(setRecents);
-    void startupFile().then((f) => {
-      if (f) void openPath(f);
-      // Moteur de réserve, une fois l'interface affichée.
-      window.setTimeout(() => void warmEngine(), f ? 4000 : 800);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const name = APP_NAMES[app ?? "office"];
 
   // Titre de la fenêtre.
   useEffect(() => {
+    if (!app) return;
     const t = tabs.find((x) => x.info.doc === active);
-    const title = t ? `${t.modified ? "• " : ""}${isUntitled(t.path) ? "Sans titre" : fileName(t.path)} — AuxiOffice` : "AuxiOffice";
+    const title = t ? `${t.modified ? "• " : ""}${isUntitled(t.path) ? "Sans titre" : fileName(t.path)} — ${name}` : name;
     void getCurrentWindow().setTitle(title);
-  }, [tabs, active]);
+  }, [tabs, active, app, name]);
 
   const openPath = useCallback(
     async (path: string) => {
@@ -104,7 +110,7 @@ export function App() {
         setActive(info.doc);
         if (!isUntitled(path)) setRecents(await recentFiles(path));
       } catch (e) {
-        await message(`Impossible d'ouvrir « ${fileName(path)} ».\n\n${e}`, { title: "AuxiOffice", kind: "error" });
+        await message(`Impossible d'ouvrir « ${fileName(path)} ».\n\n${e}`, { title: APP_NAMES[appRef.current], kind: "error" });
       } finally {
         setBusy(null);
       }
@@ -112,14 +118,35 @@ export function App() {
     [],
   );
 
+  /** Ouvre des fichiers ici, ou dans leur application s'ils sont d'un autre type. */
+  const openFiles = useCallback(
+    async (files: string[]) => {
+      if (!files.length) return;
+      try {
+        const mine = await routeFiles(files);
+        if (mine.length < files.length) notify(appRef.current === "office" ? "Ouverture dans l'application du document…" : "Document ouvert dans son application.");
+        for (const f of mine) await openPath(f);
+      } catch (e) {
+        notify(`${e}`, "error");
+      }
+    },
+    [openPath, notify],
+  );
+
   const openDialog = useCallback(async () => {
-    const path = await open({ multiple: false, filters: OPEN_FILTERS });
-    if (typeof path === "string") await openPath(path);
-  }, [openPath]);
+    const path = await open({ multiple: true, filters: openFilters(appRef.current) });
+    if (path) await openFiles(Array.isArray(path) ? path : [path]);
+  }, [openFiles]);
 
   const createNew = useCallback(
     async (kind: "text" | "spreadsheet" | "presentation") => {
       try {
+        if (APP_DOC[appRef.current] !== kind) {
+          // Un autre type : son application (AuxiOffice n'ouvre pas de document).
+          await launchApp(APP_FOR_DOC[kind], [], true);
+          notify(`Ouverture d'${APP_NAMES[APP_FOR_DOC[kind]]}…`);
+          return;
+        }
         await openPath(await newDocument(kind));
       } catch (e) {
         notify(`Création impossible : ${e}`, "error");
@@ -127,6 +154,33 @@ export function App() {
     },
     [openPath, notify],
   );
+
+  // Démarrage : quelle application, puis les lancements reçus (ligne de
+  // commande, Finder, second lancement transmis par le système).
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    const handle = async () => {
+      for (const l of await takeLaunches()) await runLaunch(l);
+    };
+    const runLaunch = async (l: Launch) => {
+      await openFiles(l.files);
+      const own = APP_DOC[appRef.current];
+      if (l.new_doc && own && !l.files.length) await createNew(own);
+    };
+    void (async () => {
+      const info = await appInfo();
+      appRef.current = info.kind;
+      setApp(info.kind);
+      setRecents(await recentFiles());
+      off = await onLaunch(() => void handle());
+      const first = await takeLaunches();
+      for (const l of first) await runLaunch(l);
+      // Moteur de réserve, une fois l'interface affichée (pas dans le gestionnaire).
+      if (info.kind !== "office") window.setTimeout(() => void warmEngine(), first.length ? 4000 : 800);
+    })();
+    return () => off?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setTab = (doc: number, patch: Partial<Tab>) => setTabs((ts) => ts.map((t) => (t.info.doc === doc ? { ...t, ...patch } : t)));
 
@@ -151,7 +205,7 @@ export function App() {
         }
         notify("Document enregistré.");
       } catch (e) {
-        await message(`L'enregistrement a échoué.\n\n${e}`, { title: "AuxiOffice", kind: "error" });
+        await message(`L'enregistrement a échoué.\n\n${e}`, { title: APP_NAMES[appRef.current], kind: "error" });
       } finally {
         setBusy(null);
       }
@@ -250,8 +304,8 @@ export function App() {
       if (h) h.run(a);
       else if (a.app) appAction(a.app, 0);
     };
-    void installMenus(activeType, run).catch((e) => console.warn("menus", e));
-  }, [activeType, appAction]);
+    if (app) void installMenus(activeType, run, app).catch((e) => console.warn("menus", e));
+  }, [activeType, appAction, app]);
 
   // Fermeture de la fenêtre : confirmer s'il reste des modifications.
   useEffect(() => {
@@ -260,7 +314,7 @@ export function App() {
       const dirty = tabsRef.current.filter((t) => t.modified && !t.lost);
       if (!dirty.length) return;
       const ok = await ask(`${dirty.length} document(s) contiennent des modifications non enregistrées. Quitter quand même ?`, {
-        title: "Quitter AuxiOffice",
+        title: `Quitter ${APP_NAMES[appRef.current]}`,
         kind: "warning",
         okLabel: "Quitter",
         cancelLabel: "Annuler",
@@ -273,11 +327,14 @@ export function App() {
   // Raccourcis globaux (Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+W…) : portés par la
   // barre de menus native, qui les intercepte avant la page.
 
+  if (!app) return <div className="app" />;
+
   return (
-    <div className="app">
+    <div className={`app app-${app}`}>
+      {app !== "office" && (
       <div className="tabbar" role="tablist">
         <div role="tab" className={`tab tab-home ${active === 0 ? "active" : ""}`} onClick={() => setActive(0)} aria-selected={active === 0}>
-          <img src="/logo-mark.svg" alt="" />
+          <img src={`/icons/auxi${app}.svg`} alt="" />
           <span className="name">Accueil</span>
         </div>
         {tabs.map((t) => (
@@ -307,9 +364,10 @@ export function App() {
           </div>
         )}
       </div>
+      )}
 
       <div className="content">
-        {active === 0 && <Home recents={recents} onNew={createNew} onOpen={openDialog} onOpenPath={openPath} />}
+        {active === 0 && <Home app={app} recents={recents} onNew={createNew} onOpen={openDialog} onOpenPath={(p) => void openFiles([p])} />}
         {tabs.map((t) =>
           t.lost ? (
             active === t.info.doc && (
@@ -363,8 +421,15 @@ export function App() {
       {about && (
         <div className="dialog-backdrop" onClick={() => setAbout(false)}>
           <div className="about" onClick={(e) => e.stopPropagation()}>
-            <img src="/logo-light.svg" alt="AuxiOffice" />
-            <p>Version 0.1.0 — suite bureautique de l'écosystème AuxiNux.</p>
+            {app === "office" ? (
+              <img src="/logo-light.svg" alt="AuxiOffice" />
+            ) : (
+              <div className="app-title">
+                <img src={`/icons/auxi${app}.svg`} alt="" />
+                <span>{name}</span>
+              </div>
+            )}
+            <p>Version 0.1.0 — {app === "office" ? "suite bureautique" : "de la suite AuxiOffice"}, écosystème AuxiNux.</p>
             <p>
               Moteur de documents : LibreOffice{tabs[0]?.info.libreoffice ? "" : ""}. LibreOffice est une marque déposée de The Document Foundation.
             </p>
