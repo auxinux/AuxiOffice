@@ -420,5 +420,28 @@ Reload it and lose your changes?</translation>
             <source>AuxiText is free software (GNU AGPL v3). It uses the Qt toolkit (GNU LGPL v3). The license texts are installed with AuxiNux Office.</source>
             <translation>AuxiText is free software (GNU AGPL v3). It uses the Qt toolkit (GNU LGPL v3). The license texts are installed with AuxiNux Office.</translation>
         </message>
+        <message>
+            <source>Check French &amp;Spelling (AuxiCorrect)</source>
+            <translation>Check French &amp;Spelling (AuxiCorrect)</translation>
+        </message>
+        <message>
+            <source>AuxiCorrect is not installed, or this integration is turned off in AuxiCorrect (Settings → Integration).</source>
+            <translation>AuxiCorrect is not installed, or this integration is turned off in AuxiCorrect (Settings → Integration).</translation>
+        </message>
+    </context>
+    <context>
+        <name>SpellChecker</name>
+        <message>
+            <source>(delete)</source>
+            <translation>(delete)</translation>
+        </message>
+        <message>
+            <source>No suggestion</source>
+            <translation>No suggestion</translation>
+        </message>
+        <message>
+            <source>Ignore</source>
+            <translation>Ignore</translation>
+        </message>
     </context>
 </TS>

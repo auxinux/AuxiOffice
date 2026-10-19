@@ -6,7 +6,9 @@
 
 #include "codeeditor.h"
 
+#include <QContextMenuEvent>
 #include <QFontDatabase>
+#include <QMenu>
 #include <QPainter>
 #include <QScrollBar>
 #include <QTextBlock>
@@ -169,7 +171,23 @@ void CodeEditor::highlightCurrentLine()
         selection.cursor.clearSelection();
         selections.append(selection);
     }
+    selections.append(m_diagnostics);
     setExtraSelections(selections);
+}
+
+void CodeEditor::setDiagnosticSelections(const QList<QTextEdit::ExtraSelection>& selections)
+{
+    m_diagnostics = selections;
+    highlightCurrentLine();
+}
+
+void CodeEditor::contextMenuEvent(QContextMenuEvent* event)
+{
+    QMenu* menu = createStandardContextMenu(event->pos());
+    if (m_contextMenuHook)
+        m_contextMenuHook(menu, cursorForPosition(event->pos()).position());
+    menu->exec(event->globalPos());
+    delete menu;
 }
 
 void CodeEditor::paintLineNumbers(QPaintEvent* event)

@@ -20,6 +20,7 @@ class QActionGroup;
 class QFileSystemWatcher;
 class QLabel;
 class QMenu;
+class SpellChecker;
 
 class MainWindow;
 
@@ -90,12 +91,14 @@ private:
     void setEol(TextIO::Eol eol);
     void setLanguage(int language);  // -1 = automatique
     void onFileChangedOnDisk(const QString& path);
+    void updateSpellingState();
 
     static QList<MainWindow*>& instances();
 
     TextHost* m_host;
     CodeEditor* m_editor;
     Highlighter* m_highlighter;
+    SpellChecker* m_spell;
     QPointer<FindDialog> m_find;
     QFileSystemWatcher* m_watcher;
 
@@ -116,7 +119,7 @@ private:
             *m_openWriterAct, *m_closeAct, *m_quitAct;
     QAction *m_undoAct, *m_redoAct, *m_cutAct, *m_copyAct, *m_pasteAct, *m_selectAllAct,
             *m_findAct, *m_findNextAct, *m_findPrevAct, *m_replaceAct, *m_gotoAct;
-    QAction *m_wrapAct, *m_lineNumbersAct, *m_zoomInAct, *m_zoomOutAct, *m_zoomResetAct;
+    QAction *m_wrapAct, *m_lineNumbersAct, *m_spellAct, *m_zoomInAct, *m_zoomOutAct, *m_zoomResetAct;
     QAction *m_themeSystemAct, *m_themeLightAct, *m_themeDarkAct;
     QAction *m_uiLangSystemAct, *m_uiLangFrAct, *m_uiLangEnAct;
     QAction *m_aboutAct, *m_licensesAct;

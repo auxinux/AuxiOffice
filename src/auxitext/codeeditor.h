@@ -12,6 +12,10 @@
 
 #include <QPlainTextEdit>
 
+#include <functional>
+
+class QMenu;
+
 class CodeEditor : public QPlainTextEdit
 {
     Q_OBJECT
@@ -27,12 +31,18 @@ public:
     int zoomSteps() const { return m_zoom; }
     void goToLine(int line);
 
+    // Soulignements de la correction (AuxiCorrect), affichés avec la ligne courante
+    void setDiagnosticSelections(const QList<QTextEdit::ExtraSelection>& selections);
+    // Complète le menu contextuel ; reçoit la position du texte sous le pointeur
+    void setContextMenuHook(const std::function<void(QMenu*, int)>& hook) { m_contextMenuHook = hook; }
+
     int lineNumberAreaWidth() const;
     void paintLineNumbers(QPaintEvent* event);
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
     void updateMarginWidth();
@@ -44,6 +54,8 @@ private:
     bool m_lineNumbers = true;
     bool m_dark = false;
     int m_zoom = 0;
+    QList<QTextEdit::ExtraSelection> m_diagnostics;
+    std::function<void(QMenu*, int)> m_contextMenuHook;
 };
 
 #endif // AUXITEXT_CODEEDITOR_H

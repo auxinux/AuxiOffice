@@ -420,5 +420,28 @@ Le recharger et perdre vos modifications ?</translation>
             <source>AuxiText is free software (GNU AGPL v3). It uses the Qt toolkit (GNU LGPL v3). The license texts are installed with AuxiNux Office.</source>
             <translation>AuxiText est un logiciel libre (GNU AGPL v3). Il utilise la bibliothèque Qt (GNU LGPL v3). Les textes des licences sont installés avec AuxiNux Office.</translation>
         </message>
+        <message>
+            <source>Check French &amp;Spelling (AuxiCorrect)</source>
+            <translation>Vérifier l'ortho&amp;graphe (AuxiCorrect)</translation>
+        </message>
+        <message>
+            <source>AuxiCorrect is not installed, or this integration is turned off in AuxiCorrect (Settings → Integration).</source>
+            <translation>AuxiCorrect n'est pas installé, ou cette intégration est désactivée dans AuxiCorrect (Paramètres → Intégration).</translation>
+        </message>
+    </context>
+    <context>
+        <name>SpellChecker</name>
+        <message>
+            <source>(delete)</source>
+            <translation>(supprimer)</translation>
+        </message>
+        <message>
+            <source>No suggestion</source>
+            <translation>Aucune suggestion</translation>
+        </message>
+        <message>
+            <source>Ignore</source>
+            <translation>Ignorer</translation>
+        </message>
     </context>
 </TS>

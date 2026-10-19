@@ -5,6 +5,7 @@
  */
 
 #include "mainwindow.h"
+#include "spellchecker.h"
 
 #include "app.h"
 #include "codeeditor.h"
@@ -50,6 +51,7 @@ MainWindow::MainWindow(QWidget* parent, TextHost* host)
     , m_host(host)
     , m_editor(new CodeEditor(this))
     , m_highlighter(new Highlighter(m_editor->document()))
+    , m_spell(new SpellChecker(m_editor))
     , m_watcher(new QFileSystemWatcher(this))
 {
     instances().append(this);
@@ -227,6 +229,12 @@ void MainWindow::createActions()
         m_editor->setLineNumbersVisible(on);
         App::settings().setValue(QStringLiteral("view/lineNumbers"), on);
     });
+    m_spellAct = new QAction(this);
+    m_spellAct->setCheckable(true);
+    connect(m_spellAct, &QAction::toggled, this, [this](bool on) {
+        m_spell->setUserEnabled(on);
+        App::settings().setValue(QStringLiteral("spelling/enabled"), on);
+    });
     m_zoomInAct = new QAction(this);
     m_zoomInAct->setShortcuts({QKeySequence::ZoomIn, QKeySequence(QStringLiteral("Ctrl+="))});
     connect(m_zoomInAct, &QAction::triggered, this, [this] { m_editor->zoomBy(1); });
@@ -337,6 +345,7 @@ void MainWindow::createMenus()
     m_viewMenu = menuBar()->addMenu(QString());
     m_viewMenu->addAction(m_wrapAct);
     m_viewMenu->addAction(m_lineNumbersAct);
+    m_viewMenu->addAction(m_spellAct);
     m_syntaxMenu = m_viewMenu->addMenu(QString());
     m_syntaxMenu->addActions(m_syntaxGroup->actions());
     m_viewMenu->addSeparator();
@@ -407,6 +416,7 @@ void MainWindow::retranslate()
     m_viewMenu->setTitle(tr("&View"));
     m_wrapAct->setText(tr("&Word Wrap"));
     m_lineNumbersAct->setText(tr("&Line Numbers"));
+    m_spellAct->setText(tr("Check French &Spelling (AuxiCorrect)"));
     m_syntaxMenu->setTitle(tr("&Syntax Highlighting"));
     const QList<QAction*> syntax = m_syntaxGroup->actions();
     syntax[0]->setText(tr("Automatic (from file extension)"));
@@ -445,6 +455,12 @@ void MainWindow::changeEvent(QEvent* event)
 {
     if (event->type() == QEvent::LanguageChange)
         retranslate();
+    // Réglage commun relu au retour dans la fenêtre : activer AuxiCorrect dans ses
+    // paramètres prend effet sans redémarrer AuxiText.
+    if (event->type() == QEvent::ActivationChange && isActiveWindow()) {
+        m_spell->reloadSharedConfig();
+        updateSpellingState();
+    }
     QMainWindow::changeEvent(event);
 }
 
@@ -457,6 +473,10 @@ void MainWindow::readSettings()
     m_editor->setWordWrap(wrap);
     m_lineNumbersAct->setChecked(numbers);
     m_editor->setLineNumbersVisible(numbers);
+    const bool spelling = s.value(QStringLiteral("spelling/enabled"), true).toBool();
+    m_spellAct->setChecked(spelling);
+    m_spell->setUserEnabled(spelling);
+    updateSpellingState();
     if (!m_host) {
         const QByteArray geometry = s.value(QStringLiteral("window/geometry")).toByteArray();
         if (geometry.isEmpty() || !restoreGeometry(geometry))
@@ -714,6 +734,7 @@ void MainWindow::setCurrentFile(const QString& path)
     m_editor->document()->setModified(false);
     if (m_languageOverride < 0)
         m_highlighter->setLanguage(Highlighter::languageForFile(m_path));
+    updateSpellingState();
     updateTitle();
     updateStatus();
 }
@@ -766,7 +787,21 @@ void MainWindow::setLanguage(int language)
     m_languageOverride = language;
     m_highlighter->setLanguage(language < 0 ? Highlighter::languageForFile(m_path)
                                             : Highlighter::Language(language));
+    updateSpellingState();
     updateStatus();
+}
+
+// Correction AuxiCorrect : texte brut et Markdown seulement (pas JSON, XML, YAML, INI) ;
+// l'option du menu est grisée tant qu'elle n'est pas activée dans AuxiCorrect.
+void MainWindow::updateSpellingState()
+{
+    const Highlighter::Language lang = m_highlighter->language();
+    m_spell->setDocumentEligible(lang == Highlighter::Language::None || lang == Highlighter::Language::Markdown);
+    const bool allowed = m_spell->allowedByAuxiCorrect();
+    m_spellAct->setEnabled(allowed);
+    m_spellAct->setStatusTip(allowed ? QString()
+                                     : tr("AuxiCorrect is not installed, or this integration is turned off in "
+                                          "AuxiCorrect (Settings → Integration)."));
 }
 
 void MainWindow::onFileChangedOnDisk(const QString& path)

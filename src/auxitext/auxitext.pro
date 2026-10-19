@@ -15,8 +15,8 @@ AUXI_VERSION = $$cat($$PWD/../../VERSION)
 DEFINES += AUXI_VERSION=\\\"$$AUXI_VERSION\\\"
 DEFINES += QT_NO_CAST_FROM_BYTEARRAY
 
-HEADERS += app.h codeeditor.h finddialog.h highlighter.h mainwindow.h textio.h
-SOURCES += app.cpp codeeditor.cpp finddialog.cpp highlighter.cpp mainwindow.cpp main.cpp textio.cpp
+HEADERS += app.h codeeditor.h finddialog.h highlighter.h mainwindow.h spellchecker.h textio.h
+SOURCES += app.cpp codeeditor.cpp finddialog.cpp highlighter.cpp mainwindow.cpp main.cpp spellchecker.cpp textio.cpp
 
 TRANSLATIONS += i18n/auxitext_fr.ts i18n/auxitext_en.ts
 
