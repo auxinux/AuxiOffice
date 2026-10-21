@@ -3,7 +3,7 @@
 ## Démarrage rapide (Linux ou Mac Apple Silicon)
 
 ```sh
-git clone https://git.auxinux.ca/Auxinux/AuxiOffice.git
+git clone https://github.com/auxinux/AuxiOffice.git
 cd AuxiOffice
 scripts/dev.sh                 # moteur + interface + compilation + lancement
 scripts/dev.sh ~/Documents/rapport.docx
