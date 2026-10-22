@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { auxiCorrectStatus, call, onEngineEvent, paint, uno, type AuxiCorrectStatus, type DocInfo, type EngineEvent } from "./engine";
-import { lokKeyFor, parseInvalidation, parseRects, parseState, toFileUrl, TWIPS_PER_PX, type Rect } from "./lok";
+import { isCompositionInput, sameClipboardText, lokKeyFor, parseInvalidation, parseRects, parseState, toFileUrl, TWIPS_PER_PX, type Rect } from "./lok";
 import { TileView } from "./TileView";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { Action, AppAction } from "./actions";
@@ -15,6 +15,11 @@ import { SlideShow } from "./SlideShow";
 import { Toolbar } from "./Toolbar";
 
 const IS_MAC = navigator.platform.toLowerCase().includes("mac");
+
+/** Dernière copie faite dans un document (texte de la sélection). */
+let lastCopy: { doc: number; text: string } | null = null;
+
+const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 export interface DocHandle {
   /** Exécute une commande du catalogue (menus, ruban) sur ce document. */
@@ -126,6 +131,13 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
       const i = await call<DocInfo>(doc, "info");
       view.setDocSize(i.width, i.height);
       setPartNames(i.part_names);
+      // Feuille insérée ou supprimée : LibreOffice change de partie sans
+      // rappel set_part (l'onglet et les en-têtes restaient sur l'ancienne).
+      if (i.part !== view.part) {
+        view.setPart(i.part);
+        setPart(i.part);
+        if (isSheet) void syncSheetViewport();
+      }
       if (isSlides) setThumbVersion((n) => n + 1);
       updatePages(i);
     };
@@ -372,7 +384,8 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
   };
 
   const onInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
-    if (composing.current) return;
+    // Texte composé (touches mortes, méthodes de saisie) : envoyé par compositionend.
+    if (composing.current || isCompositionInput(e.nativeEvent as InputEvent)) return;
     const t = e.currentTarget.value;
     e.currentTarget.value = "";
     if (t) {
@@ -392,31 +405,52 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
     void call(doc, "text", { text: e.data });
   };
 
-  const onCopy = async (e: React.ClipboardEvent, cut: boolean) => {
+  // Linux : le raccourci du menu natif (Couper, Copier, Coller) et le clavier
+  // envoient chacun l'événement ; une coupe supprimait un caractère de trop.
+  const lastClipboardEvent = useRef({ type: "", t: -1e9 });
+  const repeated = (e: React.ClipboardEvent) => {
+    const last = lastClipboardEvent.current;
+    const again = last.type === e.type && e.timeStamp - last.t < 300;
+    lastClipboardEvent.current = { type: e.type, t: e.timeStamp };
+    return again;
+  };
+
+  const onCopy = (e: React.ClipboardEvent, cut: boolean) => {
     e.preventDefault();
-    const [html, text] = await Promise.all([
-      call<{ text: string | null }>(doc, "selection", { mime: "text/html" }),
-      call<{ text: string | null }>(doc, "selection", { mime: "text/plain;charset=utf-8" }),
-    ]);
-    // L'événement natif est terminé : passer par l'API asynchrone.
-    try {
-      if (html.text && typeof ClipboardItem !== "undefined") {
-        await navigator.clipboard.write([
-          new ClipboardItem({ "text/html": new Blob([html.text], { type: "text/html" }), "text/plain": new Blob([text.text ?? ""], { type: "text/plain" }) }),
-        ]);
-      } else {
-        await navigator.clipboard.writeText(text.text ?? "");
-      }
-    } catch {
-      onMessage("Impossible d'accéder au presse-papiers.", "error");
+    if (repeated(e)) return;
+    const sel = (async () => {
+      const html = await call<{ text: string | null }>(doc, "selection", { mime: "text/html" });
+      const text = await call<{ text: string | null }>(doc, "selection", { mime: "text/plain;charset=utf-8" });
+      lastCopy = { doc, text: text.text ?? "" };
+      // Aussi dans le presse-papiers de LibreOffice, pour un collage fidèle
+      // dans ce document ; Couper retire la sélection.
+      await uno(doc, cut ? ".uno:Cut" : ".uno:Copy");
+      return { html: html.text ?? "", text: text.text ?? "" };
+    })();
+    const failed = () => onMessage("Impossible d'accéder au presse-papiers.", "error");
+    if (typeof ClipboardItem !== "undefined") {
+      // Écriture demandée pendant l'événement (geste de l'utilisateur), son
+      // contenu arrive ensuite : passé ce délai, WebKit la refusait parfois.
+      const blob = (type: string, f: (s: { html: string; text: string }) => string) => sel.then((s) => new Blob([f(s)], { type }));
+      navigator.clipboard
+        .write([new ClipboardItem({ "text/html": blob("text/html", (s) => s.html || escapeHtml(s.text)), "text/plain": blob("text/plain", (s) => s.text) })])
+        .catch(failed);
+    } else {
+      sel.then((s) => navigator.clipboard.writeText(s.text)).catch(failed);
     }
-    if (cut) sendKey(0, 1286);
   };
 
   const onPaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
+    if (repeated(e)) return;
     const html = e.clipboardData.getData("text/html");
     const text = e.clipboardData.getData("text/plain");
+    // Copie faite dans ce document : presse-papiers de LibreOffice (styles,
+    // formules, images et formes conservés).
+    if (lastCopy?.doc === doc && sameClipboardText(text, lastCopy.text)) {
+      void uno(doc, ".uno:Paste");
+      return;
+    }
     if (html) void call(doc, "paste", { mime: "text/html", data: html });
     else if (text) void call(doc, "paste", { mime: "text/plain;charset=utf-8", data: text });
   };
@@ -554,7 +588,13 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
             value={formula}
             onChange={(e) => setFormula(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") command(".uno:EnterString", { StringName: { type: "string", value: formula } });
+              if (e.key === "Enter") {
+                // EnterString ne fait que remplir la saisie de la cellule (qui
+                // restait ouverte, et un clic ailleurs y ajoutait une référence) :
+                // Entrée la valide, comme au clavier dans la cellule.
+                command(".uno:EnterString", { StringName: { type: "string", value: formula } });
+                sendKey(13, 1280);
+              }
               if (e.key === "Escape") focusInput();
             }}
             aria-label="Contenu de la cellule"
@@ -610,8 +650,8 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
               onCompositionStart={() => (composing.current = true)}
               onCompositionUpdate={onCompositionUpdate}
               onCompositionEnd={onCompositionEnd}
-              onCopy={(e) => void onCopy(e, false)}
-              onCut={(e) => void onCopy(e, true)}
+              onCopy={(e) => onCopy(e, false)}
+              onCut={(e) => onCopy(e, true)}
               onPaste={onPaste}
               aria-label="Zone d'édition du document"
             />

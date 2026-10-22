@@ -15,7 +15,7 @@ import { AuxiCorrectDictionary, AuxiCorrectOptionsDialog } from "./AuxiCorrect";
 import { appInfo, call, closeDocument, launchApp, newDocument, onLaunch, openDocument, openPdf, recentFiles, routeFiles, takeLaunches, warmEngine, type DocInfo, type Launch } from "./engine";
 import { PdfView } from "./PdfView";
 import { Home } from "./Home";
-import { fileName, isUntitled } from "./lok";
+import { besideFile, fileName, isUntitled, saveFiltersFor, withSaveExtension } from "./lok";
 
 interface Tab {
   info: DocInfo;
@@ -53,18 +53,22 @@ const DRAW_NATIVE = ["odg", "fodg", "otg"];
 const SAVE_FILTERS: Record<string, { name: string; extensions: string[] }[]> = {
   text: [
     { name: "Document Word", extensions: ["docx"] },
+    { name: "Document Word avec macros", extensions: ["docm"] },
     { name: "Texte OpenDocument", extensions: ["odt"] },
     { name: "Texte enrichi", extensions: ["rtf"] },
     { name: "Word 97-2003", extensions: ["doc"] },
+    { name: "Texte brut", extensions: ["txt"] },
   ],
   spreadsheet: [
     { name: "Classeur Excel", extensions: ["xlsx"] },
+    { name: "Classeur Excel avec macros", extensions: ["xlsm"] },
     { name: "Classeur OpenDocument", extensions: ["ods"] },
     { name: "CSV", extensions: ["csv"] },
     { name: "Excel 97-2003", extensions: ["xls"] },
   ],
   presentation: [
     { name: "Présentation PowerPoint", extensions: ["pptx"] },
+    { name: "Présentation PowerPoint avec macros", extensions: ["pptm"] },
     { name: "Présentation OpenDocument", extensions: ["odp"] },
     { name: "PowerPoint 97-2003", extensions: ["ppt"] },
   ],
@@ -207,26 +211,31 @@ export function App() {
 
   const setTab = (doc: number, patch: Partial<Tab>) => setTabs((ts) => ts.map((t) => (t.info.doc === doc ? { ...t, ...patch } : t)));
 
+  /** Enregistre ; vrai si le document est enregistré (faux : annulé ou échec). */
   const saveDocument = useCallback(
-    async (doc: number, asNew: boolean) => {
+    async (doc: number, asNew: boolean): Promise<boolean> => {
       const t = tabsRef.current.find((x) => x.info.doc === doc);
-      if (!t) return;
+      if (!t) return false;
       if (t.info.type === "pdf") {
         const saved = await handles.current.get(doc)?.save?.(asNew);
         if (saved) {
           setTab(doc, { path: saved, modified: false, info: { ...t.info, path: saved, read_only: false } });
           setRecents(await recentFiles(saved));
         }
-        return;
+        return !!saved;
       }
+      // Dessins que LibreOffice ne sait pas réécrire : enregistrés en ODG.
       const ext = t.path.split(".").pop()?.toLowerCase() ?? "";
       const foreign = t.info.type === "drawing" && !DRAW_NATIVE.includes(ext);
       try {
         if (asNew || foreign || isUntitled(t.path) || t.info.read_only) {
-          const filters = SAVE_FILTERS[t.info.type] ?? [];
+          // Format du document proposé d'abord (un .docm garde ses macros).
+          const filters = saveFiltersFor(SAVE_FILTERS[t.info.type] ?? [], isUntitled(t.path) || foreign ? "" : t.path);
           const base = isUntitled(t.path) ? "Sans titre" : fileName(t.path).replace(/\.[^.]+$/, "");
-          const target = await save({ filters, defaultPath: `${base}.${filters[0]?.extensions[0] ?? "odt"}` });
-          if (!target) return;
+          const name = `${base}.${filters[0]?.extensions[0] ?? "odt"}`;
+          const chosen = await save({ filters, defaultPath: isUntitled(t.path) ? name : besideFile(t.path, name) });
+          if (!chosen) return false;
+          const target = withSaveExtension(chosen, filters);
           setBusy("Enregistrement…");
           await call(doc, "save_as_location", { path: target });
           setTab(doc, { path: target, modified: false, info: { ...t.info, read_only: false, locked_by: null, path: target } });
@@ -237,8 +246,10 @@ export function App() {
           setTab(doc, { modified: false });
         }
         notify("Document enregistré.");
+        return true;
       } catch (e) {
         await message(`L'enregistrement a échoué.\n\n${e}`, { title: APP_NAMES[appRef.current], kind: "error" });
+        return false;
       } finally {
         setBusy(null);
       }
@@ -251,8 +262,10 @@ export function App() {
       const t = tabsRef.current.find((x) => x.info.doc === doc);
       if (!t) return;
       const base = isUntitled(t.path) ? "Sans titre" : fileName(t.path).replace(/\.[^.]+$/, "");
-      const target = await save({ filters: [{ name: "PDF", extensions: ["pdf"] }], defaultPath: `${base}.pdf` });
-      if (!target) return;
+      const pdf = [{ name: "PDF", extensions: ["pdf"] }];
+      const chosen = await save({ filters: pdf, defaultPath: isUntitled(t.path) ? `${base}.pdf` : besideFile(t.path, `${base}.pdf`) });
+      if (!chosen) return;
+      const target = withSaveExtension(chosen, pdf);
       setBusy("Exportation en PDF…");
       try {
         await call(doc, "save", { path: target, format: "pdf" });
@@ -298,13 +311,17 @@ export function App() {
     const t = tabsRef.current.find((x) => x.info.doc === doc);
     if (!t) return;
     if (t.modified && !t.lost) {
-      const discard = await ask(`Les modifications de « ${isUntitled(t.path) ? "Sans titre" : fileName(t.path)} » ne sont pas enregistrées.`, {
+      // Enregistrer d'ici, comme dans les autres suites bureautiques.
+      const choice = await message(`Les modifications de « ${isUntitled(t.path) ? "Sans titre" : fileName(t.path)} » ne sont pas enregistrées.\n\nVoulez-vous les enregistrer avant de fermer ?`, {
         title: "Fermer le document",
         kind: "warning",
-        okLabel: "Fermer sans enregistrer",
-        cancelLabel: "Annuler",
+        buttons: { yes: "Enregistrer", no: "Ne pas enregistrer", cancel: "Annuler" },
       });
-      if (!discard) return;
+      if (choice === "Enregistrer" || choice === "Yes") {
+        if (!(await saveDocument(doc, false))) return;
+      } else if (choice !== "Ne pas enregistrer" && choice !== "No") {
+        return;
+      }
     }
     await closeDocument(doc).catch(() => undefined);
     handles.current.delete(doc);
@@ -313,7 +330,7 @@ export function App() {
       setActive((a) => (a === doc ? (rest[rest.length - 1]?.info.doc ?? 0) : a));
       return rest;
     });
-  }, []);
+  }, [saveDocument]);
 
   const [about, setAbout] = useState(false);
   const [version, setVersion] = useState("");

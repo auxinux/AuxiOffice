@@ -337,6 +337,8 @@ mod tests {
         assert_eq!(AppKind::for_path("b.odg"), AppKind::Draw);
         assert_eq!(AppKind::for_path("plan.VSDX"), AppKind::Draw);
         assert_eq!(AppKind::for_path("/a/facture.pdf"), AppKind::Pdf);
+        assert_eq!(AppKind::for_path("/a/Prix l'été.XLSM"), AppKind::Sheet);
+        assert_eq!(AppKind::for_path("b.docm"), AppKind::Writer);
         for k in ALL {
             assert_eq!(AppKind::parse(k.slug()), Some(k));
             assert_eq!(AppKind::parse(k.name()), Some(k));

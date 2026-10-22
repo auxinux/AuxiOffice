@@ -161,6 +161,23 @@ export function lokKeyFor(e: KeyLike, mac = false): LokKey | null {
   return null;
 }
 
+/**
+ * Événement « input » produit par une composition (touche morte, méthode de
+ * saisie) : à ignorer, compositionend porte le texte validé. WebKitGTK, après
+ * une touche morte, envoie le caractère composé par « input »
+ * (insertFromComposition) puis par un second compositionend : « ê » arrivait
+ * deux fois.
+ */
+export function isCompositionInput(e: { isComposing?: boolean; inputType?: string }): boolean {
+  return !!e.isComposing || /Composition/.test(e.inputType ?? "");
+}
+
+/** Même texte de presse-papiers, aux fins de ligne près (\r\n, \n final). */
+export function sameClipboardText(a: string, b: string): boolean {
+  const norm = (s: string) => s.replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+  return norm(a) === norm(b);
+}
+
 /** Couleur CSS « #rrggbb » vers l'entier attendu par .uno:Color. */
 export function colorToLong(css: string): number {
   return parseInt(css.replace("#", ""), 16) & 0xffffff;
@@ -185,6 +202,38 @@ export function formatForPath(path: string): string {
 
 export function fileName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
+}
+
+/** `name` dans le dossier de `path` (boîte « Enregistrer sous » ouverte à côté du document). */
+export function besideFile(path: string, name: string): string {
+  const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return i >= 0 ? path.slice(0, i + 1) + name : name;
+}
+
+/** Extension en minuscules (« » si aucune). */
+export function extension(path: string): string {
+  const name = fileName(path);
+  const i = name.lastIndexOf(".");
+  return i > 0 ? name.slice(i + 1).toLowerCase() : "";
+}
+
+export interface FileFilter {
+  name: string;
+  extensions: string[];
+}
+
+/** Filtres d'« Enregistrer sous » : le format du document d'abord (un .docm
+ * reste un .docm et garde ses macros). */
+export function saveFiltersFor(filters: FileFilter[], path: string): FileFilter[] {
+  const ext = extension(path);
+  const i = filters.findIndex((f) => f.extensions.includes(ext));
+  return i > 0 ? [filters[i], ...filters.filter((_, j) => j !== i)] : filters;
+}
+
+/** Nom choisi sans extension connue (« rapport ») : celle du premier filtre. */
+export function withSaveExtension(target: string, filters: FileFilter[]): string {
+  if (filters.some((f) => f.extensions.includes(extension(target)))) return target;
+  return `${target}.${filters[0]?.extensions[0] ?? "odt"}`;
 }
 
 /** Document vierge pas encore enregistré par l'utilisateur. */

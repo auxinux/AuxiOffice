@@ -46,8 +46,31 @@ export const openDocument = (path: string, ignoreLock = false) => invoke<DocInfo
 
 export const closeDocument = (doc: number) => invoke<void>("doc_close", { doc });
 
+/** Dernière requête en cours de chaque document (toujours résolue). */
+const queues = new Map<number, Promise<void>>();
+
+/**
+ * Requête au moteur d'un document. Les requêtes d'un document partent dans
+ * l'ordre, chacune après la réponse de la précédente : la coque les traite
+ * en parallèle, et un appui pouvait arriver après son relâchement, une
+ * touche avant la précédente, Entrée avant le texte de la barre de formule.
+ * Un enregistrement attend les requêtes précédentes, mais les suivantes ne
+ * l'attendent pas (il peut durer, ou attendre une réponse de l'utilisateur).
+ */
 export function call<T = Record<string, unknown>>(doc: number, cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-  return invoke<T>("doc_call", { doc, req: { cmd, ...args } });
+  const before = queues.get(doc) ?? Promise.resolve();
+  const p = before.then(() => invoke<T>("doc_call", { doc, req: { cmd, ...args } }));
+  if (!cmd.startsWith("save")) {
+    const settled = p.then(
+      () => undefined,
+      () => undefined,
+    );
+    queues.set(doc, settled);
+    void settled.then(() => {
+      if (queues.get(doc) === settled) queues.delete(doc);
+    });
+  }
+  return p;
 }
 
 export async function paint(doc: number, req: PaintRequest): Promise<Uint8ClampedArray<ArrayBuffer>> {

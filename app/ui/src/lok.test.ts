@@ -114,3 +114,53 @@ describe("impression", () => {
     expect(validPageRange("a")).toBe(false);
   });
 });
+
+describe("saisie composée", () => {
+  it("ignore les « input » d'une composition (touches mortes)", async () => {
+    const { isCompositionInput } = await import("./lok");
+    // Séquence de WebKitGTK pour ^ puis e : seul compositionend porte « ê ».
+    expect(isCompositionInput({ inputType: "insertCompositionText", isComposing: true })).toBe(true);
+    expect(isCompositionInput({ inputType: "deleteCompositionText", isComposing: true })).toBe(true);
+    expect(isCompositionInput({ inputType: "insertFromComposition", isComposing: true })).toBe(true);
+    expect(isCompositionInput({ inputType: "insertFromComposition", isComposing: false })).toBe(true);
+    expect(isCompositionInput({ inputType: "insertText", isComposing: false })).toBe(false);
+    expect(isCompositionInput({})).toBe(false);
+  });
+});
+
+describe("presse-papiers", () => {
+  it("reconnaît sa propre copie malgré les fins de ligne", async () => {
+    const { sameClipboardText } = await import("./lok");
+    expect(sameClipboardText("a\r\nb\r\n", "a\nb")).toBe(true);
+    expect(sameClipboardText("", "")).toBe(true);
+    expect(sameClipboardText("a b", "a  b")).toBe(false);
+  });
+});
+
+describe("enregistrer sous", () => {
+  const filters = [
+    { name: "Document Word", extensions: ["docx"] },
+    { name: "Document Word avec macros", extensions: ["docm"] },
+    { name: "Texte OpenDocument", extensions: ["odt"] },
+  ];
+  it("propose d'abord le format du document (macros conservées)", async () => {
+    const { saveFiltersFor } = await import("./lok");
+    expect(saveFiltersFor(filters, "/home/a/Lettre de l'été.DOCM")[0].extensions).toEqual(["docm"]);
+    expect(saveFiltersFor(filters, "C:\\Docs\\x.odt").map((f) => f.extensions[0])).toEqual(["odt", "docx", "docm"]);
+    expect(saveFiltersFor(filters, "/a/notes.txt")).toBe(filters);
+    expect(saveFiltersFor(filters, "")).toBe(filters);
+  });
+  it("ouvre la boîte à côté du document", async () => {
+    const { besideFile } = await import("./lok");
+    expect(besideFile("/home/a/Lettre l'été.docx", "Lettre l'été.pdf")).toBe("/home/a/Lettre l'été.pdf");
+    expect(besideFile("C:\\Docs\\x.docx", "x.pdf")).toBe("C:\\Docs\\x.pdf");
+    expect(besideFile("x.docx", "x.pdf")).toBe("x.pdf");
+  });
+  it("ajoute l'extension manquante", async () => {
+    const { withSaveExtension } = await import("./lok");
+    expect(withSaveExtension("/home/a/rapport", filters)).toBe("/home/a/rapport.docx");
+    expect(withSaveExtension("/home/a/rapport.v2", filters)).toBe("/home/a/rapport.v2.docx");
+    expect(withSaveExtension("/home/a/rapport.DocM", filters)).toBe("/home/a/rapport.DocM");
+    expect(withSaveExtension("/home/a.b/rapport", [{ name: "PDF", extensions: ["pdf"] }])).toBe("/home/a.b/rapport.pdf");
+  });
+});
