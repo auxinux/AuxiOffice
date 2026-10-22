@@ -172,6 +172,12 @@ export function isCompositionInput(e: { isComposing?: boolean; inputType?: strin
   return !!e.isComposing || /Composition/.test(e.inputType ?? "");
 }
 
+/** Même texte de presse-papiers, aux fins de ligne près (\r\n, \n final). */
+export function sameClipboardText(a: string, b: string): boolean {
+  const norm = (s: string) => s.replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+  return norm(a) === norm(b);
+}
+
 /** Couleur CSS « #rrggbb » vers l'entier attendu par .uno:Color. */
 export function colorToLong(css: string): number {
   return parseInt(css.replace("#", ""), 16) & 0xffffff;

@@ -128,6 +128,15 @@ describe("saisie composée", () => {
   });
 });
 
+describe("presse-papiers", () => {
+  it("reconnaît sa propre copie malgré les fins de ligne", async () => {
+    const { sameClipboardText } = await import("./lok");
+    expect(sameClipboardText("a\r\nb\r\n", "a\nb")).toBe(true);
+    expect(sameClipboardText("", "")).toBe(true);
+    expect(sameClipboardText("a b", "a  b")).toBe(false);
+  });
+});
+
 describe("enregistrer sous", () => {
   const filters = [
     { name: "Document Word", extensions: ["docx"] },
