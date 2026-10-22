@@ -13,6 +13,13 @@ Quatre applications, chacune avec sa fenêtre, son icône et son entrée dans le
 | **AuxiWriter** | traitement de texte | DOCX, DOC, ODT, RTF, TXT ; export PDF |
 | **AuxiSheet** | tableur | XLSX, XLS, ODS, CSV ; export PDF |
 | **AuxiPresent** | présentations | PPTX, PPT, ODP ; export PDF |
+| **AuxiText** | éditeur de texte, **installable seul** (sans LibreOffice ni le reste de la suite) ; éditeur par défaut d'AuxiNuxOS | texte brut, journaux, Markdown, JSON, XML, YAML, INI, TOML, scripts, code source |
+
+AuxiText est une application à part (`text/`, paquet `auxitext`) : onglets, coloration
+syntaxique, recherche et remplacement (expressions régulières), multi-curseurs, encodages
+(UTF-8, UTF-16, Windows-1252, ISO-8859-…) et fins de ligne détectés et conservés,
+enregistrement atomique, thème clair ou sombre qui suit le bureau. « Ouvrir dans AuxiWriter »
+apparaît quand la suite est installée.
 
 AuxiOffice est un **produit propriétaire du Projet AuxiNux**. Son interface et sa coque sont
 écrites par AuxiNux ; le rendu et l'édition des documents sont confiés à
@@ -58,5 +65,6 @@ Voir [BUILD.md](BUILD.md). En bref (Linux x86_64 ou Mac Apple Silicon) :
 scripts/dev.sh                   # moteur LibreOffice, compilation, lancement d'AuxiOffice
 scripts/dev.sh --app writer      # … ou directement AuxiWriter (sheet, present)
 scripts/install-apps.sh          # les quatre applications dans le Finder / le menu des applications
-scripts/test.sh                  # tests de l'interface, du moteur et d'intégration
+scripts/dev-text.sh [fichier]    # AuxiText seul (aucun moteur nécessaire)
+scripts/test.sh                  # tests des interfaces, du moteur et d'intégration
 ```

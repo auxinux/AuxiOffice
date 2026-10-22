@@ -106,14 +106,45 @@ Dans un paquet, `AuxiOffice.app` (ou le dossier d'installation) contient le mote
 | `AUXI_LANG` | langue du moteur | `fr-FR` |
 | `AUXI_AUTHOR` | auteur des modifications et commentaires | nom de session |
 
+## AuxiText (éditeur de texte)
+
+AuxiText n'a besoin ni du moteur ni de LibreOffice : Rust, Node.js et WebKitGTK suffisent.
+
+```sh
+scripts/dev-text.sh [fichier…]          # npm install + build + cargo build --release + lancement
+AUXI_DEBUG=1 scripts/dev-text.sh        # compilation de débogage
+
+# à la main
+cd text && npm install && npm run build && cd ..
+cargo build --release -p auxitext --features custom-protocol
+target/release/auxitext [--new-window] [fichier…]
+```
+
+Sans `custom-protocol`, la coque charge l'interface depuis le serveur Vite
+(`cd text && npm run dev`, port **5175**). Un second lancement transmet ses fichiers à la
+fenêtre active (sans fichier ou avec `--new-window` : nouvelle fenêtre) ; un fichier absent
+est créé à l'enregistrement.
+
+Paquet Debian (construit par l'utilisateur sur sa machine) : `cd text && npx tauri build`
+produit `target/release/bundle/deb/auxitext_<version>_amd64.deb`. Il ne dépend que de
+WebKitGTK 4.1 et GTK 3, installe `ca.auxinux.AuxiText.desktop` (types MIME texte, `%F`), les
+icônes et la fiche AppStream ; l'entrée `auxitext.desktop` générée par Tauri est masquée
+(`NoDisplay`).
+
+Fichiers de l'utilisateur : préférences dans `~/.config/ca.auxinux.text/preferences.json`,
+fichiers récents et adresse de l'instance (`instance.json`, 0600) dans
+`~/.local/share/ca.auxinux.text/`.
+
 ## Tester
 
 ```sh
 scripts/test.sh
 ```
 
-- interface : vérification TypeScript et tests `vitest` (`app/ui/src/*.test.ts`) ;
-- Rust : tests unitaires (protocole, conversion des pixels) ;
+- interfaces : vérification TypeScript et tests `vitest` (`app/ui/src/*.test.ts`,
+  `text/ui/src/*.test.ts` : langages, préférences, indentation, menus) ;
+- Rust : tests unitaires (protocole, conversion des pixels ; AuxiText : encodages, BOM, fins
+  de ligne, enregistrement atomique et droits, fichiers binaires, instance unique) ;
 - intégration (`crates/auxi-engine/tests/engine.rs`), avec un vrai LibreOffice : édition et
   enregistrement Writer, formules Calc, diapositives Impress, verrous, requêtes invalides.
   Les documents sont générés par `tests/fixtures/generate.py`.

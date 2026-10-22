@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>ca.auxinux.AuxiText</id>
+  <name>AuxiText</name>
+  <summary>Text editor</summary>
+  <summary xml:lang="fr">Éditeur de texte</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <developer id="ca.auxinux">
+    <name>Projet AuxiNux</name>
+  </developer>
+  <description>
+    <p xml:lang="fr">AuxiText est l'éditeur de texte de l'écosystème AuxiNux : onglets, coloration syntaxique, recherche et remplacement avec expressions régulières, encodages et fins de ligne détectés et conservés.</p>
+    <p>AuxiText is the text editor of the AuxiNux ecosystem: tabs, syntax highlighting, search and replace with regular expressions, encodings and line endings detected and preserved.</p>
+  </description>
+  <launchable type="desktop-id">ca.auxinux.AuxiText.desktop</launchable>
+  <url type="homepage">https://office.auxinux.ca</url>
+  <provides>
+    <binary>auxitext</binary>
+  </provides>
+  <releases>
+    <release version="0.2.0~beta.1" date="2026-10-22" type="development"/>
+  </releases>
+</component>

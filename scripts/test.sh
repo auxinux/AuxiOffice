@@ -1,7 +1,8 @@
 #!/bin/sh
-# Lance tous les tests d'AuxiOffice :
-#  1. interface : vérification TypeScript + tests unitaires (vitest) ;
-#  2. Rust : tests unitaires, puis tests d'intégration du moteur avec un vrai
+# Lance tous les tests d'AuxiOffice et d'AuxiText :
+#  1. interfaces (app/, text/) : vérification TypeScript + tests unitaires (vitest) ;
+#  2. Rust : tests unitaires (dont AuxiText : encodages, enregistrement,
+#     instance unique), puis tests d'intégration du moteur avec un vrai
 #     LibreOffice (si AUXI_LO_PROGRAM ou .engine/ est disponible).
 #
 # Variables : AUXI_LO_PROGRAM (dossier program/ de LibreOffice),
@@ -13,6 +14,9 @@ cd "$ROOT"
 
 echo "== Interface"
 (cd app && npm run --silent typecheck && npx vitest run --reporter=dot)
+
+echo "== Interface d'AuxiText"
+(cd text && { [ -d node_modules ] || npm install --no-audit --no-fund; } && npm run --silent typecheck && npx vitest run --reporter=dot)
 
 if [ -z "${AUXI_LO_PROGRAM:-}" ]; then
   for f in .engine/*/program-dir; do

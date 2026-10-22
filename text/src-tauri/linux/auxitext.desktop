@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AuxiText
+Exec={{exec}} %F
+Icon={{icon}}
+Terminal=false
+NoDisplay=true
+StartupWMClass={{exec}}
+Comment=Entrée générée par le paquet ; l'entrée du menu est ca.auxinux.AuxiText.desktop

@@ -1,5 +1,34 @@
 # Journal des modifications
 
+## 0.2.0-beta.1 — AuxiText
+
+- **AuxiText**, éditeur de texte de l'écosystème, installable seul (paquet `auxitext`, sans
+  LibreOffice ni le reste de la suite), éditeur par défaut d'AuxiNuxOS. Tauri 2 +
+  CodeMirror 6 :
+  - onglets et plusieurs fenêtres, Nouveau, Ouvrir, fichiers récents, Enregistrer,
+    Enregistrer sous, Enregistrer tout, Recharger, Fermer ; question avant de perdre des
+    modifications (onglet, fenêtre, Quitter) ;
+  - coloration syntaxique d'une trentaine de langages (Markdown, JSON, XML, HTML, CSS,
+    JavaScript, TypeScript, Python, Rust, C/C++, Java, PHP, SQL, YAML, Go, shell, INI,
+    TOML, diff, Dockerfile, Makefile, CMake, journaux…), détectée par le nom du fichier ou sa
+    première ligne ;
+  - rechercher et remplacer (casse, mot entier, expressions régulières avec groupes), aller à
+    la ligne, multi-curseurs, pliage, mise en évidence de la ligne et des parenthèses,
+    commenter, dupliquer, déplacer, trier les lignes, majuscules et minuscules ;
+  - encodage détecté (BOM, UTF-8, UTF-16, Windows-1252 et autres encodages 8 bits) et fins de
+    ligne (LF, CRLF, CR) conservées octet pour octet ; changement d'encodage et de fins de
+    ligne, réouverture avec un autre encodage ; fichiers binaires refusés, confirmation
+    au-delà de 50 Mo ;
+  - enregistrement atomique (fichier temporaire puis renommage, droits conservés) ;
+  - fichier modifié ou supprimé par un autre programme signalé (Recharger, Ignorer) ;
+  - instance unique : un second lancement transmet ses fichiers à la fenêtre ouverte ;
+    glisser-déposer de fichiers ;
+  - barre d'état (ligne, colonne, sélection, langage, indentation, encodage, fins de ligne,
+    état) ; thème clair ou sombre qui suit le bureau (KDE, GTK) ou forcé ; préférences
+    (police, taille, zoom, retour à la ligne, numéros, espaces visibles, indentation) ;
+  - impression ; « Ouvrir dans AuxiWriter » quand la suite est installée.
+- Version du dépôt : 0.2.0-beta.1.
+
 ## Non publié
 
 - **AuxiCorrect dans AuxiWriter** : quand AuxiCorrect est installé et AuxiOffice activé dans

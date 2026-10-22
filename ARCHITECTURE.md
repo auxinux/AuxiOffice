@@ -33,6 +33,36 @@
 - Profils LibreOffice séparés par application (`moteur/<app>/profil-N`) : deux applications
   ouvertes ne partagent jamais un profil. Les documents récents sont communs.
 
+## AuxiText : éditeur de texte autonome
+
+- Application séparée (`text/`, crate et binaire `auxitext`, identifiant `ca.auxinux.text`),
+  installable seule : elle ne dépend d'aucun crate de la suite ni de LibreOffice.
+- `text/ui` : React + **CodeMirror 6** (une vue par onglet ; langage, thème, police,
+  retour à la ligne et indentation dans des compartiments reconfigurables). La coloration de
+  chaque langage est chargée à la demande (`languages.ts`) ; la détection se fait par nom de
+  fichier (extension, `Makefile`, `.bashrc`, copies `.bak`/`.in`…) puis par la première ligne
+  (`#!`, `<?xml`). Recherche, remplacement et « Aller à la ligne » sont ceux de CodeMirror,
+  traduits.
+- `text/src-tauri/src/textio.rs` : l'interface ne voit que du texte Unicode à fins de ligne
+  `\n`. À la lecture : BOM, puis UTF-16 sans BOM, refus des fichiers binaires (octets nuls,
+  caractères de contrôle), UTF-8 strict, sinon `chardetng` (Windows-1252 en cas de doute).
+  Encodage, BOM et fins de ligne sont rendus à l'enregistrement : un fichier relu puis
+  réécrit redonne les mêmes octets. Un caractère absent de l'encodage choisi est refusé
+  (l'interface propose l'UTF-8).
+- Enregistrement atomique : fichier temporaire dans le même dossier, `fsync`, droits et
+  groupe de l'original, renommage. Lien symbolique suivi ; fichier d'un autre propriétaire,
+  liens physiques ou dossier non modifiable : réécriture sur place.
+- Instance unique (`instance.rs`) : même principe que la suite (127.0.0.1, jeton dans un
+  fichier 0600), fichiers transmis à la dernière fenêtre active ; plusieurs fenêtres par
+  processus, chacune avec sa barre de menus native.
+- Thème (`theme.rs`) : `GTK_THEME`, puis `kdeglobals` sous KDE, puis `gsettings` ; à défaut,
+  `prefers-color-scheme`. La fenêtre GTK (barre de menus) prend le même thème.
+- Modifications sur le disque : `stat` toutes les 2 s et à chaque retour dans la fenêtre ;
+  bandeau « Recharger / Ignorer », ou « fichier supprimé ».
+- Impression : vue imprimable (`#print-area`, CSS `@media print`) puis impression de la page
+  par WebKitGTK (dialogue GTK, CUPS).
+- AuxiCorrect n'est pas encore branché sur AuxiText.
+
 ## AuxiCorrect (correction du français)
 
 - AuxiCorrect est un programme séparé (GPL-3.0) : AuxiOffice ne lie pas son code, il appelle

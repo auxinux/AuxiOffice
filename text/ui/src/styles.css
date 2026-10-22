@@ -1,0 +1,160 @@
+:root {
+  --orange: #f26f00;
+  --amber: #f2b713;
+  --graphite: #23252a;
+  --bg: #f7f7f5;
+  --panel: #ffffff;
+  --border: #dcdcd8;
+  --text: #23252a;
+  --muted: #6b6e73;
+  --hover: #ececea;
+  --editor-bg: #ffffff;
+  --editor-fg: #23252a;
+  --gutter-bg: #f7f7f5;
+  --gutter-fg: #9a9ca0;
+  --active-line: #f2f4f7;
+  --tabbar: #e9e9e6;
+  --tab-fg: #4a4d52;
+  --banner-info: #e8f0fb;
+  --banner-warn: #fff4d6;
+  --banner-changed: #ffe8d6;
+  font-family: "Noto Sans", "Segoe UI", "DejaVu Sans", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+:root.dark {
+  --bg: #1b1d22;
+  --panel: #262930;
+  --border: #383b42;
+  --text: #dcdfe4;
+  --muted: #9095a0;
+  --hover: #30333a;
+  --editor-bg: #282c34;
+  --editor-fg: #abb2bf;
+  --gutter-bg: #282c34;
+  --gutter-fg: #636d83;
+  --active-line: #2c313c;
+  --tabbar: #1b1d22;
+  --tab-fg: #a9adb5;
+  --banner-info: #24344d;
+  --banner-warn: #4a3d16;
+  --banner-changed: #4d3018;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; overflow: hidden; }
+button, select, input { font: inherit; color: inherit; }
+
+.app { display: flex; flex-direction: column; height: 100%; }
+
+/* --- Onglets ------------------------------------------------------------ */
+.tabbar { display: flex; align-items: stretch; background: var(--tabbar); height: 34px; padding: 0 4px; gap: 1px; user-select: none; overflow-x: auto; overflow-y: hidden; border-bottom: 1px solid var(--border); flex: none; scrollbar-width: thin; }
+.tab { display: flex; align-items: center; gap: 6px; padding: 0 6px 0 12px; margin-top: 4px; height: 30px; border-radius: 6px 6px 0 0; color: var(--tab-fg); max-width: 220px; min-width: 90px; flex: none; cursor: default; }
+.tab:hover { background: var(--hover); }
+.tab.active { background: var(--editor-bg); color: var(--text); box-shadow: inset 0 2px 0 var(--orange); }
+.tab .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.tab .close { border: 0; background: transparent; width: 20px; height: 20px; border-radius: 4px; padding: 0; line-height: 1; cursor: pointer; color: var(--muted); display: grid; place-items: center; }
+.tab .close .dot { display: none; font-size: 10px; color: var(--orange); }
+.tab .close .x { font-size: 16px; opacity: 0; }
+.tab.active .close .x, .tab:hover .close .x { opacity: .8; }
+.tab.dirty .close .dot { display: block; }
+.tab.dirty .close .x { display: none; }
+.tab.dirty .close:hover .dot { display: none; }
+.tab.dirty .close:hover .x { display: block; opacity: 1; }
+.tab .close:hover { background: var(--border); color: var(--text); }
+.newtab { border: 0; background: transparent; color: var(--muted); font-size: 18px; width: 28px; margin-top: 4px; border-radius: 6px; cursor: pointer; flex: none; }
+.newtab:hover { background: var(--hover); color: var(--text); }
+
+/* --- Bandeau (fichier modifié sur le disque, avertissements) ------------ */
+.banner { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-bottom: 1px solid var(--border); background: var(--banner-info); flex: none; }
+.banner.warn { background: var(--banner-warn); }
+.banner.changed, .banner.deleted { background: var(--banner-changed); }
+.banner span { flex: 1; }
+.banner button { border: 1px solid var(--border); background: var(--panel); border-radius: 5px; padding: 2px 10px; cursor: pointer; }
+.banner button:hover { border-color: var(--orange); }
+.banner button.x { border: 0; background: transparent; font-size: 16px; padding: 0 4px; }
+
+/* --- Éditeurs ----------------------------------------------------------- */
+.editors { flex: 1; min-height: 0; position: relative; background: var(--editor-bg); }
+.editor-host { position: absolute; inset: 0; }
+.editor-host[hidden] { display: none; }
+.editor-host .cm-editor { height: 100%; }
+.editor-host .cm-editor.cm-focused { outline: none; }
+.cm-panels { font-family: inherit; }
+.cm-panels .cm-search { font-size: 13px; padding: 6px 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.cm-panels .cm-search br { flex-basis: 100%; content: ""; }
+.cm-panels .cm-search input.cm-textfield { font-size: 13px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--panel); color: var(--text); min-width: 220px; }
+.cm-panels .cm-search input.cm-textfield:focus { outline: 2px solid var(--orange); outline-offset: -1px; }
+.cm-panels .cm-search .cm-button { background-image: none; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; color: var(--text); font-size: 12px; }
+.cm-panels .cm-search .cm-button:hover { border-color: var(--orange); }
+.cm-panels .cm-search label { font-size: 12px; display: inline-flex; align-items: center; gap: 3px; }
+.cm-panels .cm-search button[name=close] { font-size: 16px; color: var(--muted); }
+.cm-panel.cm-gotoLine { padding: 6px 8px; font-size: 13px; }
+.cm-panel.cm-gotoLine input { font-size: 13px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); color: var(--text); }
+.cm-panel.cm-gotoLine button { background-image: none; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
+.cm-panels { background: var(--panel) !important; color: var(--text) !important; border-color: var(--border) !important; }
+.cm-searchMatch { background-color: rgba(242, 183, 19, .35) !important; outline: 1px solid rgba(242, 111, 0, .5); }
+.cm-searchMatch-selected { background-color: rgba(242, 111, 0, .45) !important; }
+
+/* --- Barre d'état ------------------------------------------------------- */
+.statusbar { display: flex; align-items: center; gap: 2px; height: 26px; padding: 0 6px; border-top: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; white-space: nowrap; flex: none; user-select: none; }
+.statusbar > span { padding: 0 6px; }
+.statusbar .pos { color: var(--text); }
+.statusbar .spacer { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.statusbar .sb { border: 0; background: transparent; padding: 2px 7px; border-radius: 4px; cursor: pointer; color: var(--text); font-size: 12px; }
+.statusbar .sb:hover { background: var(--hover); }
+.statusbar .state.modified { color: var(--orange); font-weight: 600; }
+.statusbar .ro { color: #b04a00; }
+
+/* --- Menus surgissants -------------------------------------------------- */
+.popup { position: fixed; bottom: 30px; width: 290px; max-height: 60vh; display: flex; flex-direction: column; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .25); z-index: 50; outline: none; overflow: hidden; }
+.popup-filter { margin: 6px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); }
+.popup-filter:focus { outline: 2px solid var(--orange); outline-offset: -1px; }
+.popup-list { overflow-y: auto; padding: 4px 0; }
+.popup .header { padding: 6px 12px 3px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.popup .item { display: flex; gap: 6px; padding: 4px 12px; cursor: default; }
+.popup .item:hover, .popup .item.sel { background: var(--hover); }
+.popup .item .check { width: 14px; color: var(--orange); }
+
+/* --- Boîtes de dialogue ------------------------------------------------- */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); display: grid; place-items: center; z-index: 100; }
+.modal { background: var(--panel); color: var(--text); border-radius: 10px; box-shadow: 0 16px 48px rgba(0, 0, 0, .35); min-width: 380px; max-width: min(560px, 92vw); max-height: 88vh; display: flex; flex-direction: column; padding: 18px 20px 14px; border: 1px solid var(--border); }
+.modal.wide { max-width: min(640px, 94vw); }
+.modal h2 { margin: 0 0 10px; font-size: 16px; }
+.modal-body { overflow: auto; line-height: 1.45; }
+.modal .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.modal .buttons button { border: 1px solid var(--border); background: var(--bg); border-radius: 6px; padding: 5px 14px; cursor: pointer; }
+.modal .buttons button:hover { border-color: var(--orange); }
+.modal .buttons button:focus-visible { outline: 2px solid var(--orange); outline-offset: 1px; }
+.modal .buttons button.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
+.modal .buttons button.danger { color: #c0392b; }
+:root.dark .modal .buttons button.danger { color: #ff8a7a; }
+.prefs fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 0 0 10px; padding: 8px 12px 10px; }
+.prefs legend { padding: 0 4px; color: var(--muted); font-size: 12px; }
+.prefs label { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.prefs label > input:not([type]), .prefs label > input[list], .prefs label > input[type=number], .prefs label > select { margin-left: auto; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
+.prefs label > input[list] { width: 260px; }
+.prefs label > input[type=number] { width: 80px; }
+.prefs .hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+.prefs .link { border: 0; background: none; color: var(--orange); cursor: pointer; padding: 0; }
+.about { display: flex; gap: 16px; align-items: flex-start; }
+.about h3 { margin: 0 0 6px; }
+.about p { margin: 4px 0; }
+.licenses ul { padding-left: 18px; margin: 6px 0; }
+.stats th { text-align: left; font-weight: normal; color: var(--muted); padding: 2px 16px 2px 0; }
+.stats td { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* --- Impression --------------------------------------------------------- */
+#print-area { display: none; }
+@media print {
+  @page { margin: 15mm; }
+  :root, :root.dark { color-scheme: light; background: #fff; }
+  html, body { height: auto; overflow: visible; background: #fff; color: #000; }
+  #root { display: none; }
+  #print-area { display: block; background: #fff; color: #000; }
+  #print-area * { background: transparent; color: #000; }
+  #print-area .print-title { font: 9pt "Noto Sans", sans-serif; color: #555; border-bottom: 1px solid #999; padding-bottom: 3pt; margin-bottom: 8pt; }
+  #print-area pre { margin: 0; font: 9.5pt/1.35 "DejaVu Sans Mono", "Noto Sans Mono", monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+}
