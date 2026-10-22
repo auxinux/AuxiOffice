@@ -1,37 +1,37 @@
-// Accueil. Dans AuxiOffice (le gestionnaire) : les trois applications, ouvrir
-// un fichier, tous les documents récents. Dans AuxiWriter, AuxiSheet ou
-// AuxiPresent : un document vierge, ouvrir, les documents récents de ce type.
+// Accueil. Dans AuxiOffice (le gestionnaire) : les applications, ouvrir un
+// fichier, tous les documents récents. Dans AuxiWriter, AuxiSheet, AuxiPresent
+// ou AuxiDraw : un document vierge, ouvrir, les documents récents de ce type.
+// Dans AuxiPDF : ouvrir et les PDF récents.
 
 import { useEffect, useState } from "react";
-import { APP_DOC, APP_NAMES, type AppKind } from "./actions";
+import { APP_DOC, APP_NAMES, type AppKind, type NewKind } from "./actions";
 import { auxiCorrectStatus, type AuxiCorrectStatus } from "./engine";
 import { Icon } from "./icons";
 import { fileName } from "./lok";
 
-type DocKind = "text" | "spreadsheet" | "presentation";
 
 interface Props {
   app: AppKind;
   recents: string[];
-  onNew: (kind: DocKind) => void;
+  onNew: (kind: NewKind) => void;
   onOpen: () => void;
   onOpenPath: (path: string) => void;
   onAuxiCorrect: () => void;
 }
 
-const KINDS = [
-  { kind: "text", app: "writer", label: "Document texte", blank: "Document vierge", icon: "/icons/auxiwriter.svg", exts: ["docx", "doc", "odt", "rtf", "txt", "dotx", "ott"] },
-  { kind: "spreadsheet", app: "sheet", label: "Classeur", blank: "Classeur vierge", icon: "/icons/auxisheet.svg", exts: ["xlsx", "xls", "ods", "csv", "xlsm", "xltx", "ots"] },
-  { kind: "presentation", app: "present", label: "Présentation", blank: "Présentation vierge", icon: "/icons/auxipresent.svg", exts: ["pptx", "ppt", "odp", "ppsx", "potx", "otp", "odg"] },
+export const KINDS = [
+  { kind: "text", app: "writer", label: "Document texte", blank: "Document vierge", icon: "/icons/auxiwriter.svg", mime: "/icons/mime-document.svg", exts: ["docx", "docm", "doc", "odt", "rtf", "txt", "dotx", "dotm", "ott"] },
+  { kind: "spreadsheet", app: "sheet", label: "Classeur", blank: "Classeur vierge", icon: "/icons/auxisheet.svg", mime: "/icons/mime-spreadsheet.svg", exts: ["xlsx", "xlsm", "xls", "xlsb", "ods", "csv", "xltx", "xltm", "ots"] },
+  { kind: "presentation", app: "present", label: "Présentation", blank: "Présentation vierge", icon: "/icons/auxipresent.svg", mime: "/icons/mime-presentation.svg", exts: ["pptx", "pptm", "ppt", "odp", "ppsx", "potx", "otp"] },
+  { kind: "drawing", app: "draw", label: "Dessin", blank: "Dessin vierge", icon: "/icons/auxidraw.svg", mime: "/icons/mime-drawing.svg", exts: ["odg", "otg", "fodg", "vsdx", "vsd", "vsdm", "vdx", "cdr", "pub", "svg"] },
+  { kind: "pdf", app: "pdf", label: "Document PDF", blank: null, icon: "/icons/auxipdf.svg", mime: "/icons/mime-pdf.svg", exts: ["pdf"] },
 ] as const;
 
 const extOf = (p: string) => p.split(".").pop()?.toLowerCase() ?? "";
 
 function iconFor(path: string) {
   const ext = extOf(path);
-  if ((KINDS[1].exts as readonly string[]).includes(ext)) return "/icons/mime-spreadsheet.svg";
-  if ((KINDS[2].exts as readonly string[]).includes(ext)) return "/icons/mime-presentation.svg";
-  return "/icons/mime-document.svg";
+  return KINDS.find((k) => (k.exts as readonly string[]).includes(ext))?.mime ?? "/icons/mime-document.svg";
 }
 
 /** Documents récents qui reviennent à cette application. */
@@ -64,20 +64,23 @@ export function Home({ app, recents, onNew, onOpen, onOpenPath, onAuxiCorrect }:
         )}
       </header>
       <section>
-        <h2>Nouveau</h2>
+        <h2>{app === "pdf" ? "Ouvrir" : "Nouveau"}</h2>
         <div className="new-grid">
-          {(own ? [own] : KINDS).map((k) => (
-            <button key={k.kind} className="new-card" onClick={() => onNew(k.kind)}>
-              <img src={k.icon} alt="" />
-              <span className="label">{own ? k.blank : k.label}</span>
-              <span className="app">{APP_NAMES[k.app]}</span>
-            </button>
-          ))}
+          {(own ? [own] : KINDS).map(
+            (k) =>
+              k.blank && (
+                <button key={k.kind} className="new-card" onClick={() => onNew(k.kind)}>
+                  <img src={k.icon} alt="" />
+                  <span className="label">{own ? k.blank : k.label}</span>
+                  <span className="app">{APP_NAMES[k.app]}</span>
+                </button>
+              ),
+          )}
           <button className="new-card open" onClick={onOpen}>
             <span className="open-icon">
               <Icon name="open" size={44} />
             </span>
-            <span className="label">Ouvrir un fichier…</span>
+            <span className="label">{app === "pdf" ? "Ouvrir un PDF…" : "Ouvrir un fichier…"}</span>
             <span className="app">Ctrl+O</span>
           </button>
         </div>
@@ -101,10 +104,17 @@ export function Home({ app, recents, onNew, onOpen, onOpenPath, onAuxiCorrect }:
         )}
       </section>
       <footer>
-        {APP_NAMES[app]} · <a href="https://office.auxinux.ca" target="_blank" rel="noreferrer">office.auxinux.ca</a> · Moteur de documents : LibreOffice ·{" "}
-        <button className="link" onClick={onAuxiCorrect}>
-          Correction : {ac?.enabledForAuxiOffice ? `AuxiCorrect ${ac.version ?? ""}${ac.options.enabled ? "" : " (désactivé)"}` : "LibreOffice"}
-        </button>
+        {APP_NAMES[app]} · <a href="https://office.auxinux.ca" target="_blank" rel="noreferrer">office.auxinux.ca</a> ·{" "}
+        {app === "pdf" ? (
+          "Affichage des PDF : PDF.js (Mozilla)"
+        ) : (
+          <>
+            Moteur de documents : LibreOffice ·{" "}
+            <button className="link" onClick={onAuxiCorrect}>
+              Correction : {ac?.enabledForAuxiOffice ? `AuxiCorrect ${ac.version ?? ""}${ac.options.enabled ? "" : " (désactivé)"}` : "LibreOffice"}
+            </button>
+          </>
+        )}
       </footer>
     </div>
   );

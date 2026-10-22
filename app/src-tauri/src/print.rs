@@ -70,6 +70,37 @@ pub fn print_pdf(file: &Path, o: &PrintOptions) -> Result<String, String> {
     }
 }
 
+/// Arguments de `lp` pour certaines pages d'un PDF (`-P 1-3,5` ; vide = toutes).
+pub fn lp_args_pages(file: &Path, pages: &str, o: &PrintOptions) -> Result<Vec<String>, String> {
+    let mut args = lp_args(file, o)?;
+    let pages: String = pages.chars().filter(|c| !c.is_whitespace()).map(|c| if c == ';' { ',' } else { c }).collect();
+    if !pages.is_empty() {
+        let ok = pages.split(',').all(|part| {
+            let mut ends = part.splitn(2, '-');
+            let num = |x: Option<&str>| x.is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) && n.parse::<u32>().is_ok_and(|v| v >= 1));
+            let first = ends.next();
+            let rest = ends.next();
+            num(first) && (rest.is_none() || num(rest))
+        });
+        if !ok {
+            return Err(format!("pages invalides : « {pages} » (exemple : 1-3, 5)"));
+        }
+        let at = args.len() - 2; // avant « -- fichier »
+        args.splice(at..at, ["-P".to_string(), pages]);
+    }
+    Ok(args)
+}
+
+/// Envoie certaines pages d'un PDF à l'imprimante (AuxiPDF).
+pub fn print_pdf_pages(file: &Path, pages: &str, o: &PrintOptions) -> Result<String, String> {
+    let out = Command::new("lp").args(lp_args_pages(file, pages, o)?).output().map_err(|e| format!("service d'impression indisponible ({e})"))?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
+}
+
 /// Ouvre un fichier avec l'application par défaut du système (aperçu PDF).
 pub fn open_with_system(file: &Path) -> Result<(), String> {
     let status = if cfg!(target_os = "macos") {
@@ -114,5 +145,15 @@ mod tests {
         let mut o = opts();
         o.sides = "both".into();
         assert!(lp_args(Path::new("/tmp/a.pdf"), &o).is_err());
+    }
+
+    #[test]
+    fn page_ranges_for_pdf_files() {
+        let a = lp_args_pages(Path::new("/tmp/f.pdf"), " 1-3; 5 ", &opts()).unwrap();
+        assert_eq!(&a[a.len() - 4..], ["-P", "1-3,5", "--", "/tmp/f.pdf"]);
+        assert_eq!(lp_args_pages(Path::new("/tmp/f.pdf"), "", &opts()).unwrap(), lp_args(Path::new("/tmp/f.pdf"), &opts()).unwrap());
+        for bad in ["0", "1-", "-2", "a", "1--2", "1,,2", "1-2-3"] {
+            assert!(lp_args_pages(Path::new("/tmp/f.pdf"), bad, &opts()).is_err(), "{bad}");
+        }
     }
 }

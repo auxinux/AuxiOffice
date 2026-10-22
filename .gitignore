@@ -10,3 +10,5 @@ __pycache__/
 # Vidages mémoire de LibreOffice
 core
 core.[0-9]*
+/app/ui/public/pdfjs/
+.claude/

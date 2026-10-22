@@ -375,6 +375,7 @@ fn new_document(app: AppHandle, kind: String) -> Result<String, String> {
         "text" => "docx",
         "spreadsheet" => "xlsx",
         "presentation" => "pptx",
+        "drawing" => "odg",
         _ => return Err(format!("type inconnu : {kind}")),
     };
     let template = templates_dir(&app)?.join(format!("vierge.{ext}"));
@@ -428,6 +429,137 @@ fn export_for_print(engine: &Engine, title: &str, pages: &str) -> Result<PathBuf
     }
     engine.request(req, &[], Duration::from_secs(300))?;
     Ok(pdf)
+}
+
+// --- AuxiPDF ------------------------------------------------------------------
+// Les PDF sont lus et affichés par l'interface (PDF.js) : pas de moteur
+// LibreOffice. La coque lit et écrit les fichiers et les imprime.
+
+/// Ouvre un PDF : vérifie le fichier et attribue un numéro de document (le
+/// même compteur que les documents du moteur, pour les onglets).
+#[tauri::command]
+fn pdf_open(state: State<'_, Engines>, path: String) -> Result<Value, String> {
+    let meta = std::fs::metadata(&path).map_err(|e| format!("{path} : {e}"))?;
+    if !meta.is_file() {
+        return Err(format!("{path} n'est pas un fichier"));
+    }
+    let mut head = [0u8; 1024];
+    let n = std::io::Read::read(&mut std::fs::File::open(&path).map_err(|e| e.to_string())?, &mut head).map_err(|e| e.to_string())?;
+    if !head[..n].windows(5).any(|w| w == b"%PDF-") {
+        return Err("ce fichier n'est pas un document PDF".into());
+    }
+    let id = state.next.fetch_add(1, Ordering::Relaxed) + 1;
+    let read_only = meta.permissions().readonly();
+    Ok(json!({
+        "doc": id, "path": path, "type": "pdf", "parts": 0, "part": 0, "part_names": [],
+        "width": 0, "height": 0, "read_only": read_only, "locked_by": null, "size": meta.len(),
+    }))
+}
+
+/// Contenu d'un PDF (octets bruts, sans passer par JSON).
+#[tauri::command]
+async fn pdf_read(path: String) -> Result<tauri::ipc::Response, String> {
+    if !is_pdf_path(&path) {
+        return Err("seuls les fichiers PDF sont lus".into());
+    }
+    let bytes = tauri::async_runtime::spawn_blocking(move || std::fs::read(&path).map_err(|e| format!("{path} : {e}"))).await.map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// Enregistre un PDF (formulaires remplis, annotations) : corps brut de la
+/// requête, chemin dans l'en-tête `x-path` (encodé en URI). Écriture dans un
+/// fichier temporaire voisin puis renommage : le PDF n'est jamais à moitié écrit.
+/// Avec l'en-tête `x-temp` (nom du fichier), copie dans le dossier temporaire
+/// (impression d'un PDF modifié). Retourne le chemin écrit.
+#[tauri::command]
+async fn pdf_write(request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("contenu attendu en octets".into());
+    };
+    let header = |k: &str| request.headers().get(k).and_then(|v| v.to_str().ok()).map(url_decode);
+    let path = match (header("x-path"), header("x-temp")) {
+        (Some(p), _) => p,
+        (None, Some(name)) => {
+            let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+            let dir = std::env::temp_dir().join("AuxiOffice").join(format!("impression-{stamp}"));
+            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            let safe: String = Path::new(&name).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default().chars().map(|c| if c.is_control() || "/\\:*?\"<>|".contains(c) { '_' } else { c }).collect();
+            dir.join(if is_pdf_path(&safe) { safe } else { "Document.pdf".into() }).to_string_lossy().into_owned()
+        }
+        _ => return Err("en-tête x-path manquant".into()),
+    };
+    if !is_pdf_path(&path) || !bytes.starts_with(b"%PDF-") {
+        return Err("seuls des documents PDF sont enregistrés".into());
+    }
+    let bytes = bytes.clone();
+    tauri::async_runtime::spawn_blocking(move || write_atomic(Path::new(&path), &bytes).map(|_| path)).await.map_err(|e| e.to_string())?
+}
+
+fn is_pdf_path(path: &str) -> bool {
+    Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
+}
+
+/// Décodage des « %XX » (encodeURIComponent côté interface).
+fn url_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let hex = |c: u8| (c as char).to_digit(16);
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let (Some(h), Some(l)) = (hex(b[i + 1]), hex(b[i + 2])) {
+                out.push((h * 16 + l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Écrit `bytes` dans `path` sans jamais laisser un fichier à moitié écrit ;
+/// les droits d'un fichier existant sont conservés.
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+    let dir = path.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let tmp = dir.join(format!(".{name}.auxi-{}.tmp", std::process::id()));
+    let res = (|| {
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(bytes)?;
+        f.sync_all()?;
+        if let Ok(meta) = std::fs::metadata(path) {
+            std::fs::set_permissions(&tmp, meta.permissions())?;
+        }
+        std::fs::rename(&tmp, path)
+    })();
+    if let Err(e) = res {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(format!("{} : {e}", path.display()));
+    }
+    Ok(())
+}
+
+/// Imprime un fichier PDF existant (AuxiPDF), pages choisies.
+#[tauri::command]
+async fn print_file(path: String, pages: String, options: print::PrintOptions) -> Result<String, String> {
+    if !is_pdf_path(&path) {
+        return Err("seuls les fichiers PDF sont imprimés".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || print::print_pdf_pages(Path::new(&path), &pages, &options)).await.map_err(|e| e.to_string())?
+}
+
+/// Ouvre un lien d'un document (http, https, mailto) dans le navigateur ou
+/// le logiciel de courriel du système.
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    let lower = url.to_ascii_lowercase();
+    if !(lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:")) || url.chars().any(char::is_control) {
+        return Err(format!("lien non pris en charge : {url}"));
+    }
+    print::open_with_system(Path::new(&url))
 }
 
 /// Imprimantes du système (CUPS).
@@ -577,7 +709,8 @@ fn route_files(state: State<'_, AppState>, files: Vec<String>) -> Result<Vec<Str
     let mut others: Vec<(AppKind, Vec<String>)> = Vec::new();
     for f in files {
         let k = AppKind::for_path(&f);
-        if k == state.kind {
+        // AuxiDraw modifie aussi les PDF (« Modifier dans AuxiDraw »).
+        if k == state.kind || (state.kind == AppKind::Draw && k == AppKind::Pdf) {
             mine.push(f);
         } else if let Some(o) = others.iter_mut().find(|(o, _)| *o == k) {
             o.1.push(f);
@@ -685,7 +818,12 @@ pub fn run() {
             warm_engine,
             printers,
             print_document,
-            print_with_system
+            print_with_system,
+            pdf_open,
+            pdf_read,
+            pdf_write,
+            print_file,
+            open_url
         ])
         .build(context)
         .expect("démarrage d'AuxiOffice")
@@ -712,4 +850,47 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uri_paths_are_decoded() {
+        assert_eq!(url_decode("%2Fhome%2Fl%C3%A9a%2Ffacture%20d'%C3%A9t%C3%A9.pdf"), "/home/léa/facture d'été.pdf");
+        assert_eq!(url_decode("C%3A%5CDocs%5Ca.pdf"), "C:\\Docs\\a.pdf");
+        assert_eq!(url_decode("100%"), "100%");
+        assert_eq!(url_decode("%zz%é"), "%zz%é");
+    }
+
+    #[test]
+    fn atomic_write_replaces_and_keeps_permissions() {
+        let dir = std::env::temp_dir().join(format!("auxi-pdfw-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("a b.pdf");
+        std::fs::write(&f, b"%PDF-ancien").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o640)).unwrap();
+        }
+        write_atomic(&f, b"%PDF-nouveau").unwrap();
+        assert_eq!(std::fs::read(&f).unwrap(), b"%PDF-nouveau");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(&f).unwrap().permissions().mode() & 0o777, 0o640);
+        }
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "aucun fichier temporaire laissé");
+        assert!(write_atomic(&dir.join("absent/x.pdf"), b"%PDF-").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn only_pdf_files() {
+        assert!(is_pdf_path("/a/B.PDF"));
+        assert!(!is_pdf_path("/etc/passwd"));
+        assert!(!is_pdf_path("/a/pdf"));
+    }
 }

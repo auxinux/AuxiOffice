@@ -4,10 +4,12 @@
 // l'application d'aperçu (Aperçu sous macOS), avec sa propre impression.
 
 import { useEffect, useState } from "react";
-import { listPrinters, printDocument, printWithSystem, type Printer } from "./engine";
+import { listPrinters, printDocument, printFile, printWithSystem, type Printer } from "./engine";
 
 interface Props {
   doc: number;
+  /** AuxiPDF : le PDF à imprimer tel quel (sans passer par le moteur). */
+  file?: () => Promise<string>;
   title: string;
   onClose: () => void;
   onMessage: (text: string, kind?: "info" | "error") => void;
@@ -20,7 +22,7 @@ export function validPageRange(s: string): boolean {
   return t.split(/[,;]/).every((part) => /^\s*\d+\s*(-\s*\d+\s*)?$/.test(part) && part.split("-").map(Number).every((n) => n >= 1));
 }
 
-export function PrintDialog({ doc, title, onClose, onMessage }: Props) {
+export function PrintDialog({ doc, file, title, onClose, onMessage }: Props) {
   const [printers, setPrinters] = useState<Printer[] | null>(null);
   const [printer, setPrinter] = useState("");
   const [all, setAll] = useState(true);
@@ -47,7 +49,8 @@ export function PrintDialog({ doc, title, onClose, onMessage }: Props) {
         await printWithSystem(doc, title, pages);
         onMessage("Document ouvert dans l'aperçu du système pour impression.");
       } else {
-        const job = await printDocument(doc, title, pages, { printer, copies, sides, monochrome: mono });
+        const options = { printer, copies, sides, monochrome: mono };
+        const job = file ? await printFile(await file(), pages, options) : await printDocument(doc, title, pages, options);
         onMessage(job ? `Impression envoyée (${job}).` : "Impression envoyée.");
       }
       onClose();
@@ -124,9 +127,11 @@ export function PrintDialog({ doc, title, onClose, onMessage }: Props) {
           </div>
         </div>
         <div className="print-actions">
-          <button className="secondary" disabled={busy || !rangeOk} onClick={() => void run(true)} title="Ouvre le PDF dans l'aperçu du système, avec toutes ses options d'impression">
-            Aperçu du système…
-          </button>
+          {!file && (
+            <button className="secondary" disabled={busy || !rangeOk} onClick={() => void run(true)} title="Ouvre le PDF dans l'aperçu du système, avec toutes ses options d'impression">
+              Aperçu du système…
+            </button>
+          )}
           <span className="spacer-flex" />
           <button className="secondary" onClick={onClose}>
             Annuler

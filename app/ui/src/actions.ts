@@ -9,6 +9,9 @@ export type AppAction =
   | "newText"
   | "newSheet"
   | "newSlides"
+  | "newDrawing"
+  | "exportImage"
+  | "pdf"
   | "open"
   | "save"
   | "saveAs"
@@ -275,16 +278,66 @@ export const A = {
   shapeArrow: u("Flèche", ".uno:ArrowShapes.right-arrow", { icon: "arrow" }),
   slideShow: a("Lancer le diaporama", "slideShow", { accel: "F5", icon: "play" }),
   slideShowHere: a("Diaporama depuis cette diapositive", "slideShowHere", { accel: "Shift+F5" }),
+  // Draw
+  newPage: u("Nouvelle page", ".uno:InsertPage", { icon: "slideAdd" }),
+  dupPage: u("Dupliquer la page", ".uno:DuplicatePage", { icon: "slideDup" }),
+  delPage: u("Supprimer la page", ".uno:DeletePage", { icon: "slideDel" }),
+  renamePage: u("Renommer la page…", ".uno:RenamePage"),
+  pageProps: u("Propriétés de la page…", ".uno:PageSetup", { icon: "page" }),
+  layer: u("Couche…", ".uno:InsertLayer", { icon: "layers" }),
+  select: u("Sélection", ".uno:SelectObject", { icon: "pointer" }),
+  shapeRoundRect: u("Rectangle arrondi", ".uno:BasicShapes.round-rectangle", { icon: "roundRect" }),
+  shapeTriangle: u("Triangle", ".uno:BasicShapes.isosceles-triangle", { icon: "triangle" }),
+  shapeStar: u("Étoile", ".uno:StarShapes.star5", { icon: "star" }),
+  shapeCallout: u("Bulle", ".uno:CalloutShapes.round-rectangular-callout", { icon: "callout" }),
+  shapeFlow: u("Processus (organigramme)", ".uno:FlowChartShapes.flowchart-process", { icon: "rect" }),
+  shapeDecision: u("Décision (organigramme)", ".uno:FlowChartShapes.flowchart-decision", { icon: "diamond" }),
+  lineArrow: u("Ligne fléchée", ".uno:LineArrowEnd", { icon: "arrowLine" }),
+  connector: u("Connecteur", ".uno:ConnectorArrowEnd", { icon: "connector" }),
+  curve: u("Courbe", ".uno:Bezier_Unfilled", { icon: "curve" }),
+  polygon: u("Polygone", ".uno:Polygon_Unfilled", { icon: "polygon" }),
+  freeline: u("Main levée", ".uno:Freeline_Unfilled", { icon: "freehand" }),
+  measure: u("Ligne de cote", ".uno:MeasureLine", { icon: "measure" }),
+  groupShapes: u("Grouper", ".uno:FormatGroup", { icon: "group" }),
+  ungroupShapes: u("Dissocier", ".uno:FormatUngroup", { icon: "ungroup" }),
+  enterGroup: u("Entrer dans le groupe", ".uno:EnterGroup"),
+  leaveGroup: u("Quitter le groupe", ".uno:LeaveGroup"),
+  forward: u("Avancer d'un plan", ".uno:Forward"),
+  backward: u("Reculer d'un plan", ".uno:Backward"),
+  alignLeft: u("À gauche", ".uno:ObjectAlignLeft", { icon: "objLeft" }),
+  alignHCenter: u("Centré", ".uno:AlignCenter", { icon: "objCenter" }),
+  alignRight: u("À droite", ".uno:ObjectAlignRight", { icon: "objRight" }),
+  alignTop: u("En haut", ".uno:AlignUp", { icon: "objTop" }),
+  alignVCenter: u("Au milieu", ".uno:AlignMiddle", { icon: "objMiddle" }),
+  alignBottom: u("En bas", ".uno:AlignDown", { icon: "objBottom" }),
+  distribute: u("Répartir…", ".uno:DistributeSelection"),
+  flipH: u("Retourner horizontalement", ".uno:FlipHorizontal", { icon: "flipH" }),
+  flipV: u("Retourner verticalement", ".uno:FlipVertical", { icon: "flipV" }),
+  rotate: u("Rotation", ".uno:ToggleObjectRotateMode", { icon: "rotate" }),
+  combine: u("Combiner", ".uno:Combine"),
+  merge2: u("Fusionner les formes", ".uno:Merge"),
+  subtract: u("Soustraire les formes", ".uno:Substract"),
+  intersect: u("Intersection des formes", ".uno:Intersect"),
+  convertCurve: u("Convertir en courbe", ".uno:ChangeBezier"),
+  convertPolygon: u("Convertir en polygone", ".uno:ChangePolygon"),
+  shadow: u("Ombre", ".uno:FillShadow", { check: ".uno:FillShadow" }),
+  grid: u("Afficher la grille", ".uno:GridVisible", { check: ".uno:GridVisible", icon: "grid" }),
+  snapGrid: u("Aligner sur la grille", ".uno:GridUse", { check: ".uno:GridUse" }),
+  helplines: u("Lignes de repère pendant le déplacement", ".uno:HelplinesMove", { check: ".uno:HelplinesMove" }),
+  exportImage: a("Exporter en image (PNG, SVG)…", "exportImage", { icon: "image" }),
 } satisfies Record<string, Action>;
 
 // --- Barre de menus ----------------------------------------------------------
 /** Application en cours : le gestionnaire AuxiOffice ou une application d'un type de document. */
-export type AppKind = "office" | "writer" | "sheet" | "present";
+export type AppKind = "office" | "writer" | "sheet" | "present" | "draw" | "pdf";
 
-export const APP_NAMES: Record<AppKind, string> = { office: "AuxiOffice", writer: "AuxiWriter", sheet: "AuxiSheet", present: "AuxiPresent" };
+export const APP_NAMES: Record<AppKind, string> = { office: "AuxiOffice", writer: "AuxiWriter", sheet: "AuxiSheet", present: "AuxiPresent", draw: "AuxiDraw", pdf: "AuxiPDF" };
+
+/** Types de documents que l'on peut créer (document vierge). */
+export type NewKind = "text" | "spreadsheet" | "presentation" | "drawing";
 
 /** Type de document de chaque application. */
-export const APP_DOC: Record<AppKind, "text" | "spreadsheet" | "presentation" | null> = { office: null, writer: "text", sheet: "spreadsheet", present: "presentation" };
+export const APP_DOC: Record<AppKind, NewKind | "pdf" | null> = { office: null, writer: "text", sheet: "spreadsheet", present: "presentation", draw: "drawing", pdf: "pdf" };
 
 /** « Nouveau » : le type de l'application d'abord (Ctrl+N), les autres ensuite (ils ouvrent leur application). */
 function newMenu(app: AppKind): MenuEntry {
@@ -292,6 +345,7 @@ function newMenu(app: AppKind): MenuEntry {
     { kind: "writer" as const, item: (accel?: string) => a("Document texte", "newText", { accel }) },
     { kind: "sheet" as const, item: (accel?: string) => a("Classeur", "newSheet", { accel }) },
     { kind: "present" as const, item: (accel?: string) => a("Présentation", "newSlides", { accel }) },
+    { kind: "draw" as const, item: (accel?: string) => a("Dessin", "newDrawing", { accel }) },
   ];
   const own = all.find((x) => x.kind === app);
   const items: MenuEntry[] = own ? [own.item("CmdOrCtrl+N"), "-", ...all.filter((x) => x !== own).map((x) => x.item())] : all.map((x, i) => x.item(i === 0 ? "CmdOrCtrl+N" : undefined));
@@ -307,6 +361,7 @@ const fileMenu_ = (app: AppKind): MenuDef => ({
     a("Enregistrer", "save", { accel: "CmdOrCtrl+S" }),
     a("Enregistrer sous…", "saveAs", { accel: "CmdOrCtrl+Shift+S" }),
     a("Exporter en PDF…", "exportPdf"),
+    ...(app === "draw" ? [A.exportImage] : []),
     a("Imprimer…", "print", { accel: "CmdOrCtrl+P" }),
     "-",
     A.docProps,
@@ -316,7 +371,67 @@ const fileMenu_ = (app: AppKind): MenuDef => ({
 });
 
 /** Menu Fichier sans document ouvert (accueil). */
-const homeFileMenu = (app: AppKind): MenuDef => ({ label: "Fichier", items: [newMenu(app), a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" })] });
+const homeFileMenu = (app: AppKind): MenuDef => ({
+  label: "Fichier",
+  items: app === "pdf" ? [a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" })] : [newMenu(app), a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" })],
+});
+
+/** Commande du lecteur PDF (traitée par PdfView). */
+const p = (label: string, cmd: string, extra: Partial<Action> = {}): Action => ({ label, app: "pdf", args: { cmd }, ...extra });
+
+export const PDF = {
+  save: a("Enregistrer", "save", { accel: "CmdOrCtrl+S" }),
+  saveAs: a("Enregistrer une copie…", "saveAs", { accel: "CmdOrCtrl+Shift+S" }),
+  print: a("Imprimer…", "print", { accel: "CmdOrCtrl+P" }),
+  props: p("Propriétés du document…", "properties"),
+  close: a("Fermer le document", "close", { accel: "CmdOrCtrl+W" }),
+  find: p("Rechercher…", "find", { accel: "CmdOrCtrl+F" }),
+  findNext: p("Occurrence suivante", "findNext", { accel: "F3" }),
+  findPrev: p("Occurrence précédente", "findPrev", { accel: "Shift+F3" }),
+  selectAll: p("Tout sélectionner", "selectAll"),
+  copy: p("Copier", "copy"),
+  zoomIn: p("Zoom avant", "zoomIn", { accel: "CmdOrCtrl+=" }),
+  zoomOut: p("Zoom arrière", "zoomOut", { accel: "CmdOrCtrl+-" }),
+  actual: p("Taille réelle", "actual", { accel: "CmdOrCtrl+0" }),
+  fitPage: p("Page entière", "fitPage"),
+  fitWidth: p("Pleine largeur", "fitWidth"),
+  rotateLeft: p("Rotation à gauche", "rotateLeft", { accel: "CmdOrCtrl+Shift+L" }),
+  rotateRight: p("Rotation à droite", "rotateRight", { accel: "CmdOrCtrl+Shift+R" }),
+  sidebar: p("Panneau latéral", "sidebar", { accel: "F4" }),
+  present: p("Mode présentation", "present", { accel: "F5" }),
+  scrollVertical: p("Défilement continu", "scrollVertical"),
+  scrollPage: p("Une page à la fois", "scrollPage"),
+  scrollWrapped: p("Pages en mosaïque", "scrollWrapped"),
+  spreadNone: p("Pages seules", "spreadNone"),
+  spreadOdd: p("Pages côte à côte (impaires à gauche)", "spreadOdd"),
+  spreadEven: p("Pages côte à côte (paires à gauche)", "spreadEven"),
+  first: p("Première page", "first", { accel: "CmdOrCtrl+Home" }),
+  prev: p("Page précédente", "prev"),
+  next: p("Page suivante", "next"),
+  last: p("Dernière page", "last", { accel: "CmdOrCtrl+End" }),
+  goto: p("Aller à la page…", "goto", { accel: "CmdOrCtrl+G" }),
+  noEdit: p("Aucun outil (lecture)", "editNone", { icon: "pointer" }),
+  highlight: p("Surligner", "editHighlight", { icon: "highlight" }),
+  freeText: p("Texte", "editText", { icon: "textbox" }),
+  ink: p("Dessin à main levée", "editInk", { icon: "freehand" }),
+  stamp: p("Image…", "editStamp", { icon: "image" }),
+  editDraw: p("Modifier dans AuxiDraw", "openInDraw"),
+};
+
+function pdfMenus(): MenuDef[] {
+  return [
+    { label: "Fichier", items: [a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" }), "-", PDF.save, PDF.saveAs, "-", PDF.print, "-", PDF.props, PDF.editDraw, "-", PDF.close] },
+    { label: "Édition", items: [PDF.copy, PDF.selectAll, "-", PDF.find, PDF.findNext, PDF.findPrev] },
+    {
+      label: "Affichage",
+      items: [PDF.zoomIn, PDF.zoomOut, PDF.actual, PDF.fitPage, PDF.fitWidth, "-", PDF.rotateLeft, PDF.rotateRight, "-",
+        { submenu: "Défilement", items: [PDF.scrollVertical, PDF.scrollPage, PDF.scrollWrapped] },
+        { submenu: "Pages côte à côte", items: [PDF.spreadNone, PDF.spreadOdd, PDF.spreadEven] }, "-", PDF.sidebar, PDF.present],
+    },
+    { label: "Aller", items: [PDF.first, PDF.prev, PDF.next, PDF.last, "-", PDF.goto] },
+    { label: "Annoter", items: [PDF.noEdit, "-", PDF.highlight, PDF.freeText, PDF.ink, PDF.stamp] },
+  ];
+}
 
 const viewItems = (sheet = false): MenuEntry[] => [
   A.zoomIn,
@@ -326,6 +441,7 @@ const viewItems = (sheet = false): MenuEntry[] => [
 ];
 
 export function menusFor(type: DocType | null, app: AppKind = "office"): MenuDef[] {
+  if (type === "pdf") return pdfMenus();
   const fileMenu = type ? fileMenu_(app) : homeFileMenu(app);
   const editBase: MenuEntry[] = [A.undo, A.redo, "-", A.pasteSpecial, A.selectAll, "-", A.find];
   const language: MenuEntry = {
@@ -404,7 +520,35 @@ export function menusFor(type: DocType | null, app: AppKind = "office"): MenuDef
       },
     ];
   }
-  if (type === "presentation" || type === "drawing") {
+  if (type === "drawing") {
+    return [
+      fileMenu,
+      { label: "Édition", items: [...editBase, "-", A.dupPage, A.delPage] },
+      { label: "Affichage", items: [...viewItems(), "-", A.grid, A.snapGrid, A.helplines] },
+      {
+        label: "Insertion",
+        items: [A.newPage, A.dupPage, "-", A.image, A.textBox, A.table, A.chart, A.qrCode, A.fontwork, "-",
+          { submenu: "Formes", items: [A.shapeRect, A.shapeRoundRect, A.shapeEllipse, A.shapeTriangle, A.shapeStar, A.shapeCallout, "-", A.shapeFlow, A.shapeDecision, A.shapeArrow] },
+          { submenu: "Lignes", items: [A.shapeLine, A.lineArrow, A.connector, A.curve, A.polygon, A.freeline, A.measure] }, "-",
+          A.specialChar, A.hyperlink, A.comment, { submenu: "Champ", items: [A.slideNumber, A.slideDate] }, "-", A.layer],
+      },
+      {
+        label: "Format",
+        items: [A.fontDialog, A.paragraphDialog, A.outlineBullets, A.textAttrs, "-", A.area, A.line, A.shadow, A.transform, "-",
+          { submenu: "Convertir", items: [A.convertCurve, A.convertPolygon] }, "-", A.bold, A.italic, A.underline, A.strike, "-", A.clearFormat],
+      },
+      {
+        label: "Disposition",
+        items: [{ submenu: "Disposition", items: [A.toFront, A.forward, A.backward, A.toBack] },
+          { submenu: "Aligner", items: [A.alignLeft, A.alignHCenter, A.alignRight, "-", A.alignTop, A.alignVCenter, A.alignBottom] },
+          A.distribute, "-", A.flipH, A.flipV, A.rotate, "-", A.groupShapes, A.ungroupShapes, A.enterGroup, A.leaveGroup, "-",
+          { submenu: "Formes", items: [A.combine, A.merge2, A.subtract, A.intersect] }],
+      },
+      { label: "Page", items: [A.newPage, A.dupPage, A.delPage, A.renamePage, "-", A.pageProps, A.layer] },
+      { label: "Outils", items: [{ submenu: "AuxiCorrect", items: [A.acDictionary, A.acOptions] }, "-", A.calcSpell, language] },
+    ];
+  }
+  if (type === "presentation") {
     return [
       fileMenu,
       { label: "Édition", items: editBase },
@@ -441,6 +585,32 @@ export interface RibbonTab {
 }
 
 export function ribbonFor(type: DocType): RibbonTab[] {
+  if (type === "drawing") {
+    return [
+      { label: "Accueil", home: true, groups: [] },
+      {
+        label: "Insertion",
+        groups: [
+          { label: "Pages", actions: [A.newPage, A.dupPage] },
+          { label: "Objets", actions: [A.image, A.textBox, A.table, A.chart] },
+          { label: "Formes", actions: [A.shapeRect, A.shapeRoundRect, A.shapeEllipse, A.shapeTriangle, A.shapeStar, A.shapeCallout, A.shapeDecision, A.shapeArrow] },
+          { label: "Lignes", actions: [A.shapeLine, A.lineArrow, A.connector, A.curve, A.polygon, A.freeline, A.measure] },
+        ],
+      },
+      {
+        label: "Disposition",
+        groups: [
+          { label: "Plan", actions: [A.toFront, A.toBack] },
+          { label: "Aligner", actions: [A.alignLeft, A.alignHCenter, A.alignRight, A.alignTop, A.alignVCenter, A.alignBottom] },
+          { label: "Transformer", actions: [A.flipH, A.flipV, A.rotate, A.transform] },
+          { label: "Grouper", actions: [A.groupShapes, A.ungroupShapes] },
+        ],
+      },
+      { label: "Format", groups: [{ label: "Objet", actions: [A.area, A.line, A.transform] }, { label: "Texte", actions: [A.fontDialog, A.paragraphDialog] }] },
+      { label: "Page", groups: [{ label: "Page", actions: [A.newPage, A.dupPage, A.delPage, A.pageProps, A.layer] }, { label: "Exporter", actions: [A.exportImage, A.print] }] },
+      { label: "Affichage", groups: [{ label: "Zoom", actions: [A.zoomOut, A.zoomIn, A.fitWidth] }, { label: "Grille", actions: [A.grid] }] },
+    ];
+  }
   if (type === "text") {
     return [
       { label: "Accueil", home: true, groups: [] },

@@ -19,6 +19,10 @@ const IS_MAC = navigator.platform.toLowerCase().includes("mac");
 export interface DocHandle {
   /** Exécute une commande du catalogue (menus, ruban) sur ce document. */
   run: (a: Action) => void;
+  /** AuxiPDF : enregistre (ou une copie) ; retourne le chemin, ou null si annulé. */
+  save?: (asNew: boolean) => Promise<string | null>;
+  /** AuxiPDF : fichier à imprimer (une copie temporaire s'il est modifié). */
+  printable?: () => Promise<string>;
 }
 
 interface Props {
@@ -66,6 +70,7 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
   const [pageInfo, setPageInfo] = useState("");
   const isSheet = info.type === "spreadsheet";
   const isSlides = info.type === "presentation" || info.type === "drawing";
+  const isShow = info.type === "presentation";
 
   const dialogRef = useRef<DialogLayerHandle>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; items: LoMenuItem[] } | null>(null);
@@ -175,6 +180,10 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
         case "cell_cursor":
           view.overlays.cellCursor = parseRects(payload)[0] ?? null;
           view.schedule();
+          break;
+        case "mouse_pointer":
+          // Pointeur demandé par LibreOffice (déplacer, redimensionner, texte…).
+          if (scrollerRef.current) scrollerRef.current.style.cursor = /^[a-z-]+$/.test(payload) ? payload : "";
           break;
         case "graphic_selection":
           view.overlays.graphic = parseRects(payload.split(",").slice(0, 4).join(","))[0] ?? null;
@@ -320,7 +329,7 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (composing.current || e.nativeEvent.isComposing) return;
     const primary = IS_MAC ? e.metaKey : e.ctrlKey;
-    if (isSlides && e.key === "F5" && !primary && !e.altKey) {
+    if (isShow && e.key === "F5" && !primary && !e.altKey) {
       e.preventDefault();
       startShow(e.shiftKey ? part : 0);
       return;
@@ -458,6 +467,9 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
     (a: Action) => {
       if (a.uno) {
         command(a.uno, a.args);
+        // LibreOfficeKit insère la forme au centre de la vue, sélectionnée,
+        // mais laisse l'outil actif : un glisser en créerait une seconde.
+        if (/^\.uno:(Basic|Star|Callout|FlowChart|Arrow|Symbol)Shapes\./.test(a.uno)) window.setTimeout(() => void uno(doc, ".uno:SelectObject"), 150);
         return;
       }
       const z = viewRef.current?.zoom ?? 1;
@@ -482,13 +494,13 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
           break;
         case "slideShow":
         case "slideShowHere":
-          if (isSlides) startShow(a.app === "slideShow" ? 0 : part);
+          if (isShow) startShow(a.app === "slideShow" ? 0 : part);
           break;
         default:
           if (a.app) onAppAction(a.app);
       }
     },
-    [command, applyZoom, fitWidth, insertImage, onAppAction, isSlides, part, startShow],
+    [command, doc, applyZoom, fitWidth, insertImage, onAppAction, isShow, part, startShow],
   );
 
   useEffect(() => {
@@ -629,7 +641,7 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
         />
       )}
       <div className="statusbar">
-        <span>{pageInfo || (isSlides ? `Diapositive ${part + 1} sur ${partNames.length}` : isSheet ? partNames[part] : "")}</span>
+        <span>{pageInfo || (isShow ? `Diapositive ${part + 1} sur ${partNames.length}` : isSlides ? `Page ${part + 1} sur ${partNames.length}` : isSheet ? partNames[part] : "")}</span>
         <span className="spacer-flex" />
         {ac && info.type === "text" && (
           <button className={`ac-badge ${ac.active ? "" : "off"}`} title="Options d'AuxiCorrect" onClick={() => onAppAction("auxicorrectOptions")}>

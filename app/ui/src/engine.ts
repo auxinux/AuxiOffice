@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-export type DocType = "text" | "spreadsheet" | "presentation" | "drawing" | "other";
+export type DocType = "text" | "spreadsheet" | "presentation" | "drawing" | "pdf" | "other";
 
 export interface DocInfo {
   doc: number;
@@ -19,6 +19,8 @@ export interface DocInfo {
   read_only: boolean;
   locked_by: { user: string; host: string; date: string } | null;
   libreoffice?: string | null;
+  /** Taille du fichier (PDF). */
+  size?: number;
 }
 
 export interface EngineEvent {
@@ -62,12 +64,23 @@ export async function paintWindow(doc: number, req: { window: number; x: number;
 export const uno =(doc: number, command: string, args?: Record<string, unknown>, notify = false) =>
   call(doc, "uno", { command, args: args ?? null, notify });
 
-export const newDocument = (kind: "text" | "spreadsheet" | "presentation") => invoke<string>("new_document", { kind });
+export const newDocument = (kind: "text" | "spreadsheet" | "presentation" | "drawing") => invoke<string>("new_document", { kind });
+
+// --- AuxiPDF : fichiers lus et écrits par la coque, affichés par PDF.js ------
+
+export const openPdf = (path: string) => invoke<DocInfo>("pdf_open", { path });
+export const readPdf = async (path: string) => new Uint8Array(await invoke<ArrayBuffer>("pdf_read", { path }));
+export const writePdf = (path: string, bytes: Uint8Array) => invoke<string>("pdf_write", bytes, { headers: { "x-path": encodeURIComponent(path) } });
+/** Copie temporaire (impression d'un PDF modifié) ; retourne son chemin. */
+export const writePdfTemp = (name: string, bytes: Uint8Array) => invoke<string>("pdf_write", bytes, { headers: { "x-temp": encodeURIComponent(name) } });
+export const printFile = (path: string, pages: string, options: PrintOptions) => invoke<string>("print_file", { path, pages, options });
+/** Lien d'un document (http, https, mailto) : navigateur ou courriel du système. */
+export const openUrl = (url: string) => invoke<void>("open_url", { url });
 
 export const recentFiles = (add?: string) => invoke<string[]>("recent_files", { add: add ?? null });
 
 export interface AppInfo {
-  kind: "office" | "writer" | "sheet" | "present";
+  kind: "office" | "writer" | "sheet" | "present" | "draw" | "pdf";
   name: string;
 }
 

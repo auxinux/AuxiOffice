@@ -87,6 +87,7 @@ button, select, input { font: inherit; color: inherit; }
 .tb.s { text-decoration: line-through; }
 .tb.color { font-weight: 700; border-bottom: 3px solid #c0392b; }
 .tb.color.hl { border-bottom-color: #f1d000; color: #b59b00; }
+.tb.color.fill { border-bottom-color: #729fcf; color: #3465a4; }
 .tb.color input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .toolbar select { height: 30px; border: 1px solid var(--line); border-radius: 6px; background: #fff; padding: 0 4px; }
 .font-select { width: 170px; }
@@ -264,3 +265,43 @@ button, select, input { font: inherit; color: inherit; }
 .statusbar .ac-badge.off { color: var(--muted); }
 .statusbar .ac-badge:hover { color: var(--orange); }
 .home footer .link { border: 0; background: transparent; padding: 0; color: var(--orange-dark); cursor: pointer; font: inherit; text-decoration: underline; }
+
+/* AuxiPDF */
+.pdf-toolbar .pdf-page-input { width: 46px; height: 26px; text-align: center; border: 1px solid var(--line); border-radius: 6px; margin: 0 4px; }
+.pdf-toolbar .pdf-page-count { color: var(--muted); font-size: 13px; margin-right: 4px; white-space: nowrap; }
+.pdf-toolbar .pdf-zoom { width: 128px; }
+.pdf-findbar { display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 13px; }
+.pdf-findbar input[type=text], .pdf-findbar input:not([type]) { width: 260px; height: 26px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; }
+.pdf-findbar input.not-found { background: #fde3e3; border-color: #d9534f; }
+.pdf-findbar button { border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; padding: 3px; border-radius: 4px; font-size: 16px; }
+.pdf-findbar button:hover { background: rgba(0,0,0,.06); }
+.pdf-findbar label { display: flex; align-items: center; gap: 4px; }
+.pdf-sidebar { width: 200px; display: flex; flex-direction: column; background: #efefec; border-right: 1px solid var(--line); min-height: 0; }
+.pdf-sidebar-tabs { display: flex; gap: 2px; padding: 6px; border-bottom: 1px solid var(--line); }
+.pdf-sidebar-tabs button { flex: 1; border: 0; background: transparent; padding: 4px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.pdf-sidebar-tabs button.active { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.pdf-sidebar-tabs button:disabled { opacity: .45; cursor: default; }
+.pdf-thumbs { flex: 1; overflow-y: auto; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.pdf-thumbs button { display: flex; flex-direction: column; align-items: center; gap: 3px; border: 0; background: transparent; cursor: pointer; padding: 3px; }
+.pdf-thumbs .thumb { width: 120px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); border: 2px solid transparent; }
+.pdf-thumbs button.active .thumb { border-color: var(--orange); }
+.pdf-thumbs .num { font-size: 12px; color: var(--muted); }
+.pdf-outline { list-style: none; margin: 0; padding: 4px 0 4px 10px; font-size: 13px; overflow-y: auto; }
+.pdf-sidebar > .pdf-outline { flex: 1; padding-right: 6px; }
+.pdf-outline .row { display: flex; align-items: flex-start; }
+.pdf-outline .twisty { width: 16px; flex: none; border: 0; background: transparent; cursor: pointer; padding: 2px 0; color: var(--muted); }
+.pdf-outline .title { border: 0; background: transparent; text-align: left; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+.pdf-outline .title:hover { background: rgba(0,0,0,.06); }
+.pdf-area { flex: 1; position: relative; min-width: 0; background: var(--doc-bg); }
+.pdf-container { position: absolute; inset: 0; overflow: auto; outline: none; }
+.pdf-container .pdfViewer .page { margin: 10px auto; box-shadow: 0 1px 4px rgba(0,0,0,.25); border: 0; }
+.pdf-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); pointer-events: none; }
+.pdf-dialog { text-align: left; min-width: 360px; }
+.pdf-dialog h3 { margin-top: 0; }
+.pdf-dialog input[type=password] { width: 100%; box-sizing: border-box; height: 30px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; }
+.pdf-dialog .print-actions { padding: 14px 0 0; }
+.pdf-props { border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
+.pdf-props th { text-align: right; color: var(--muted); font-weight: 400; padding: 3px 12px 3px 0; vertical-align: top; white-space: nowrap; }
+.pdf-props td { padding: 3px 0; word-break: break-word; max-width: 360px; }
+.pdf-show canvas { box-shadow: none; }
+.pdf-show .show-hint { position: absolute; right: 16px; bottom: 10px; color: rgba(255,255,255,.35); font-size: 12px; }

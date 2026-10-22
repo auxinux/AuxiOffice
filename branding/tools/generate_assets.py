@@ -285,6 +285,7 @@ def main():
         "auxiwriter": app_icon(apps["writer"]["letter"], apps["writer"]["color"]),
         "auxisheet": app_icon(apps["sheet"]["letter"], apps["sheet"]["color"]),
         "auxipresent": app_icon(apps["present"]["letter"], apps["present"]["color"]),
+        "auxidraw": app_icon(apps["draw"]["letter"], apps["draw"]["color"]),
         "auxipdf": app_icon("PDF", apps["pdf"]["color"]),
         "auxitext": app_icon(apps["text"]["letter"], apps["text"]["color"]),
         "auximail": app_icon(apps["mail"]["letter"], apps["mail"]["color"]),
@@ -293,6 +294,7 @@ def main():
         "document": mime_icon(apps["writer"]["letter"], apps["writer"]["color"]),
         "spreadsheet": mime_icon(apps["sheet"]["letter"], apps["sheet"]["color"]),
         "presentation": mime_icon(apps["present"]["letter"], apps["present"]["color"]),
+        "drawing": mime_icon(apps["draw"]["letter"], apps["draw"]["color"]),
         "pdf": mime_icon("PDF", apps["pdf"]["color"]),
         "text": mime_icon("TXT", apps["text"]["color"]),
     }

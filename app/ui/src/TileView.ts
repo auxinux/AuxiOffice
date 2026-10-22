@@ -270,8 +270,20 @@ export class TileView {
       ctx.strokeStyle = "#F26F00";
       ctx.setLineDash([4 * this.dpr, 3 * this.dpr]);
       ctx.lineWidth = this.dpr;
-      ctx.strokeRect(...r(ov.graphic));
+      const [gx, gy, gw, gh] = r(ov.graphic);
+      ctx.strokeRect(gx, gy, gw, gh);
       ctx.setLineDash([]);
+      // Poignées de redimensionnement (coins et milieux des côtés) : c'est
+      // LibreOffice qui reconnaît le glisser d'une poignée.
+      const hs = 7 * this.dpr;
+      ctx.fillStyle = "#fff";
+      for (const [hx, hy] of [[0, 0], [0.5, 0], [1, 0], [0, 0.5], [1, 0.5], [0, 1], [0.5, 1], [1, 1]]) {
+        if ((gw < 3 * hs && hx === 0.5) || (gh < 3 * hs && hy === 0.5)) continue;
+        const x = Math.round(gx + gw * hx - hs / 2);
+        const y = Math.round(gy + gh * hy - hs / 2);
+        ctx.fillRect(x, y, hs, hs);
+        ctx.strokeRect(x + 0.5, y + 0.5, hs - 1, hs - 1);
+      }
     }
     if (ov.cursor && ov.cursorVisible && this.blink) {
       const [x, y, , h] = r(ov.cursor);

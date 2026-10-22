@@ -1,16 +1,18 @@
 // Fenêtre principale. AuxiOffice (le gestionnaire) : accueil seul, chaque
-// document part dans son application. AuxiWriter, AuxiSheet, AuxiPresent :
-// onglet Accueil et un onglet par document de leur type.
+// document part dans son application. AuxiWriter, AuxiSheet, AuxiPresent,
+// AuxiDraw, AuxiPDF : onglet Accueil et un onglet par document de leur type.
 
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getVersion } from "@tauri-apps/api/app";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { APP_DOC, APP_NAMES, type Action, type AppAction, type AppKind } from "./actions";
+import { APP_DOC, APP_NAMES, type Action, type AppAction, type AppKind, type NewKind } from "./actions";
 import { DocView, type DocHandle } from "./DocView";
 import { installMenus, updateMenuChecks } from "./menus";
 import { PrintDialog } from "./PrintDialog";
 import { AuxiCorrectDictionary, AuxiCorrectOptionsDialog } from "./AuxiCorrect";
-import { appInfo, call, closeDocument, launchApp, newDocument, onLaunch, openDocument, recentFiles, routeFiles, takeLaunches, warmEngine, type DocInfo, type Launch } from "./engine";
+import { appInfo, call, closeDocument, launchApp, newDocument, onLaunch, openDocument, openPdf, recentFiles, routeFiles, takeLaunches, warmEngine, type DocInfo, type Launch } from "./engine";
+import { PdfView } from "./PdfView";
 import { Home } from "./Home";
 import { fileName, isUntitled } from "./lok";
 
@@ -22,9 +24,11 @@ interface Tab {
 }
 
 const TYPE_FILTERS = {
-  text: { name: "Textes", extensions: ["docx", "doc", "odt", "rtf", "txt", "dotx"] },
-  spreadsheet: { name: "Classeurs", extensions: ["xlsx", "xls", "ods", "csv", "xlsm"] },
-  presentation: { name: "Présentations", extensions: ["pptx", "ppt", "odp", "ppsx", "odg"] },
+  text: { name: "Textes", extensions: ["docx", "docm", "doc", "odt", "rtf", "txt", "dotx", "dotm", "ott"] },
+  spreadsheet: { name: "Classeurs", extensions: ["xlsx", "xlsm", "xls", "xlsb", "ods", "csv", "xltx", "ots"] },
+  presentation: { name: "Présentations", extensions: ["pptx", "pptm", "ppt", "odp", "ppsx", "potx", "otp"] },
+  drawing: { name: "Dessins", extensions: ["odg", "otg", "fodg", "vsdx", "vsd", "vsdm", "vdx", "cdr", "pub", "svg"] },
+  pdf: { name: "Documents PDF", extensions: ["pdf"] },
 };
 const ALL_FILTER = { name: "Documents pris en charge", extensions: Object.values(TYPE_FILTERS).flatMap((f) => f.extensions) };
 
@@ -32,11 +36,18 @@ const ALL_FILTER = { name: "Documents pris en charge", extensions: Object.values
 function openFilters(app: AppKind) {
   const own = APP_DOC[app];
   const types = Object.entries(TYPE_FILTERS);
+  if (own === "pdf") return [TYPE_FILTERS.pdf, { name: "Tous les fichiers", extensions: ["*"] }];
   const ordered = own ? [TYPE_FILTERS[own], ALL_FILTER, ...types.filter(([k]) => k !== own).map(([, f]) => f)] : [ALL_FILTER, ...types.map(([, f]) => f)];
+  // AuxiDraw ouvre aussi les PDF pour les modifier.
+  if (own === "drawing") ordered.splice(1, 0, { name: "PDF (à modifier)", extensions: ["pdf"] });
   return [...ordered, { name: "Tous les fichiers", extensions: ["*"] }];
 }
 
-const APP_FOR_DOC = { text: "writer", spreadsheet: "sheet", presentation: "present" } as const;
+const APP_FOR_DOC = { text: "writer", spreadsheet: "sheet", presentation: "present", drawing: "draw" } as const;
+
+/** Dessins que LibreOffice sait lire mais pas réécrire (Visio, CorelDRAW,
+ * Publisher, SVG) : « Enregistrer » demande un emplacement en ODG. */
+const DRAW_NATIVE = ["odg", "fodg", "otg"];
 
 const SAVE_FILTERS: Record<string, { name: string; extensions: string[] }[]> = {
   text: [
@@ -56,7 +67,10 @@ const SAVE_FILTERS: Record<string, { name: string; extensions: string[] }[]> = {
     { name: "Présentation OpenDocument", extensions: ["odp"] },
     { name: "PowerPoint 97-2003", extensions: ["ppt"] },
   ],
-  drawing: [{ name: "Dessin OpenDocument", extensions: ["odg"] }],
+  drawing: [
+    { name: "Dessin OpenDocument", extensions: ["odg"] },
+    { name: "Dessin OpenDocument (XML à plat)", extensions: ["fodg"] },
+  ],
 };
 
 export function App() {
@@ -95,6 +109,13 @@ export function App() {
       }
       setBusy(`Ouverture de ${fileName(path)}…`);
       try {
+        if (appRef.current === "pdf") {
+          const info = await openPdf(path);
+          setTabs((ts) => [...ts, { info, path, modified: false, lost: false }]);
+          setActive(info.doc);
+          setRecents(await recentFiles(path));
+          return;
+        }
         let info = await openDocument(path);
         if (info.locked_by) {
           const who = `${info.locked_by.user || "un autre utilisateur"}${info.locked_by.host ? ` sur ${info.locked_by.host}` : ""}${info.locked_by.date ? ` (${info.locked_by.date})` : ""}`;
@@ -140,7 +161,7 @@ export function App() {
   }, [openFiles]);
 
   const createNew = useCallback(
-    async (kind: "text" | "spreadsheet" | "presentation") => {
+    async (kind: NewKind) => {
       try {
         if (APP_DOC[appRef.current] !== kind) {
           // Un autre type : son application (AuxiOffice n'ouvre pas de document).
@@ -166,7 +187,7 @@ export function App() {
     const runLaunch = async (l: Launch) => {
       await openFiles(l.files);
       const own = APP_DOC[appRef.current];
-      if (l.new_doc && own && !l.files.length) await createNew(own);
+      if (l.new_doc && own && own !== "pdf" && !l.files.length) await createNew(own);
     };
     void (async () => {
       const info = await appInfo();
@@ -177,7 +198,7 @@ export function App() {
       const first = await takeLaunches();
       for (const l of first) await runLaunch(l);
       // Moteur de réserve, une fois l'interface affichée (pas dans le gestionnaire).
-      if (info.kind !== "office") window.setTimeout(() => void warmEngine(), first.length ? 4000 : 800);
+      if (info.kind !== "office" && info.kind !== "pdf") window.setTimeout(() => void warmEngine(), first.length ? 4000 : 800);
     })();
     return () => off?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,8 +210,18 @@ export function App() {
     async (doc: number, asNew: boolean) => {
       const t = tabsRef.current.find((x) => x.info.doc === doc);
       if (!t) return;
+      if (t.info.type === "pdf") {
+        const saved = await handles.current.get(doc)?.save?.(asNew);
+        if (saved) {
+          setTab(doc, { path: saved, modified: false, info: { ...t.info, path: saved, read_only: false } });
+          setRecents(await recentFiles(saved));
+        }
+        return;
+      }
+      const ext = t.path.split(".").pop()?.toLowerCase() ?? "";
+      const foreign = t.info.type === "drawing" && !DRAW_NATIVE.includes(ext);
       try {
-        if (asNew || isUntitled(t.path) || t.info.read_only) {
+        if (asNew || foreign || isUntitled(t.path) || t.info.read_only) {
           const filters = SAVE_FILTERS[t.info.type] ?? [];
           const base = isUntitled(t.path) ? "Sans titre" : fileName(t.path).replace(/\.[^.]+$/, "");
           const target = await save({ filters, defaultPath: `${base}.${filters[0]?.extensions[0] ?? "odt"}` });
@@ -234,6 +265,34 @@ export function App() {
     [notify],
   );
 
+  /** AuxiDraw : copie de la page en cours en image (PNG ou SVG). */
+  const exportImage = useCallback(
+    async (doc: number) => {
+      const t = tabsRef.current.find((x) => x.info.doc === doc);
+      if (!t) return;
+      const base = isUntitled(t.path) ? "Sans titre" : fileName(t.path).replace(/\.[^.]+$/, "");
+      const target = await save({
+        filters: [
+          { name: "Image PNG", extensions: ["png"] },
+          { name: "Image vectorielle SVG", extensions: ["svg"] },
+        ],
+        defaultPath: `${base}.png`,
+      });
+      if (!target) return;
+      const format = target.toLowerCase().endsWith(".svg") ? "svg" : "png";
+      setBusy("Exportation…");
+      try {
+        await call(doc, "save", { path: target, format });
+        notify("Image exportée.");
+      } catch (e) {
+        notify(`Exportation impossible : ${e}`, "error");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [notify],
+  );
+
   const closeTab = useCallback(async (doc: number) => {
     const t = tabsRef.current.find((x) => x.info.doc === doc);
     if (!t) return;
@@ -256,6 +315,10 @@ export function App() {
   }, []);
 
   const [about, setAbout] = useState(false);
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+    void getVersion().then(setVersion).catch(() => undefined);
+  }, []);
   const [acOptions, setAcOptions] = useState(false);
   const [acWord, setAcWord] = useState<string | null>(null);
 
@@ -295,6 +358,10 @@ export function App() {
           return void createNew("spreadsheet");
         case "newSlides":
           return void createNew("presentation");
+        case "newDrawing":
+          return void createNew("drawing");
+        case "exportImage":
+          return doc ? void exportImage(doc) : undefined;
         case "open":
           return void openDialog();
         case "auxicorrectOptions":
@@ -315,7 +382,7 @@ export function App() {
           return doc ? void closeTab(doc) : undefined;
       }
     },
-    [createNew, openDialog, saveDocument, exportPdf, closeTab, openDictionary],
+    [createNew, openDialog, saveDocument, exportPdf, exportImage, closeTab, openDictionary],
   );
 
   // Barre de menus : reconstruite quand le type du document actif change ;
@@ -411,6 +478,17 @@ export function App() {
                 </button>
               </div>
             )
+          ) : t.info.type === "pdf" ? (
+            <PdfView
+              key={t.info.doc}
+              info={t.info}
+              path={t.path}
+              active={active === t.info.doc}
+              onModified={(m) => setTab(t.info.doc, { modified: m })}
+              onMessage={notify}
+              register={(h) => handles.current.set(t.info.doc, h)}
+              onAppAction={(a) => appAction(a, t.info.doc)}
+            />
           ) : (
             <DocView
               key={t.info.doc}
@@ -436,6 +514,7 @@ export function App() {
       {printing !== null && tabs.some((t) => t.info.doc === printing) && (
         <PrintDialog
           doc={printing}
+          file={tabs.find((x) => x.info.doc === printing)?.info.type === "pdf" ? () => handles.current.get(printing)!.printable!() : undefined}
           title={(() => {
             const t = tabs.find((x) => x.info.doc === printing)!;
             return isUntitled(t.path) ? "Sans titre" : fileName(t.path);
@@ -457,10 +536,12 @@ export function App() {
                 <span>{name}</span>
               </div>
             )}
-            <p>Version 0.1.0 — {app === "office" ? "suite bureautique" : "de la suite AuxiOffice"}, écosystème AuxiNux.</p>
-            <p>
-              Moteur de documents : LibreOffice{tabs[0]?.info.libreoffice ? "" : ""}. LibreOffice est une marque déposée de The Document Foundation.
-            </p>
+            <p>Version {version.replace(/-beta\.?(\d+)$/, " bêta $1")} — {app === "office" ? "suite bureautique" : "de la suite AuxiOffice"}, écosystème AuxiNux.</p>
+            {app === "pdf" ? (
+              <p>Affichage des PDF : PDF.js de Mozilla (licence Apache 2.0).</p>
+            ) : (
+              <p>Moteur de documents : LibreOffice. LibreOffice est une marque déposée de The Document Foundation.</p>
+            )}
             <p>© 2026 Projet AuxiNux · office.auxinux.ca</p>
             <button onClick={() => setAbout(false)}>Fermer</button>
           </div>

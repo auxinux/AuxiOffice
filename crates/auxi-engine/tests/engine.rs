@@ -480,3 +480,53 @@ fn french_is_checked_by_the_grammar_server() {
     assert!(xcu.contains(r#"SpellCheckerList"><prop oor:name="fr-CA""#), "dictionnaire LibreOffice retiré pour fr-CA");
     ctx.engine.shutdown();
 }
+
+/// AuxiDraw : dessin vierge livré, forme insérée, enregistrement ODG et
+/// exportations PDF, PNG et SVG.
+#[test]
+fn draw_shapes_save_and_export() {
+    let Some((ctx, _)) = setup("draw") else { return };
+    let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../app/src-tauri/templates/vierge.odg");
+    let doc = ctx.tmp.join("dessin.odg");
+    std::fs::copy(&src, &doc).unwrap();
+    let info = ctx.call(json!({"cmd": "load", "path": doc}));
+    assert_eq!(info["type"], "drawing");
+    assert_eq!(info["parts"], 1);
+    // Page Lettre US en portrait (21,59 × 27,94 cm).
+    assert!((info["width"].as_i64().unwrap() - 12240).abs() < 30, "{info}");
+    ctx.call(json!({"cmd": "uno", "command": ".uno:BasicShapes.rectangle"}));
+    ctx.settle();
+    let copy = ctx.tmp.join("copie.odg");
+    ctx.call(json!({"cmd": "save", "path": copy, "format": "odg"}));
+    assert!(zip_entry(&copy, "content.xml").contains("draw:custom-shape"), "forme absente du fichier");
+    for (ext, magic) in [("pdf", &b"%PDF-"[..]), ("png", &b"\x89PNG"[..])] {
+        let out = ctx.tmp.join(format!("export.{ext}"));
+        ctx.call(json!({"cmd": "save", "path": out, "format": ext}));
+        assert!(std::fs::read(&out).unwrap().starts_with(magic), "export {ext}");
+    }
+    let svg = ctx.tmp.join("export.svg");
+    ctx.call(json!({"cmd": "save", "path": svg, "format": "svg"}));
+    assert!(String::from_utf8_lossy(&std::fs::read(&svg).unwrap()).contains("<svg"), "export svg");
+    // Ajouter une page.
+    ctx.call(json!({"cmd": "uno", "command": ".uno:InsertPage"}));
+    ctx.settle();
+    assert_eq!(ctx.call(json!({"cmd": "info"}))["parts"], 2);
+}
+
+/// AuxiDraw ouvre aussi les PDF (« Modifier dans AuxiDraw ») : une page de
+/// dessin par page du PDF.
+#[test]
+fn pdf_opens_as_a_drawing() {
+    let Some((ctx, fx)) = setup("pdfdraw") else { return };
+    ctx.call(json!({"cmd": "load", "path": fx.join("rapport.docx")}));
+    let pdf = ctx.tmp.join("rapport.pdf");
+    let opts = json!({"PageRange": {"type": "string", "value": "1-2"}}).to_string();
+    ctx.call(json!({"cmd": "save", "path": pdf, "format": "pdf", "filter": opts}));
+    drop(ctx);
+    let Some((ctx, _)) = setup("pdfdraw2") else { return };
+    let info = ctx.call(json!({"cmd": "load", "path": pdf}));
+    assert_eq!(info["type"], "drawing", "{info}");
+    assert_eq!(info["parts"], 2);
+    let (w, h) = (info["width"].as_i64().unwrap(), info["height"].as_i64().unwrap());
+    assert!(ctx.paint_png("pdf-page.png", Some(0), 300, 0, 0, w, h) > 0.002, "page du PDF vide");
+}

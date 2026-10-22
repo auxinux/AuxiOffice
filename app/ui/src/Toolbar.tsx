@@ -134,6 +134,7 @@ function HomeBar({ type, doc, states, command, run }: Props) {
   const style = states[".uno:StyleApply"] ?? "";
   const text = type === "text";
   const sheet = type === "spreadsheet";
+  const draw = type === "drawing";
 
   return (
     <div className="toolbar" role="toolbar">
@@ -234,6 +235,30 @@ function HomeBar({ type, doc, states, command, run }: Props) {
         {sheet && <Btn icon="cell" title="Format des cellules…" onClick={() => run(A.cellFormat)} />}
         <Btn icon="search" title="Rechercher et remplacer (Ctrl+H)" onClick={() => run(A.find)} />
       </div>
+
+      {draw && (
+        <div className="group">
+          <Btn icon="pointer" title="Sélection" onClick={() => run(A.select)} />
+          <Btn icon="rect" title="Rectangle" onClick={() => run(A.shapeRect)} />
+          <Btn icon="ellipse" title="Ellipse" onClick={() => run(A.shapeEllipse)} />
+          <Btn icon="lineShape" title="Ligne" onClick={() => run(A.shapeLine)} />
+          <Btn icon="arrowLine" title="Ligne fléchée" onClick={() => run(A.lineArrow)} />
+          <Btn icon="connector" title="Connecteur" onClick={() => run(A.connector)} />
+          <Btn icon="curve" title="Courbe" onClick={() => run(A.curve)} />
+          <Btn icon="textbox" title="Zone de texte" onClick={() => run(A.textBox)} />
+          <Btn icon="image" title="Image…" onClick={() => run(A.image)} />
+          <label className="tb color fill" title="Couleur de remplissage">
+            ◼
+            <input type="color" defaultValue="#729fcf" onChange={(e) => command(".uno:FillColor", { FillColor: { type: "long", value: colorToLong(e.target.value) } })} />
+          </label>
+          <label className="tb color" title="Couleur de ligne">
+            ▭
+            <input type="color" defaultValue="#3465a4" onChange={(e) => command(".uno:XLineColor", { XLineColor: { type: "long", value: colorToLong(e.target.value) } })} />
+          </label>
+          <Btn icon="group" title="Grouper" onClick={() => run(A.groupShapes)} />
+          <Btn icon="ungroup" title="Dissocier" onClick={() => run(A.ungroupShapes)} />
+        </div>
+      )}
 
       {sheet && (
         <div className="group">

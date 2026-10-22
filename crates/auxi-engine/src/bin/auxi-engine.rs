@@ -151,6 +151,7 @@ fn filter_for(path: &str) -> Option<&'static str> {
         "ppt" => "MS PowerPoint 97",
         "odp" => "impress8",
         "odg" => "draw8",
+        "fodg" => "OpenDocument Drawing Flat XML",
         _ => return None,
     })
 }

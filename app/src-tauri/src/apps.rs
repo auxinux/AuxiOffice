@@ -1,9 +1,9 @@
-//! Les quatre applications : AuxiOffice (le gestionnaire : créer, ouvrir,
-//! documents récents) et AuxiWriter, AuxiSheet, AuxiPresent (un type de
-//! document chacune). C'est le même exécutable ; l'application est choisie
+//! Les applications : AuxiOffice (le gestionnaire : créer, ouvrir, documents
+//! récents) et AuxiWriter, AuxiSheet, AuxiPresent, AuxiDraw, AuxiPDF (un type
+//! de document chacune). C'est le même exécutable ; l'application est choisie
 //! au lancement :
 //!
-//! 1. `--app writer|sheet|present|office` (raccourcis Linux et Windows) ;
+//! 1. `--app writer|sheet|present|draw|pdf|office` (raccourcis Linux et Windows) ;
 //! 2. variable `AUXI_APP` (développement) ;
 //! 3. nom de l'exécutable : `AuxiWriter`, `auxisheet.exe`… (paquets macOS,
 //!    où chaque application a son propre paquet `.app`).
@@ -25,7 +25,13 @@ pub enum AppKind {
     Writer,
     Sheet,
     Present,
+    Draw,
+    Pdf,
 }
+
+/// Toutes les applications (tests).
+#[cfg(test)]
+pub const ALL: [AppKind; 6] = [AppKind::Office, AppKind::Writer, AppKind::Sheet, AppKind::Present, AppKind::Draw, AppKind::Pdf];
 
 impl AppKind {
     pub fn slug(self) -> &'static str {
@@ -34,6 +40,8 @@ impl AppKind {
             AppKind::Writer => "writer",
             AppKind::Sheet => "sheet",
             AppKind::Present => "present",
+            AppKind::Draw => "draw",
+            AppKind::Pdf => "pdf",
         }
     }
 
@@ -43,6 +51,8 @@ impl AppKind {
             AppKind::Writer => "AuxiWriter",
             AppKind::Sheet => "AuxiSheet",
             AppKind::Present => "AuxiPresent",
+            AppKind::Draw => "AuxiDraw",
+            AppKind::Pdf => "AuxiPDF",
         }
     }
 
@@ -54,6 +64,8 @@ impl AppKind {
             "writer" | "text" => Some(AppKind::Writer),
             "sheet" | "spreadsheet" => Some(AppKind::Sheet),
             "present" | "presentation" => Some(AppKind::Present),
+            "draw" | "drawing" => Some(AppKind::Draw),
+            "pdf" => Some(AppKind::Pdf),
             _ => None,
         }
     }
@@ -62,8 +74,10 @@ impl AppKind {
     pub fn for_path(path: &str) -> AppKind {
         let ext = Path::new(path).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
         match ext.as_str() {
-            "xlsx" | "xlsm" | "xltx" | "xls" | "ods" | "ots" | "csv" | "fods" => AppKind::Sheet,
-            "pptx" | "ppsx" | "potx" | "ppt" | "pps" | "odp" | "otp" | "fodp" | "odg" => AppKind::Present,
+            "xlsx" | "xlsm" | "xltx" | "xltm" | "xls" | "xlt" | "xlsb" | "ods" | "ots" | "csv" | "fods" => AppKind::Sheet,
+            "pptx" | "pptm" | "ppsx" | "potx" | "potm" | "ppt" | "pps" | "pot" | "odp" | "otp" | "fodp" => AppKind::Present,
+            "odg" | "otg" | "fodg" | "vsdx" | "vsd" | "vsdm" | "vdx" | "vstx" | "vst" | "cdr" | "cmx" | "pub" | "wpg" | "svg" => AppKind::Draw,
+            "pdf" => AppKind::Pdf,
             _ => AppKind::Writer,
         }
     }
@@ -74,6 +88,8 @@ impl AppKind {
             AppKind::Writer => include_bytes!("../icons/auxiwriter.png"),
             AppKind::Sheet => include_bytes!("../icons/auxisheet.png"),
             AppKind::Present => include_bytes!("../icons/auxipresent.png"),
+            AppKind::Draw => include_bytes!("../icons/auxidraw.png"),
+            AppKind::Pdf => include_bytes!("../icons/auxipdf.png"),
         }
     }
 }
@@ -317,7 +333,14 @@ mod tests {
         assert_eq!(AppKind::for_path("b.csv"), AppKind::Sheet);
         assert_eq!(AppKind::for_path("b.xls"), AppKind::Sheet);
         assert_eq!(AppKind::for_path("b.pptx"), AppKind::Present);
-        assert_eq!(AppKind::for_path("b.odg"), AppKind::Present);
+        assert_eq!(AppKind::for_path("b.pptm"), AppKind::Present);
+        assert_eq!(AppKind::for_path("b.odg"), AppKind::Draw);
+        assert_eq!(AppKind::for_path("plan.VSDX"), AppKind::Draw);
+        assert_eq!(AppKind::for_path("/a/facture.pdf"), AppKind::Pdf);
+        for k in ALL {
+            assert_eq!(AppKind::parse(k.slug()), Some(k));
+            assert_eq!(AppKind::parse(k.name()), Some(k));
+        }
         assert_eq!(AppKind::for_path("notes"), AppKind::Writer);
     }
 

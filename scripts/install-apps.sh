@@ -1,7 +1,7 @@
 #!/bin/sh
-# Installe les quatre applications pour l'utilisateur courant, à partir de la
+# Installe les applications pour l'utilisateur courant, à partir de la
 # compilation de développement (ce n'est pas un paquet) :
-#   AuxiOffice (gestionnaire), AuxiWriter, AuxiSheet, AuxiPresent.
+#   AuxiOffice (gestionnaire), AuxiWriter, AuxiSheet, AuxiPresent, AuxiDraw, AuxiPDF.
 #
 #   macOS : ~/Applications/Auxi*.app (Finder, Launchpad, Dock, « Ouvrir avec »)
 #   Linux : menu des applications (~/.local/share/applications)
@@ -15,8 +15,8 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
-APPS="office writer sheet present"
-name() { case $1 in office) echo AuxiOffice ;; writer) echo AuxiWriter ;; sheet) echo AuxiSheet ;; present) echo AuxiPresent ;; esac; }
+APPS="office writer sheet present draw pdf"
+name() { case $1 in office) echo AuxiOffice ;; writer) echo AuxiWriter ;; sheet) echo AuxiSheet ;; present) echo AuxiPresent ;; draw) echo AuxiDraw ;; pdf) echo AuxiPDF ;; esac; }
 say() { printf '\n== %s\n' "$*"; }
 die() { printf '\nErreur : %s\n' "$*" >&2; exit 1; }
 
@@ -50,16 +50,19 @@ ls .engine/*/program-dir >/dev/null 2>&1 || die "moteur LibreOffice absent : lan
 # --- macOS -------------------------------------------------------------------
 
 doc_types() {
-  # $1 = writer|sheet|present → CFBundleDocumentTypes
+  # $1 = writer|sheet|present|draw|pdf → CFBundleDocumentTypes
+  role=Editor
   case $1 in
-    writer) label="Document texte"; utis="org.openxmlformats.wordprocessingml.document com.microsoft.word.doc org.oasis-open.opendocument.text public.rtf org.openxmlformats.wordprocessingml.template" ;;
+    writer) label="Document texte"; utis="org.openxmlformats.wordprocessingml.document org.openxmlformats.wordprocessingml.document.macroenabled com.microsoft.word.doc org.oasis-open.opendocument.text public.rtf org.openxmlformats.wordprocessingml.template" ;;
     sheet) label="Classeur"; utis="org.openxmlformats.spreadsheetml.sheet com.microsoft.excel.xls org.oasis-open.opendocument.spreadsheet public.comma-separated-values-text org.openxmlformats.spreadsheetml.sheet.macroenabled" ;;
-    present) label="Présentation"; utis="org.openxmlformats.presentationml.presentation com.microsoft.powerpoint.ppt org.oasis-open.opendocument.presentation org.openxmlformats.presentationml.slideshow org.oasis-open.opendocument.graphics" ;;
+    present) label="Présentation"; utis="org.openxmlformats.presentationml.presentation org.openxmlformats.presentationml.presentation.macroenabled com.microsoft.powerpoint.ppt org.oasis-open.opendocument.presentation org.openxmlformats.presentationml.slideshow" ;;
+    draw) label="Dessin"; utis="org.oasis-open.opendocument.graphics org.oasis-open.opendocument.graphics-template com.microsoft.visio.drawing" ;;
+    pdf) label="Document PDF"; role=Viewer; utis="com.adobe.pdf" ;;
     *) return 0 ;;
   esac
   printf '  <key>CFBundleDocumentTypes</key>\n  <array>\n    <dict>\n'
   printf '      <key>CFBundleTypeName</key><string>%s</string>\n' "$label"
-  printf '      <key>CFBundleTypeRole</key><string>Editor</string>\n'
+  printf '      <key>CFBundleTypeRole</key><string>%s</string>\n' "$role"
   printf '      <key>LSHandlerRank</key><string>Alternate</string>\n'
   printf '      <key>LSItemContentTypes</key>\n      <array>\n'
   for u in $utis; do printf '        <string>%s</string>\n' "$u"; done
@@ -113,7 +116,7 @@ PLIST
   done
   LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
   for a in $APPS; do [ -x "$LSREG" ] && "$LSREG" -f "$DEST/$(name "$a").app" || true; done
-  say "Installé dans $DEST : AuxiOffice, AuxiWriter, AuxiSheet, AuxiPresent"
+  say "Installé dans $DEST : AuxiOffice, AuxiWriter, AuxiSheet, AuxiPresent, AuxiDraw, AuxiPDF"
   echo "Finder → Applications (de votre dossier personnel), Launchpad, ou : open -a AuxiWriter"
 }
 
@@ -131,13 +134,16 @@ install_linux() {
     exe="$ROOT/target/release/auxi$a"
     cp "$ROOT/app/ui/public/icons/auxi$a.svg" "$icons_dir/auxi$a.svg"
     case $a in
-      office) comment="Créer et ouvrir des documents, des classeurs et des présentations"; cats="Office;"; mime="" ;;
+      office) comment="Créer et ouvrir des documents, des classeurs, des présentations et des dessins"; cats="Office;"; mime="" ;;
       writer) comment="Traitement de texte"; cats="Office;WordProcessor;"
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/msword;application/vnd.oasis.opendocument.text;application/rtf;text/rtf;" ;;
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.ms-word.document.macroEnabled.12;application/msword;application/vnd.oasis.opendocument.text;application/rtf;text/rtf;" ;;
       sheet) comment="Tableur"; cats="Office;Spreadsheet;"
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/vnd.ms-excel;application/vnd.oasis.opendocument.spreadsheet;text/csv;" ;;
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/vnd.ms-excel.sheet.macroEnabled.12;application/vnd.ms-excel;application/vnd.oasis.opendocument.spreadsheet;text/csv;" ;;
       present) comment="Présentations"; cats="Office;Presentation;"
-        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation;application/vnd.ms-powerpoint;application/vnd.oasis.opendocument.presentation;" ;;
+        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation;application/vnd.ms-powerpoint.presentation.macroEnabled.12;application/vnd.ms-powerpoint;application/vnd.oasis.opendocument.presentation;" ;;
+      draw) comment="Dessin vectoriel et mise en page"; cats="Office;Graphics;VectorGraphics;"
+        mime="application/vnd.oasis.opendocument.graphics;application/vnd.oasis.opendocument.graphics-template;application/vnd.visio;application/vnd.ms-visio.drawing.main+xml;" ;;
+      pdf) comment="Lecteur de documents PDF"; cats="Office;Viewer;"; mime="application/pdf;" ;;
     esac
     {
       echo "[Desktop Entry]"
@@ -150,8 +156,8 @@ install_linux() {
       echo "Categories=$cats"
       echo "StartupWMClass=auxi$a"
       [ -z "$mime" ] || echo "MimeType=$mime"
-      [ "$a" = office ] || echo "Actions=new;"
-      if [ "$a" != office ]; then
+      case $a in office|pdf) ;; *) echo "Actions=new;" ;; esac
+      if [ "$a" != office ] && [ "$a" != pdf ]; then
         echo
         echo "[Desktop Action new]"
         echo "Name=Nouveau"
@@ -162,7 +168,7 @@ install_linux() {
   done
   command -v update-desktop-database >/dev/null && update-desktop-database "$apps_dir" 2>/dev/null || true
   command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -t "$DEST/icons/hicolor" 2>/dev/null || true
-  say "Installé : AuxiOffice, AuxiWriter, AuxiSheet, AuxiPresent dans le menu des applications (catégorie Bureautique)"
+  say "Installé : AuxiOffice, AuxiWriter, AuxiSheet, AuxiPresent, AuxiDraw, AuxiPDF dans le menu des applications (catégorie Bureautique)"
 }
 
 install_$OS

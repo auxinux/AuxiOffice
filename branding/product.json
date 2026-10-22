@@ -72,6 +72,29 @@
         "pptm"
       ]
     },
+    "draw": {
+      "name": "AuxiDraw",
+      "kind_fr": "Dessin et mise en page",
+      "kind_en": "Drawing and layout",
+      "color": "#7B4FC4",
+      "letter": "D",
+      "extensions": [
+        "odg",
+        "otg",
+        "fodg",
+        "vsdx",
+        "vsd",
+        "vsdm",
+        "vdx",
+        "vstx",
+        "vst",
+        "cdr",
+        "pub",
+        "wpg",
+        "cmx",
+        "svg"
+      ]
+    },
     "pdf": {
       "name": "AuxiPDF",
       "kind_fr": "Lecteur PDF",
@@ -79,10 +102,7 @@
       "color": "#C8283C",
       "letter": "PDF",
       "extensions": [
-        "pdf",
-        "djvu",
-        "xps",
-        "oxps"
+        "pdf"
       ]
     },
     "text": {
