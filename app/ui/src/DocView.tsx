@@ -126,6 +126,13 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
       const i = await call<DocInfo>(doc, "info");
       view.setDocSize(i.width, i.height);
       setPartNames(i.part_names);
+      // Feuille insérée ou supprimée : LibreOffice change de partie sans
+      // rappel set_part (l'onglet et les en-têtes restaient sur l'ancienne).
+      if (i.part !== view.part) {
+        view.setPart(i.part);
+        setPart(i.part);
+        if (isSheet) void syncSheetViewport();
+      }
       if (isSlides) setThumbVersion((n) => n + 1);
       updatePages(i);
     };
