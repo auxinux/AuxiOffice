@@ -62,8 +62,8 @@ impl AppKind {
     pub fn for_path(path: &str) -> AppKind {
         let ext = Path::new(path).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
         match ext.as_str() {
-            "xlsx" | "xlsm" | "xltx" | "xls" | "ods" | "ots" | "csv" | "fods" => AppKind::Sheet,
-            "pptx" | "ppsx" | "potx" | "ppt" | "pps" | "odp" | "otp" | "fodp" | "odg" => AppKind::Present,
+            "xlsx" | "xlsm" | "xltx" | "xltm" | "xls" | "ods" | "ots" | "csv" | "fods" => AppKind::Sheet,
+            "pptx" | "pptm" | "ppsx" | "potx" | "ppt" | "pps" | "odp" | "otp" | "fodp" | "odg" => AppKind::Present,
             _ => AppKind::Writer,
         }
     }
@@ -317,6 +317,10 @@ mod tests {
         assert_eq!(AppKind::for_path("b.csv"), AppKind::Sheet);
         assert_eq!(AppKind::for_path("b.xls"), AppKind::Sheet);
         assert_eq!(AppKind::for_path("b.pptx"), AppKind::Present);
+        // Avec macros.
+        assert_eq!(AppKind::for_path("/a/Prix l'été.XLSM"), AppKind::Sheet);
+        assert_eq!(AppKind::for_path("b.pptm"), AppKind::Present);
+        assert_eq!(AppKind::for_path("b.docm"), AppKind::Writer);
         assert_eq!(AppKind::for_path("b.odg"), AppKind::Present);
         assert_eq!(AppKind::for_path("notes"), AppKind::Writer);
     }

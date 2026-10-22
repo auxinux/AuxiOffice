@@ -139,15 +139,19 @@ fn filter_for(path: &str) -> Option<&'static str> {
     let ext = Path::new(path).extension()?.to_string_lossy().to_lowercase();
     Some(match ext.as_str() {
         "docx" => "MS Word 2007 XML",
+        // Avec macros : le projet VBA (vbaProject.bin) est conservé.
+        "docm" => "MS Word 2007 XML VBA",
         "doc" => "MS Word 97",
         "odt" => "writer8",
         "rtf" => "Rich Text Format",
         "txt" => "Text",
         "xlsx" => "Calc MS Excel 2007 XML",
+        "xlsm" => "Calc MS Excel 2007 VBA XML",
         "xls" => "MS Excel 97",
         "ods" => "calc8",
         "csv" => "Text - txt - csv (StarCalc)",
         "pptx" => "Impress MS PowerPoint 2007 XML",
+        "pptm" => "Impress MS PowerPoint 2007 XML VBA",
         "ppt" => "MS PowerPoint 97",
         "odp" => "impress8",
         "odg" => "draw8",
@@ -510,9 +514,12 @@ impl Engine {
             "save_in_place" => {
                 // Fichier > Enregistrer, dans le fichier d'origine et son format.
                 // La réponse part quand LibreOffice confirme (réponse différée).
+                // DontTerminateEdit à faux, comme Fichier > Enregistrer de
+                // LibreOffice : la cellule en cours de saisie (Ctrl+S sans
+                // Entrée) est validée, sinon elle manquait dans le fichier.
                 let d = self.doc()?;
                 let args = json!({
-                    "DontTerminateEdit": {"type": "boolean", "value": true},
+                    "DontTerminateEdit": {"type": "boolean", "value": false},
                     "DontSaveIfUnmodified": {"type": "boolean", "value": false},
                 });
                 self.deferred.lock().unwrap().push((self.current_id.clone(), ".uno:Save".into()));
@@ -839,5 +846,13 @@ mod tests {
         // Échantillon coupé au milieu d'un caractère, fichier vide.
         assert_eq!(csv_import_options(&"é;é\n".as_bytes()[..4]), "59,34,76,1,,0,false,true");
         assert_eq!(csv_import_options(b""), "44,34,76,1,,0,false,true");
+    }
+
+    #[test]
+    fn macro_formats_can_be_saved() {
+        assert_eq!(filter_for("/a/Rapport l'été.DOCM"), Some("MS Word 2007 XML VBA"));
+        assert_eq!(filter_for("b.xlsm"), Some("Calc MS Excel 2007 VBA XML"));
+        assert_eq!(filter_for("c.pptm"), Some("Impress MS PowerPoint 2007 XML VBA"));
+        assert_eq!(filter_for("d.pdf"), None);
     }
 }

@@ -114,3 +114,25 @@ describe("impression", () => {
     expect(validPageRange("a")).toBe(false);
   });
 });
+
+describe("enregistrer sous", () => {
+  const filters = [
+    { name: "Document Word", extensions: ["docx"] },
+    { name: "Document Word avec macros", extensions: ["docm"] },
+    { name: "Texte OpenDocument", extensions: ["odt"] },
+  ];
+  it("propose d'abord le format du document (macros conservées)", async () => {
+    const { saveFiltersFor } = await import("./lok");
+    expect(saveFiltersFor(filters, "/home/a/Lettre de l'été.DOCM")[0].extensions).toEqual(["docm"]);
+    expect(saveFiltersFor(filters, "C:\\Docs\\x.odt").map((f) => f.extensions[0])).toEqual(["odt", "docx", "docm"]);
+    expect(saveFiltersFor(filters, "/a/notes.txt")).toBe(filters);
+    expect(saveFiltersFor(filters, "")).toBe(filters);
+  });
+  it("ajoute l'extension manquante", async () => {
+    const { withSaveExtension } = await import("./lok");
+    expect(withSaveExtension("/home/a/rapport", filters)).toBe("/home/a/rapport.docx");
+    expect(withSaveExtension("/home/a/rapport.v2", filters)).toBe("/home/a/rapport.v2.docx");
+    expect(withSaveExtension("/home/a/rapport.DocM", filters)).toBe("/home/a/rapport.DocM");
+    expect(withSaveExtension("/home/a.b/rapport", [{ name: "PDF", extensions: ["pdf"] }])).toBe("/home/a.b/rapport.pdf");
+  });
+});

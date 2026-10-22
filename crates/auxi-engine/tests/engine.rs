@@ -187,6 +187,49 @@ fn writer_edit_save_and_export() {
     assert!(pages > 150, "{pages} pages seulement");
 }
 
+/// Le code de la macro AuxiBonjour est-il encore dans `doc` ? (relu par
+/// LibreOffice et réécrit en ODF, où le module Basic est en clair).
+fn macro_survives(doc: &PathBuf, odf_ext: &str) -> bool {
+    let (ctx, _) = setup("macro-relu").unwrap();
+    ctx.call(json!({"cmd": "load", "path": doc}));
+    let odf = ctx.tmp.join(format!("relu.{odf_ext}"));
+    ctx.call(json!({"cmd": "save", "path": odf, "format": odf_ext}));
+    zip_entry(&odf, "Basic/VBAProject/Module1.xml").contains("AuxiBonjour")
+}
+
+#[test]
+fn macro_documents_keep_their_vba_project() {
+    let Some((ctx, fx)) = setup("docm") else { return };
+    // DOCM : Enregistrer (en place), puis Enregistrer sous en .docm.
+    let docm = ctx.tmp.join("Lettre de l'été.docm");
+    std::fs::copy(fx.join("macro.docm"), &docm).unwrap();
+    ctx.call(json!({"cmd": "load", "path": docm}));
+    ctx.type_text("Modifié ");
+    ctx.settle();
+    ctx.call(json!({"cmd": "save_in_place"}));
+    assert!(zip_entry(&docm, "word/document.xml").contains("Modifié"));
+    assert!(zip_entry(&docm, "[Content_Types].xml").contains("macroEnabled"), "format DOCM perdu");
+    let copy = ctx.tmp.join("copie.docm");
+    ctx.call(json!({"cmd": "save_as_location", "path": copy}));
+    drop(ctx);
+    assert!(macro_survives(&docm, "odt"), "macro perdue à l'enregistrement du DOCM");
+    assert!(macro_survives(&copy, "odt"), "macro perdue dans Enregistrer sous .docm");
+
+    // XLSM : Ctrl+S pendant la saisie d'une cellule (sans Entrée).
+    let (ctx, _) = setup("xlsm").unwrap();
+    let xlsm = ctx.tmp.join("classeur.xlsm");
+    std::fs::copy(fx.join("macro.xlsm"), &xlsm).unwrap();
+    ctx.call(json!({"cmd": "load", "path": xlsm}));
+    ctx.call(json!({"cmd": "uno", "command": ".uno:GoToCell", "args": {"ToPoint": {"type": "string", "value": "A3"}}}));
+    ctx.type_text("SaisieEnCours");
+    ctx.settle();
+    ctx.call(json!({"cmd": "save_in_place"}));
+    assert!(zip_entry(&xlsm, "[Content_Types].xml").contains("macroEnabled"), "format XLSM perdu");
+    assert!(zip_entry(&xlsm, "xl/sharedStrings.xml").contains("SaisieEnCours"), "cellule en cours de saisie non enregistrée");
+    drop(ctx);
+    assert!(macro_survives(&xlsm, "ods"), "macro perdue à l'enregistrement du XLSM");
+}
+
 #[test]
 fn csv_opens_without_the_import_dialog() {
     let Some((ctx, _)) = setup("csv") else { return };

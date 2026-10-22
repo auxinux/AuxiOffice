@@ -10,9 +10,9 @@ Quatre applications, chacune avec sa fenêtre, son icône et son entrée dans le
 | Application | Rôle | Formats |
 |---|---|---|
 | **AuxiOffice** | gestionnaire : créer, ouvrir, documents récents ; chaque document part dans son application | — |
-| **AuxiWriter** | traitement de texte | DOCX, DOC, ODT, RTF, TXT ; export PDF |
-| **AuxiSheet** | tableur | XLSX, XLS, ODS, CSV ; export PDF |
-| **AuxiPresent** | présentations | PPTX, PPT, ODP ; export PDF |
+| **AuxiWriter** | traitement de texte | DOCX, DOCM (macros conservées), DOC, ODT, RTF, TXT ; export PDF |
+| **AuxiSheet** | tableur | XLSX, XLSM (macros conservées), XLS, ODS, CSV ; export PDF |
+| **AuxiPresent** | présentations | PPTX, PPTM, PPT, ODP ; export PDF |
 
 AuxiOffice est un **produit propriétaire du Projet AuxiNux**. Son interface et sa coque sont
 écrites par AuxiNux ; le rendu et l'édition des documents sont confiés à

@@ -20,9 +20,9 @@ interface Props {
 }
 
 const KINDS = [
-  { kind: "text", app: "writer", label: "Document texte", blank: "Document vierge", icon: "/icons/auxiwriter.svg", exts: ["docx", "doc", "odt", "rtf", "txt", "dotx", "ott"] },
+  { kind: "text", app: "writer", label: "Document texte", blank: "Document vierge", icon: "/icons/auxiwriter.svg", exts: ["docx", "docm", "doc", "odt", "rtf", "txt", "dotx", "ott"] },
   { kind: "spreadsheet", app: "sheet", label: "Classeur", blank: "Classeur vierge", icon: "/icons/auxisheet.svg", exts: ["xlsx", "xls", "ods", "csv", "xlsm", "xltx", "ots"] },
-  { kind: "presentation", app: "present", label: "Présentation", blank: "Présentation vierge", icon: "/icons/auxipresent.svg", exts: ["pptx", "ppt", "odp", "ppsx", "potx", "otp", "odg"] },
+  { kind: "presentation", app: "present", label: "Présentation", blank: "Présentation vierge", icon: "/icons/auxipresent.svg", exts: ["pptx", "pptm", "ppt", "odp", "ppsx", "potx", "otp", "odg"] },
 ] as const;
 
 const extOf = (p: string) => p.split(".").pop()?.toLowerCase() ?? "";

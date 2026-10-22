@@ -187,6 +187,32 @@ export function fileName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
 }
 
+/** Extension en minuscules (« » si aucune). */
+export function extension(path: string): string {
+  const name = fileName(path);
+  const i = name.lastIndexOf(".");
+  return i > 0 ? name.slice(i + 1).toLowerCase() : "";
+}
+
+export interface FileFilter {
+  name: string;
+  extensions: string[];
+}
+
+/** Filtres d'« Enregistrer sous » : le format du document d'abord (un .docm
+ * reste un .docm et garde ses macros). */
+export function saveFiltersFor(filters: FileFilter[], path: string): FileFilter[] {
+  const ext = extension(path);
+  const i = filters.findIndex((f) => f.extensions.includes(ext));
+  return i > 0 ? [filters[i], ...filters.filter((_, j) => j !== i)] : filters;
+}
+
+/** Nom choisi sans extension connue (« rapport ») : celle du premier filtre. */
+export function withSaveExtension(target: string, filters: FileFilter[]): string {
+  if (filters.some((f) => f.extensions.includes(extension(target)))) return target;
+  return `${target}.${filters[0]?.extensions[0] ?? "odt"}`;
+}
+
 /** Document vierge pas encore enregistré par l'utilisateur. */
 export function isUntitled(path: string): boolean {
   return /[\\/]AuxiOffice[\\/]Sans titre \d+\.\w+$/.test(path);

@@ -12,7 +12,7 @@ import { PrintDialog } from "./PrintDialog";
 import { AuxiCorrectDictionary, AuxiCorrectOptionsDialog } from "./AuxiCorrect";
 import { appInfo, call, closeDocument, launchApp, newDocument, onLaunch, openDocument, recentFiles, routeFiles, takeLaunches, warmEngine, type DocInfo, type Launch } from "./engine";
 import { Home } from "./Home";
-import { fileName, isUntitled } from "./lok";
+import { fileName, isUntitled, saveFiltersFor, withSaveExtension } from "./lok";
 
 interface Tab {
   info: DocInfo;
@@ -22,9 +22,9 @@ interface Tab {
 }
 
 const TYPE_FILTERS = {
-  text: { name: "Textes", extensions: ["docx", "doc", "odt", "rtf", "txt", "dotx"] },
+  text: { name: "Textes", extensions: ["docx", "docm", "doc", "odt", "rtf", "txt", "dotx"] },
   spreadsheet: { name: "Classeurs", extensions: ["xlsx", "xls", "ods", "csv", "xlsm"] },
-  presentation: { name: "Présentations", extensions: ["pptx", "ppt", "odp", "ppsx", "odg"] },
+  presentation: { name: "Présentations", extensions: ["pptx", "pptm", "ppt", "odp", "ppsx", "odg"] },
 };
 const ALL_FILTER = { name: "Documents pris en charge", extensions: Object.values(TYPE_FILTERS).flatMap((f) => f.extensions) };
 
@@ -41,18 +41,22 @@ const APP_FOR_DOC = { text: "writer", spreadsheet: "sheet", presentation: "prese
 const SAVE_FILTERS: Record<string, { name: string; extensions: string[] }[]> = {
   text: [
     { name: "Document Word", extensions: ["docx"] },
+    { name: "Document Word avec macros", extensions: ["docm"] },
     { name: "Texte OpenDocument", extensions: ["odt"] },
     { name: "Texte enrichi", extensions: ["rtf"] },
     { name: "Word 97-2003", extensions: ["doc"] },
+    { name: "Texte brut", extensions: ["txt"] },
   ],
   spreadsheet: [
     { name: "Classeur Excel", extensions: ["xlsx"] },
+    { name: "Classeur Excel avec macros", extensions: ["xlsm"] },
     { name: "Classeur OpenDocument", extensions: ["ods"] },
     { name: "CSV", extensions: ["csv"] },
     { name: "Excel 97-2003", extensions: ["xls"] },
   ],
   presentation: [
     { name: "Présentation PowerPoint", extensions: ["pptx"] },
+    { name: "Présentation PowerPoint avec macros", extensions: ["pptm"] },
     { name: "Présentation OpenDocument", extensions: ["odp"] },
     { name: "PowerPoint 97-2003", extensions: ["ppt"] },
   ],
@@ -191,10 +195,12 @@ export function App() {
       if (!t) return;
       try {
         if (asNew || isUntitled(t.path) || t.info.read_only) {
-          const filters = SAVE_FILTERS[t.info.type] ?? [];
+          // Format du document proposé d'abord (un .docm garde ses macros).
+          const filters = saveFiltersFor(SAVE_FILTERS[t.info.type] ?? [], isUntitled(t.path) ? "" : t.path);
           const base = isUntitled(t.path) ? "Sans titre" : fileName(t.path).replace(/\.[^.]+$/, "");
-          const target = await save({ filters, defaultPath: `${base}.${filters[0]?.extensions[0] ?? "odt"}` });
-          if (!target) return;
+          const chosen = await save({ filters, defaultPath: `${base}.${filters[0]?.extensions[0] ?? "odt"}` });
+          if (!chosen) return;
+          const target = withSaveExtension(chosen, filters);
           setBusy("Enregistrement…");
           await call(doc, "save_as_location", { path: target });
           setTab(doc, { path: target, modified: false, info: { ...t.info, read_only: false, locked_by: null, path: target } });
@@ -219,8 +225,10 @@ export function App() {
       const t = tabsRef.current.find((x) => x.info.doc === doc);
       if (!t) return;
       const base = isUntitled(t.path) ? "Sans titre" : fileName(t.path).replace(/\.[^.]+$/, "");
-      const target = await save({ filters: [{ name: "PDF", extensions: ["pdf"] }], defaultPath: `${base}.pdf` });
-      if (!target) return;
+      const pdf = [{ name: "PDF", extensions: ["pdf"] }];
+      const chosen = await save({ filters: pdf, defaultPath: `${base}.pdf` });
+      if (!chosen) return;
+      const target = withSaveExtension(chosen, pdf);
       setBusy("Exportation en PDF…");
       try {
         await call(doc, "save", { path: target, format: "pdf" });
