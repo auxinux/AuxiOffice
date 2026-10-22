@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { APP_DOC, APP_NAMES, type AppKind, type NewKind } from "./actions";
-import { auxiCorrectStatus, type AuxiCorrectStatus } from "./engine";
+import { auxiCorrectStatus, launchApp, type AuxiCorrectStatus } from "./engine";
 import { Icon } from "./icons";
 import { fileName } from "./lok";
 
@@ -75,6 +75,13 @@ export function Home({ app, recents, onNew, onOpen, onOpenPath, onAuxiCorrect }:
                   <span className="app">{APP_NAMES[k.app]}</span>
                 </button>
               ),
+          )}
+          {!own && (
+            <button className="new-card" onClick={() => void launchApp("pdf")}>
+              <img src="/icons/auxipdf.svg" alt="" />
+              <span className="label">Lire un PDF</span>
+              <span className="app">AuxiPDF</span>
+            </button>
           )}
           <button className="new-card open" onClick={onOpen}>
             <span className="open-icon">

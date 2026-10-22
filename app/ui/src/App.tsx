@@ -5,6 +5,7 @@
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APP_DOC, APP_NAMES, type Action, type AppAction, type AppKind, type NewKind } from "./actions";
 import { DocView, type DocHandle } from "./DocView";
@@ -417,6 +418,21 @@ export function App() {
     return () => void un.then((f) => f());
   }, []);
 
+  // Fichiers déposés sur la fenêtre : ouverts ici ou dans leur application.
+  const [dropping, setDropping] = useState(false);
+  useEffect(() => {
+    const un = getCurrentWebview().onDragDropEvent((e) => {
+      const p = e.payload;
+      if (p.type === "enter" || p.type === "over") setDropping(true);
+      else if (p.type === "leave") setDropping(false);
+      else if (p.type === "drop") {
+        setDropping(false);
+        if (p.paths.length) void openFiles(p.paths);
+      }
+    });
+    return () => void un.then((f) => f());
+  }, [openFiles]);
+
   // Raccourcis globaux (Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+W…) : portés par la
   // barre de menus native, qui les intercepte avant la page.
 
@@ -505,6 +521,7 @@ export function App() {
         )}
       </div>
 
+      {dropping && <div className="drop-zone">Déposez le fichier pour l'ouvrir</div>}
       {busy && (
         <div className="busy">
           <div className="spinner" /> {busy}
