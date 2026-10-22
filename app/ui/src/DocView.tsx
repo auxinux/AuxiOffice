@@ -569,7 +569,13 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
             value={formula}
             onChange={(e) => setFormula(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") command(".uno:EnterString", { StringName: { type: "string", value: formula } });
+              if (e.key === "Enter") {
+                // EnterString ne fait que remplir la saisie de la cellule (qui
+                // restait ouverte, et un clic ailleurs y ajoutait une référence) :
+                // Entrée la valide, comme au clavier dans la cellule.
+                command(".uno:EnterString", { StringName: { type: "string", value: formula } });
+                sendKey(13, 1280);
+              }
               if (e.key === "Escape") focusInput();
             }}
             aria-label="Contenu de la cellule"
