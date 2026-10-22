@@ -204,6 +204,12 @@ export function fileName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
 }
 
+/** `name` dans le dossier de `path` (boîte « Enregistrer sous » ouverte à côté du document). */
+export function besideFile(path: string, name: string): string {
+  const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return i >= 0 ? path.slice(0, i + 1) + name : name;
+}
+
 /** Extension en minuscules (« » si aucune). */
 export function extension(path: string): string {
   const name = fileName(path);

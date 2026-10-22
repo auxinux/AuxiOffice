@@ -150,6 +150,12 @@ describe("enregistrer sous", () => {
     expect(saveFiltersFor(filters, "/a/notes.txt")).toBe(filters);
     expect(saveFiltersFor(filters, "")).toBe(filters);
   });
+  it("ouvre la boîte à côté du document", async () => {
+    const { besideFile } = await import("./lok");
+    expect(besideFile("/home/a/Lettre l'été.docx", "Lettre l'été.pdf")).toBe("/home/a/Lettre l'été.pdf");
+    expect(besideFile("C:\\Docs\\x.docx", "x.pdf")).toBe("C:\\Docs\\x.pdf");
+    expect(besideFile("x.docx", "x.pdf")).toBe("x.pdf");
+  });
   it("ajoute l'extension manquante", async () => {
     const { withSaveExtension } = await import("./lok");
     expect(withSaveExtension("/home/a/rapport", filters)).toBe("/home/a/rapport.docx");
