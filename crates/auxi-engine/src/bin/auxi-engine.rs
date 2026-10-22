@@ -853,7 +853,83 @@ fn main() {
 /// scripts/build-engine-macos.sh) ; ce fil-ci lit les requêtes et appelle
 /// LibreOfficeKit.
 fn run(engine: Engine, out: Out, ready: Value) -> ! {
+    if cfg!(windows) {
+        run_windows(engine, out, ready)
+    } else {
+        run_threaded(engine, out, ready)
+    }
+}
+
+/// Windows : le module d'affichage de LibreOffice considère comme « fil
+/// principal » celui qui a appelé `lok_init` (le nôtre), et sa fenêtre de
+/// messages interne lui appartient. Le fil de LibreOffice lui envoie des
+/// messages (`SendMessage`) et attend qu'ils soient traités : ce fil doit donc
+/// faire tourner une boucle de messages Win32. Un second fil lit les requêtes
+/// et réveille celui-ci, qui les exécute entre deux messages.
+#[cfg(not(windows))]
+fn run_windows(engine: Engine, out: Out, ready: Value) -> ! {
     run_threaded(engine, out, ready)
+}
+
+#[cfg(windows)]
+fn run_windows(mut engine: Engine, out: Out, ready: Value) -> ! {
+    use std::collections::VecDeque;
+    use windows_sys::Win32::System::Threading::{CreateEventW, SetEvent, INFINITE};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{DispatchMessageW, MsgWaitForMultipleObjects, PeekMessageW, TranslateMessage, MSG, PM_REMOVE, QS_ALLINPUT};
+
+    // Requêtes lues (None : fin du flux d'entrée).
+    let queue: Arc<Mutex<VecDeque<Option<Frame>>>> = Arc::new(Mutex::new(VecDeque::new()));
+    let event = unsafe { CreateEventW(std::ptr::null(), 0, 0, std::ptr::null()) } as usize;
+    {
+        let queue = queue.clone();
+        std::thread::Builder::new()
+            .name("auxi-engine-lecture".into())
+            .spawn(move || {
+                let mut input = BufReader::new(std::io::stdin().lock());
+                loop {
+                    let frame = match read_frame(&mut input) {
+                        Ok(f) => f,
+                        Err(e) => {
+                            eprintln!("auxi-engine: flux d'entrée invalide : {e}");
+                            None
+                        }
+                    };
+                    let end = frame.is_none();
+                    queue.lock().unwrap().push_back(frame);
+                    unsafe { SetEvent(event as _) };
+                    if end {
+                        break;
+                    }
+                }
+            })
+            .expect("fil de lecture");
+    }
+    send(&out, &ready, &[]);
+    loop {
+        // Exécuter les requêtes en attente, une à une : une requête peut
+        // elle-même faire tourner la boucle de messages de LibreOffice.
+        loop {
+            let next = queue.lock().unwrap().pop_front();
+            match next {
+                Some(Some(frame)) => {
+                    if engine.process(frame) {
+                        engine.shutdown();
+                    }
+                }
+                Some(None) => engine.shutdown(),
+                None => break,
+            }
+        }
+        let handles = [event as _];
+        unsafe { MsgWaitForMultipleObjects(1, handles.as_ptr(), 0, INFINITE, QS_ALLINPUT) };
+        let mut msg: MSG = unsafe { std::mem::zeroed() };
+        while unsafe { PeekMessageW(&mut msg, std::ptr::null_mut(), 0, 0, PM_REMOVE) } != 0 {
+            unsafe {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+    }
 }
 
 fn run_threaded(mut engine: Engine, out: Out, ready: Value) -> ! {

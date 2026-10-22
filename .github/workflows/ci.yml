@@ -94,9 +94,29 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D clippy::correctness -D clippy::suspicious
       - name: Compilation de production
         run: cargo build --release --workspace --features auxioffice/custom-protocol
-      - name: Journal du moteur (en cas d'échec)
+      - name: Installation Windows 11 (install-apps.sh) et lancement d'AuxiWriter
+        run: |
+          scripts/install-apps.sh
+          P="$(cygpath -u "$LOCALAPPDATA")/Programs"
+          M="$(cygpath -u "$APPDATA")/Microsoft/Windows/Start Menu/Programs"
+          test -f "$P/AuxiOffice/AuxiWriter.exe"
+          test -f "$P/AuxiOffice/engine/program/soffice.exe"
+          test -f "$P/AuxiText/AuxiText.exe"
+          test -f "$M/AuxiOffice/AuxiWriter.lnk"
+          test -f "$M/AuxiText.lnk"
+          reg query 'HKCU\Software\Classes\.docx\OpenWithProgids' | grep -q AuxiOffice.AuxiWriter
+          "$P/AuxiOffice/AuxiWriter.exe" "$(cygpath -w target/fixtures/rapport.docx)" &
+          sleep 90
+          tasklist | grep -i -E "auxi|soffice" || true
+          tasklist | grep -qi "auxi-engine.exe"
+          D="$(cygpath -u "$APPDATA")/ca.auxinux.office"
+          cat "$D/moteur.log" "$D/interface.log" 2>/dev/null | tail -30 || true
+          ! grep -qi "erreur\|error" "$D/interface.log" 2>/dev/null
+      - name: Journaux (en cas d'échec)
         if: failure()
-        run: cat .engine/windows-x86_64/msiexec.log 2>/dev/null | tail -40 || true
+        run: |
+          cat .engine/windows-x86_64/msiexec.log 2>/dev/null | tail -40 || true
+          cat "$(cygpath -u "$APPDATA")/ca.auxinux.office/moteur.log" 2>/dev/null | tail -60 || true
 
   autres:
     name: ${{ matrix.name }}
