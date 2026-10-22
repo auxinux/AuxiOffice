@@ -1,6 +1,21 @@
 # Journal des modifications
 
-## 0.2.0-beta.1 — AuxiText
+## 0.2.0-beta.1 — AuxiDraw, AuxiPDF, AuxiText
+
+- **AuxiDraw**, dessin vectoriel et mise en page : dessin vierge Lettre US, formes, lignes,
+  connecteurs, courbes, cotes, texte, images ; menus Disposition (plans, alignement,
+  répartition, retournement, groupes, fusion et soustraction de formes) et Page (pages,
+  couches) ; grille ; lecture de Visio, CorelDRAW, Publisher, SVG et PDF ; export PDF, PNG,
+  SVG. Poignées de sélection et pointeur de LibreOffice (aussi pour les images d'AuxiWriter
+  et d'AuxiPresent).
+- **AuxiPDF**, lecteur PDF (PDF.js) : miniatures, signets, recherche (casse, mots entiers),
+  zoom, rotation, défilement et pages côte à côte, mode présentation, formulaires,
+  annotations (surlignage, texte, dessin, image), enregistrement, impression des pages
+  choisies, mot de passe, propriétés, liens vers le navigateur, « Modifier dans AuxiDraw ».
+- Glisser-déposer de fichiers sur les fenêtres ; DOCM, XLSM, PPTM et modèles dans les filtres
+  d'ouverture et les documents récents.
+- Intégration continue GitHub : Linux (tests complets avec LibreOffice), macOS et Windows
+  (compilation et tests sans moteur). Icône Windows ajoutée : la compilation Windows échouait.
 
 - **AuxiText**, éditeur de texte de l'écosystème, installable seul (paquet `auxitext`, sans
   LibreOffice ni le reste de la suite), éditeur par défaut d'AuxiNuxOS. Tauri 2 +

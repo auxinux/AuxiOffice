@@ -1,18 +1,20 @@
 # AuxiOffice
 
 **AuxiOffice** ([office.auxinux.ca](https://office.auxinux.ca)) est la suite bureautique de
-l'écosystème AuxiNux : traitement de texte, tableur et présentations, hors ligne, sans compte
-et sans télémétrie, pour Linux, Windows et macOS.
+l'écosystème AuxiNux : traitement de texte, tableur, présentations, dessin et lecture de PDF,
+hors ligne, sans compte et sans télémétrie, pour Linux, Windows et macOS.
 
-Quatre applications, chacune avec sa fenêtre, son icône et son entrée dans les Applications
-(macOS) ou le menu de démarrage (Linux, Windows) :
+Des applications séparées, chacune avec sa fenêtre, son icône et son entrée dans les
+Applications (macOS) ou le menu de démarrage (Linux, Windows) :
 
 | Application | Rôle | Formats |
 |---|---|---|
 | **AuxiOffice** | gestionnaire : créer, ouvrir, documents récents ; chaque document part dans son application | — |
-| **AuxiWriter** | traitement de texte | DOCX, DOC, ODT, RTF, TXT ; export PDF |
-| **AuxiSheet** | tableur | XLSX, XLS, ODS, CSV ; export PDF |
-| **AuxiPresent** | présentations | PPTX, PPT, ODP ; export PDF |
+| **AuxiWriter** | traitement de texte | DOCX, DOCM, DOC, ODT, RTF, TXT ; export PDF |
+| **AuxiSheet** | tableur | XLSX, XLSM, XLS, ODS, CSV ; export PDF |
+| **AuxiPresent** | présentations | PPTX, PPTM, PPT, ODP ; export PDF |
+| **AuxiDraw** | dessin vectoriel et mise en page | ODG ; lecture de VSDX/VSD (Visio), CDR, PUB, SVG et PDF ; export PDF, PNG, SVG |
+| **AuxiPDF** | lecteur de PDF : recherche, signets, miniatures, formulaires, annotations, impression | PDF |
 | **AuxiText** | éditeur de texte, **installable seul** (sans LibreOffice ni le reste de la suite) ; éditeur par défaut d'AuxiNuxOS | texte brut, journaux, Markdown, JSON, XML, YAML, INI, TOML, scripts, code source |
 
 AuxiText est une application à part (`text/`, paquet `auxitext`) : onglets, coloration
@@ -29,10 +31,11 @@ AuxiOffice est un **produit propriétaire du Projet AuxiNux**. Son interface et 
 > AuxiOffice remplace **AuxiNux Office** (fork AGPL d'ONLYOFFICE, abandonné). Le dernier état de
 > ce produit reste disponible sous l'étiquette git `auxinux-office-0.1.0-final`.
 
-## État : prototype 0.1.0
+## État : bêta 0.2.0-beta.1
 
 Vérifié sous Linux x86_64 ; Mac Apple Silicon : ouverture et édition vérifiées par
-l'utilisateur.
+l'utilisateur. L'intégration continue (GitHub Actions, `.github/workflows/ci.yml`) compile et
+teste chaque envoi sous Linux (avec le vrai moteur LibreOffice), macOS et Windows.
 
 - ouverture, édition, enregistrement et export PDF de documents DOCX, XLSX et PPTX ;
 - **barre de menus** native (Fichier, Édition, Affichage, Insertion, Format, Tableau ou
@@ -52,10 +55,18 @@ l'utilisateur.
   images, barre de formule, en-têtes de lignes et colonnes, onglets de feuilles, miniatures
   de diapositives ;
 - documents verrouillés, verrous orphelins ; un moteur par document, et un moteur prêt
-  d'avance pour accélérer l'ouverture.
+  d'avance pour accélérer l'ouverture ;
+- **AuxiDraw** : formes, lignes, connecteurs, courbes, cotes, texte, images ; disposition
+  (plans, alignement, répartition, retournement, groupes, opérations sur les formes), pages
+  et couches, grille ; modification des PDF ;
+- **AuxiPDF** (PDF.js, sans LibreOffice) : miniatures, signets, recherche, zoom, rotation,
+  mode présentation, formulaires, annotations (surlignage, texte, dessin, image),
+  enregistrement, impression, document protégé par mot de passe ;
+- glisser-déposer de fichiers sur les fenêtres.
 
-Pas encore fait : paquets, Windows (prévu mais non compilé ; l'impression y passe par la
-visionneuse du système), animations du diaporama.
+Pas encore fait : moteur Windows (l'application compile sous Windows, mais LibreOffice n'y
+est pas encore extrait ni testé comme moteur ; l'impression y passe par la visionneuse du
+système), animations du diaporama, AuxiCorrect dans AuxiText.
 
 ## Développement
 
@@ -63,8 +74,8 @@ Voir [BUILD.md](BUILD.md). En bref (Linux x86_64 ou Mac Apple Silicon) :
 
 ```sh
 scripts/dev.sh                   # moteur LibreOffice, compilation, lancement d'AuxiOffice
-scripts/dev.sh --app writer      # … ou directement AuxiWriter (sheet, present)
-scripts/install-apps.sh          # les quatre applications dans le Finder / le menu des applications
+scripts/dev.sh --app writer      # … ou directement AuxiWriter (sheet, present, draw, pdf)
+scripts/install-apps.sh          # les applications dans le Finder / le menu des applications
 scripts/dev-text.sh [fichier]    # AuxiText seul (aucun moteur nécessaire)
 scripts/test.sh                  # tests des interfaces, du moteur et d'intégration
 ```

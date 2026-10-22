@@ -68,7 +68,7 @@ Sans `custom-protocol`, la coque charge l'interface depuis le serveur Vite
 ## Lancer en développement
 
 ```sh
-target/release/auxioffice [--app office|writer|sheet|present] [--new] [document…]
+target/release/auxioffice [--app office|writer|sheet|present|draw|pdf] [--new] [document…]
 ```
 
 Lancé depuis `target/<profil>/`, l'exécutable trouve seul `auxi-engine`, le LibreOffice de
@@ -99,7 +99,7 @@ Dans un paquet, `AuxiOffice.app` (ou le dossier d'installation) contient le mote
 
 | Variable | Rôle | Par défaut (paquets) |
 |---|---|---|
-| `AUXI_APP` | application : `office`, `writer`, `sheet`, `present` | d'après `--app` ou le nom de l'exécutable |
+| `AUXI_APP` | application : `office`, `writer`, `sheet`, `present`, `draw`, `pdf` | d'après `--app` ou le nom de l'exécutable |
 | `AUXI_ENGINE_EXE` | exécutable `auxi-engine` | à côté de `auxioffice` |
 | `AUXI_LO_PROGRAM` | dossier `program/` de LibreOffice | `engine/program/` à côté de `auxioffice` (macOS : `Resources/engine/*.app`) |
 | `AUXI_TEMPLATES` | modèles vierges | ressources de l'application (`templates/`) |
@@ -151,3 +151,17 @@ scripts/test.sh
 
 Les modèles vierges (`app/src-tauri/templates`) se régénèrent avec
 `tests/fixtures/make_templates.py`.
+
+## Intégration continue (GitHub Actions)
+
+`.github/workflows/ci.yml` tourne à chaque envoi sur GitHub :
+
+- **Linux x86_64** : moteur LibreOffice épinglé (`scripts/fetch-engine.sh`, mis en cache),
+  `scripts/test.sh` complet (interfaces, coque, moteur avec de vrais documents), Clippy,
+  compilation de production ;
+- **macOS Apple Silicon** et **Windows x86_64** : compilation, tests sans moteur, Clippy,
+  compilation de production (le moteur macOS se compile en 1 à 3 h ; Windows n'a pas encore
+  le sien).
+
+`scripts/ci-npm.sh` installe et compile les deux interfaces (`app/`, `text/`). Aucun paquet
+n'est construit par l'intégration continue.

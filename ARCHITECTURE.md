@@ -19,12 +19,14 @@
 └──────────────────────────────┘
 ```
 
-## Quatre applications, un exécutable
+## Six applications, un exécutable
 
 - **AuxiOffice** est le gestionnaire : créer, ouvrir, documents récents. Il n'ouvre aucun
-  document lui-même (aucun moteur) : il les confie à **AuxiWriter**, **AuxiSheet** ou
-  **AuxiPresent**, qui ont chacune leur fenêtre, leur icône, leur accueil, leurs documents
-  récents et leurs menus. Un fichier d'un autre type ouvert dans l'une part dans la bonne.
+  document lui-même (aucun moteur) : il les confie à **AuxiWriter**, **AuxiSheet**,
+  **AuxiPresent**, **AuxiDraw** ou **AuxiPDF**, qui ont chacune leur fenêtre, leur icône, leur
+  accueil, leurs documents récents et leurs menus. Un fichier d'un autre type ouvert dans
+  l'une part dans la bonne (exception : AuxiDraw garde les PDF qu'on lui confie, pour les
+  modifier).
 - Même exécutable, application choisie au lancement (`app/src-tauri/src/apps.rs`) : `--app`,
   `AUXI_APP` ou nom de l'exécutable / du paquet `.app`.
 - **Instance unique par application** : la première écoute sur `127.0.0.1` (port et jeton
@@ -32,6 +34,31 @@
   fichiers et quitte. Sous macOS, les fichiers du Finder arrivent par `RunEvent::Opened`.
 - Profils LibreOffice séparés par application (`moteur/<app>/profil-N`) : deux applications
   ouvertes ne partagent jamais un profil. Les documents récents sont communs.
+
+## AuxiDraw
+
+- Documents de type « drawing » de LibreOfficeKit : même vue par tuiles et même panneau de
+  pages que les présentations (sans diaporama). Formats natifs ODG, OTG, FODG ; les formats
+  que LibreOffice lit sans savoir les réécrire (Visio, CorelDRAW, Publisher, SVG, PDF) passent
+  par « Enregistrer sous » en ODG. Exports PDF, PNG et SVG (`save` avec `format`).
+- LibreOfficeKit insère une forme demandée par un bouton au centre de la vue, sélectionnée,
+  mais laisse l'outil actif : l'interface envoie ensuite `.uno:SelectObject`.
+- Les poignées de la sélection (`graphic_selection`) sont dessinées par l'interface ; le
+  pointeur (`mouse_pointer`) est celui demandé par LibreOffice.
+
+## AuxiPDF
+
+- Pas de moteur LibreOffice : le PDF est lu par la coque (`pdf_read`, octets bruts) et affiché
+  par **PDF.js** (Mozilla, Apache 2.0, `pdfjs-dist`), chargé à la demande
+  (`app/ui/src/pdfjs.ts`) ; ses ressources (jeux de caractères, polices standard, décodeurs
+  WebAssembly) sont copiées dans `ui/public/pdfjs` par `app/pdfjs-assets.mjs`. La CSP autorise
+  `wasm-unsafe-eval` pour ces décodeurs.
+- Formulaires et annotations : `saveDocument()` de PDF.js, écrit par `pdf_write` (corps brut,
+  chemin dans un en-tête, fichier temporaire puis renommage). Impression : le fichier (ou une
+  copie temporaire s'il est modifié) envoyé à `lp -P <pages>`.
+- Liens externes interceptés et ouverts par le système (`open_url` : http, https, mailto
+  seulement). « Modifier dans AuxiDraw » confie le fichier à AuxiDraw (import PDF de
+  LibreOffice).
 
 ## AuxiText : éditeur de texte autonome
 

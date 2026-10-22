@@ -39,6 +39,7 @@
         "desktopTemplate": "linux/auxitext.desktop",
         "files": {
           "/usr/share/applications/ca.auxinux.AuxiText.desktop": "linux/ca.auxinux.AuxiText.desktop",
+          "/usr/share/applications/ca.auxinux.AuxiNuxOffice.Text.desktop": "linux/ca.auxinux.AuxiNuxOffice.Text.desktop",
           "/usr/share/icons/hicolor/scalable/apps/auxitext.svg": "icons/auxitext.svg",
           "/usr/share/metainfo/ca.auxinux.AuxiText.metainfo.xml": "linux/ca.auxinux.AuxiText.metainfo.xml"
         }
