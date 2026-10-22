@@ -258,6 +258,13 @@ struct Engine {
     out: Out,
     args: Args,
     password: Arc<Mutex<Option<String>>>,
+    /// LibreOffice a demandé le mot de passe d'ouverture pendant le chargement.
+    password_asked: Arc<std::sync::atomic::AtomicBool>,
+    /// Mot de passe d'ouverture du document chargé (repris par Enregistrer sous).
+    doc_password: Option<String>,
+    /// Commandes UNO dont le moteur attend lui-même la fin (rappel
+    /// UNO_COMMAND_RESULT), sans réponse à l'application.
+    waiters: Arc<Mutex<Vec<(String, std::sync::mpsc::Sender<()>)>>>,
     /// Réponses différées : requêtes qui attendent le résultat d'une commande
     /// UNO (enregistrement). Le rappel de LibreOffice envoie la réponse ; on ne
     /// bloque donc jamais le fil qui fait tourner LibreOffice (indispensable
@@ -309,7 +316,9 @@ impl Engine {
                     locked_by = None;
                 }
                 let read_only_file = std::fs::metadata(path).map(|m| m.permissions().readonly()).unwrap_or(false);
-                *self.password.lock().unwrap() = string(req, "password").map(str::to_owned);
+                let given = string(req, "password").filter(|p| !p.is_empty());
+                *self.password.lock().unwrap() = given.map(str::to_owned);
+                self.password_asked.store(false, std::sync::atomic::Ordering::SeqCst);
                 let mut opts = format!("Language={}", self.args.lang);
                 if is_csv(path) {
                     // Le reste des options devient FilterOptions pour LibreOffice.
@@ -321,12 +330,29 @@ impl Engine {
                     opts.push(',');
                     opts.push_str(&csv_import_options(&sample));
                 }
-                let mut doc = self.office.load(&url, &opts)?;
+                let mut doc = match self.office.load(&url, &opts) {
+                    Ok(d) => d,
+                    // Document chiffré : message reconnu par l'interface, qui
+                    // demande alors le mot de passe (LibreOffice ne dit que
+                    // « type detection aborted »).
+                    Err(_) if self.password_asked.load(std::sync::atomic::Ordering::SeqCst) => {
+                        return Err(if given.is_some() { "mot de passe incorrect" } else { "mot de passe requis" }.into());
+                    }
+                    Err(e) => return Err(e),
+                };
                 let out = self.out.clone();
                 let deferred = self.deferred.clone();
+                let waiters = self.waiters.clone();
                 doc.register_callback(Box::new(move |t, payload| {
                     if t == sys::LOK_CALLBACK_UNO_COMMAND_RESULT {
                         if let Ok(r) = serde_json::from_str::<Value>(&payload) {
+                            waiters.lock().unwrap().retain(|(c, tx)| {
+                                let done = r["commandName"] == c.as_str();
+                                if done {
+                                    let _ = tx.send(());
+                                }
+                                !done
+                            });
                             let waiting = {
                                 let mut d = deferred.lock().unwrap();
                                 d.iter().position(|(_, c)| r["commandName"] == c.as_str()).map(|i| d.remove(i))
@@ -357,6 +383,7 @@ impl Engine {
                 v["read_only"] = json!(locked_by.is_some() || read_only_file);
                 v["locked_by"] = locked_by.unwrap_or(Value::Null);
                 self.doc = Some(doc);
+                self.doc_password = given.map(str::to_owned);
                 (v, none)
             }
             "info" => (info(self.doc()?), none),
@@ -537,10 +564,36 @@ impl Engine {
                 if filter_for(path).is_none() {
                     return Err(format!("format non pris en charge : {path}"));
                 }
+                // Destination ouverte ailleurs (verrou d'un autre profil : autre
+                // onglet, autre utilisateur) : saveAs attendait indéfiniment la
+                // réponse à « Document en cours d'utilisation » et le moteur
+                // restait bloqué.
+                if let Some(owner) = lock_owner(path) {
+                    let norm = |s: &str| s.trim_end_matches('/').to_string();
+                    let ours = owner["profile"].as_str().zip(self.profile_url.as_deref()).is_some_and(|(p, o)| norm(p) == norm(o));
+                    if !ours {
+                        let name = Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                        let user = owner["user"].as_str().filter(|u| !u.is_empty()).unwrap_or("un autre utilisateur");
+                        return Err(format!("« {name} » est déjà ouvert ({user}) : fermez-le d'abord ou choisissez un autre nom."));
+                    }
+                }
                 // CSV : virgule et UTF-8 sur toutes les plateformes (sinon
                 // l'encodage du système, Windows-1252 sous Windows).
-                let options = if is_csv(path) { "44,34,76,1,TakeOwnership" } else { "TakeOwnership" };
-                d.save_as(&file_url(path)?, Some(&ext), Some(options))?;
+                let mut options = if is_csv(path) { "44,34,76,1,TakeOwnership" } else { "TakeOwnership" }.to_string();
+                // Document chiffré : la copie l'est aussi, comme dans LibreOffice
+                // (sans cela, saveAs l'écrivait en clair).
+                if let Some(pw) = self.doc_password.as_deref().filter(|_| !is_csv(path)) {
+                    options.push_str(&format!(",Password={pw}PASSWORDEND"));
+                    // Avec un mot de passe, saveAs (TakeOwnership) ne revient
+                    // jamais si le document est modifié : il est d'abord marqué
+                    // « non modifié » (son contenu ne change pas).
+                    let (tx, rx) = std::sync::mpsc::channel();
+                    self.waiters.lock().unwrap().push((".uno:ModifiedStatus".into(), tx));
+                    let unmodified = json!({"ModifiedStatus": {"type": "boolean", "value": false}});
+                    d.uno(".uno:ModifiedStatus", Some(&unmodified.to_string()), true);
+                    let _ = rx.recv_timeout(std::time::Duration::from_secs(10));
+                }
+                d.save_as(&file_url(path)?, Some(&ext), Some(&options))?;
                 (json!({"path": path}), none)
             }
             "save" => {
@@ -757,12 +810,17 @@ fn main() {
     // progression. Le mot de passe est fourni (ou refusé) depuis le rappel,
     // comme le prévoit l'API.
     let password: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    let password_asked = Arc::new(std::sync::atomic::AtomicBool::new(false));
     {
         let out = out.clone();
         let password = password.clone();
+        let asked = password_asked.clone();
         let kit = office_ptr(&office);
         office.register_callback(Box::new(move |t, payload| {
             if t == sys::LOK_CALLBACK_DOCUMENT_PASSWORD || t == sys::LOK_CALLBACK_DOCUMENT_PASSWORD_TO_MODIFY {
+                if t == sys::LOK_CALLBACK_DOCUMENT_PASSWORD {
+                    asked.store(true, std::sync::atomic::Ordering::SeqCst);
+                }
                 let pw = password.lock().unwrap().take();
                 send(&out, &json!({"event": "password_requested", "provided": pw.is_some()}), &[]);
                 unsafe { set_password_raw(kit, &payload, pw.as_deref()) };
@@ -779,6 +837,9 @@ fn main() {
         out: out.clone(),
         args,
         password,
+        password_asked,
+        doc_password: None,
+        waiters: Arc::new(Mutex::new(Vec::new())),
         deferred: Arc::new(Mutex::new(Vec::new())),
         current_id: Value::Null,
         profile_url,

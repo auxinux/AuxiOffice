@@ -128,6 +128,16 @@ describe("saisie composée", () => {
   });
 });
 
+describe("documents chiffrés", () => {
+  it("reconnaît les erreurs de mot de passe du moteur", async () => {
+    const { passwordError } = await import("./PasswordDialog");
+    expect(passwordError("mot de passe requis")).toBe("requis");
+    expect(passwordError(new Error("mot de passe incorrect"))).toBe(null); // « Error: … »
+    expect(passwordError("mot de passe incorrect")).toBe("incorrect");
+    expect(passwordError("Unsupported URL")).toBe(null);
+  });
+});
+
 describe("presse-papiers", () => {
   it("reconnaît sa propre copie malgré les fins de ligne", async () => {
     const { sameClipboardText } = await import("./lok");

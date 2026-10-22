@@ -42,7 +42,7 @@ export interface PaintRequest {
   part?: number;
 }
 
-export const openDocument = (path: string, ignoreLock = false) => invoke<DocInfo>("doc_open", { path, ignoreLock });
+export const openDocument = (path: string, ignoreLock = false, password?: string) => invoke<DocInfo>("doc_open", { path, ignoreLock, password: password ?? null });
 
 export const closeDocument = (doc: number) => invoke<void>("doc_close", { doc });
 

@@ -305,7 +305,7 @@ fn user_name() -> String {
 /// Ouvre un document dans un nouveau moteur. Les rappels du moteur sont
 /// relayés à l'interface sous l'événement `engine` avec l'identifiant du document.
 #[tauri::command]
-async fn doc_open(app: AppHandle, state: State<'_, Engines>, path: String, ignore_lock: Option<bool>) -> Result<Value, String> {
+async fn doc_open(app: AppHandle, state: State<'_, Engines>, path: String, ignore_lock: Option<bool>, password: Option<String>) -> Result<Value, String> {
     let id = state.next.fetch_add(1, Ordering::Relaxed) + 1;
     let a = app.clone();
     let (engine, profile) = tauri::async_runtime::spawn_blocking(move || take_engine(&a, id)).await.map_err(|e| e.to_string())??;
@@ -314,7 +314,10 @@ async fn doc_open(app: AppHandle, state: State<'_, Engines>, path: String, ignor
     // Préparer déjà le moteur du document suivant.
     prepare_spare(&app);
     let e = engine.clone();
-    let req = json!({"cmd": "load", "path": path, "ignore_lock": ignore_lock.unwrap_or(false)});
+    let mut req = json!({"cmd": "load", "path": path, "ignore_lock": ignore_lock.unwrap_or(false)});
+    if let Some(p) = password {
+        req["password"] = json!(p);
+    }
     let loaded = tauri::async_runtime::spawn_blocking(move || e.call(req)).await.map_err(|e| e.to_string())?;
     let mut info = match loaded {
         Ok(info) => info,

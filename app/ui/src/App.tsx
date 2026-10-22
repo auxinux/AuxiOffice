@@ -15,6 +15,7 @@ import { AuxiCorrectDictionary, AuxiCorrectOptionsDialog } from "./AuxiCorrect";
 import { appInfo, call, closeDocument, launchApp, newDocument, onLaunch, openDocument, openPdf, recentFiles, routeFiles, takeLaunches, warmEngine, type DocInfo, type Launch } from "./engine";
 import { PdfView } from "./PdfView";
 import { Home } from "./Home";
+import { askPassword, passwordError } from "./PasswordDialog";
 import { besideFile, fileName, isUntitled, saveFiltersFor, withSaveExtension } from "./lok";
 
 interface Tab {
@@ -121,7 +122,22 @@ export function App() {
           setRecents(await recentFiles(path));
           return;
         }
-        let info = await openDocument(path);
+        // Document chiffré : demander le mot de passe (de nouveau s'il est faux).
+        let password: string | undefined;
+        let info: DocInfo | null = null;
+        while (!info) {
+          try {
+            info = await openDocument(path, false, password);
+          } catch (e) {
+            const why = passwordError(e);
+            if (!why) throw e;
+            setBusy(null);
+            const pw = await askPassword(fileName(path), why === "incorrect");
+            if (pw === null) return;
+            password = pw;
+            setBusy(`Ouverture de ${fileName(path)}…`);
+          }
+        }
         if (info.locked_by) {
           const who = `${info.locked_by.user || "un autre utilisateur"}${info.locked_by.host ? ` sur ${info.locked_by.host}` : ""}${info.locked_by.date ? ` (${info.locked_by.date})` : ""}`;
           const force = await ask(
@@ -130,7 +146,7 @@ export function App() {
           );
           if (force) {
             await closeDocument(info.doc);
-            info = await openDocument(path, true);
+            info = await openDocument(path, true, password);
           }
         }
         setTabs((ts) => [...ts, { info, path, modified: false, lost: false }]);

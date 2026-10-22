@@ -231,6 +231,62 @@ fn macro_documents_keep_their_vba_project() {
 }
 
 #[test]
+fn encrypted_documents_ask_for_the_password_and_stay_encrypted() {
+    let Some((ctx, fx)) = setup("chiffre") else { return };
+    // Copie chiffrée (mot de passe « été 2026 ») faite par LibreOffice lui-même.
+    let doc = ctx.tmp.join("secret l'été.docx");
+    ctx.call(json!({"cmd": "load", "path": fx.join("simple.docx")}));
+    let opts = ",Password=été 2026PASSWORDEND";
+    ctx.call(json!({"cmd": "save", "path": doc, "format": "docx", "filter": opts}));
+    drop(ctx);
+    let load = |pw: Option<&str>| {
+        let (ctx, _) = setup("chiffre-ouvrir").unwrap();
+        let mut req = json!({"cmd": "load", "path": doc});
+        if let Some(p) = pw {
+            req["password"] = json!(p);
+        }
+        let r = ctx.engine.request(req, &[], Duration::from_secs(60)).map(|r| r.json);
+        (ctx, r)
+    };
+    assert_eq!(load(None).1.unwrap_err(), "mot de passe requis");
+    assert_eq!(load(Some("faux")).1.unwrap_err(), "mot de passe incorrect");
+    let (ctx, r) = load(Some("été 2026"));
+    assert_eq!(r.unwrap()["type"], "text");
+    // Modifié puis « Enregistrer sous » : la copie reste chiffrée (saveAs ne
+    // revenait jamais pour un document chiffré modifié).
+    ctx.call(json!({"cmd": "uno", "command": ".uno:SelectAll"}));
+    ctx.call(json!({"cmd": "uno", "command": ".uno:Bold"}));
+    ctx.settle();
+    let copy = ctx.tmp.join("copie chiffrée.docx");
+    ctx.engine
+        .request(json!({"cmd": "save_as_location", "path": copy}), &[], Duration::from_secs(60))
+        .expect("Enregistrer sous d'un document chiffré modifié");
+    ctx.call(json!({"cmd": "save_in_place"}));
+    drop(ctx);
+    let (_ctx, r) = {
+        let (ctx, _) = setup("chiffre-copie").unwrap();
+        let r = ctx.engine.request(json!({"cmd": "load", "path": copy}), &[], Duration::from_secs(60)).map(|r| r.json);
+        (ctx, r)
+    };
+    assert_eq!(r.unwrap_err(), "mot de passe requis", "copie écrite en clair");
+}
+
+#[test]
+fn save_as_onto_a_file_open_elsewhere_is_refused() {
+    let Some((ctx, fx)) = setup("cible-verrouillee") else { return };
+    let target = ctx.tmp.join("cible.docx");
+    std::fs::copy(fx.join("simple.docx"), &target).unwrap();
+    std::fs::write(ctx.tmp.join(".~lock.cible.docx#"), ",marie,poste-12,15.10.2026 09:00,file:///x;").unwrap();
+    ctx.call(json!({"cmd": "load", "path": fx.join("simple.docx")}));
+    // Sans contrôle, saveAs attendait sans fin la réponse à « Document en
+    // cours d'utilisation » et le moteur restait bloqué.
+    let err = ctx.engine.request(json!({"cmd": "save_as_location", "path": target}), &[], Duration::from_secs(30)).err().expect("refus attendu");
+    assert!(err.contains("déjà ouvert (marie)"), "{err}");
+    // Le moteur répond toujours.
+    ctx.call(json!({"cmd": "info"}));
+}
+
+#[test]
 fn csv_opens_without_the_import_dialog() {
     let Some((ctx, _)) = setup("csv") else { return };
     // Point-virgule, virgule décimale, UTF-8 : séparateur et encodage devinés.
