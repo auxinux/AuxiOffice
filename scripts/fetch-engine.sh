@@ -3,8 +3,9 @@
 # engine/libreoffice.lock.json, dans .engine/<plateforme>/.
 # Chaque fichier est vérifié par SHA-256. Aucun droit administrateur requis.
 #
-# Plateformes : Linux x86_64 (paquets .deb extraits), macOS Apple Silicon
-# (LibreOffice.app copiée depuis l'image disque officielle).
+# Plateformes : Linux x86_64 (paquets .deb extraits), Windows x86_64 (MSI
+# officiel extrait par une installation administrative, sous Git Bash).
+# Sous macOS, le moteur se compile : scripts/build-engine-macos.sh.
 #
 # Usage : scripts/fetch-engine.sh [--sdk]
 # Écrit le dossier à passer dans AUXI_LO_PROGRAM dans .engine/<plateforme>/program-dir.
@@ -16,6 +17,7 @@ CACHE="$ROOT/.engine/cache"
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64) PLATFORM=linux-x86_64 ;;
   Darwin-arm64) PLATFORM=macos-aarch64 ;;
+  MINGW*-x86_64|MSYS*-x86_64|CYGWIN*-x86_64) PLATFORM=windows-x86_64 ;;
   *) echo "Plateforme non prise en charge : $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
 if [ "$PLATFORM" = macos-aarch64 ]; then
@@ -24,6 +26,9 @@ if [ "$PLATFORM" = macos-aarch64 ]; then
   exit 1
 fi
 OUT="$ROOT/.engine/$PLATFORM"
+# Python : « python3 » sous Linux et macOS, souvent « python » sous Windows.
+PY=${PYTHON:-python3}
+"$PY" -c "" 2>/dev/null || PY=python
 # Repartir d'un dossier vide : une ancienne version ne doit pas rester à côté
 # (les téléchargements, eux, restent dans le cache).
 rm -rf "$OUT"
@@ -80,6 +85,21 @@ install_linux() {
   rm -rf "$work"
 }
 
+# Windows : installation administrative du MSI (simple extraction des
+# fichiers, sans droits d'administrateur ni inscription dans le système).
+install_windows() {
+  dest=$1
+  target=$(cygpath -w "$OUT/root")
+  mkdir -p "$OUT/root"
+  MSYS2_ARG_CONV_EXCL='*' msiexec /a "$(cygpath -w "$dest")" /qn TARGETDIR="$target" /L*v "$(cygpath -w "$OUT/msiexec.log")" || {
+    echo "Extraction du MSI impossible (journal : $OUT/msiexec.log)" >&2; return 1; }
+  # msiexec rend la main avant d'avoir fini d'écrire sur certaines machines.
+  n=0
+  while [ ! -f "$(find "$OUT/root" -maxdepth 3 -name soffice.exe | head -n1)" ] && [ $n -lt 60 ]; do sleep 2; n=$((n + 1)); done
+  # Le MSI lui-même est recopié par l'installation administrative : inutile.
+  find "$OUT/root" -maxdepth 1 -name '*.msi' -delete
+}
+
 install_macos() {
   dest=$1
   mnt=$(mktemp -d "${TMPDIR:-/tmp}/auxi-lo.XXXXXX")
@@ -105,8 +125,8 @@ install_macos() {
   xattr -dr com.apple.quarantine "$OUT/LibreOffice.app" 2>/dev/null || true
 }
 
-base=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['base_url'])" "$LOCK")
-entries=$(python3 -c "
+base=$("$PY" -c "import json,sys;print(json.load(open(sys.argv[1]))['base_url'])" "$LOCK")
+entries=$("$PY" -c "
 import json,sys
 lock=json.load(open(sys.argv[1]))
 for s in sys.argv[2:]:
@@ -129,6 +149,7 @@ while read -r file sum need; do
   case "$PLATFORM" in
     linux-*) install_linux "$CACHE/$(basename "$file")" ;;
     macos-*) install_macos "$CACHE/$(basename "$file")" ;;
+    windows-*) install_windows "$CACHE/$(basename "$file")" ;;
   esac
 done < "$tmp_entries"
 rm -f "$tmp_entries"
@@ -136,9 +157,12 @@ rm -f "$tmp_entries"
 case "$PLATFORM" in
   linux-*) program=$(find "$OUT/root/opt" -maxdepth 2 -type d -name program | head -n1) ;;
   macos-*) program="$OUT/LibreOffice.app/Contents/Frameworks" ;;
+  windows-*) program=$(dirname "$(find "$OUT/root" -maxdepth 4 -name soffice.exe | head -n1)") ;;
 esac
+# Chemin au format Windows pour l'exécutable (C:\…).
+[ "${PLATFORM%%-*}" = windows ] && program=$(cygpath -w "$program")
 [ -n "$program" ] && [ -d "$program" ] || { echo "Dossier du moteur introuvable" >&2; exit 1; }
 echo "$program" > "$OUT/program-dir"
-python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['version'])" "$LOCK" > "$OUT/version"
+"$PY" -c "import json,sys;print(json.load(open(sys.argv[1]))['version'])" "$LOCK" > "$OUT/version"
 echo "Moteur prêt : $program"
 echo "export AUXI_LO_PROGRAM=\"$program\""

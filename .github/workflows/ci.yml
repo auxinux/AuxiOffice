@@ -2,10 +2,9 @@
 # virtuelles de GitHub (Linux, macOS, Windows). Aucun paquet n'est construit
 # ici : les paquets sont faits sur chaque système par l'équipe.
 #
-# Linux : tests complets, y compris ceux du moteur avec le vrai LibreOffice
-# (scripts/fetch-engine.sh). macOS et Windows : compilation et tests sans
-# moteur (le moteur macOS se compile en 1 à 3 h ; Windows n'a pas encore le
-# sien).
+# Linux et Windows : tests complets, y compris ceux du moteur avec le vrai
+# LibreOffice (scripts/fetch-engine.sh). macOS : compilation et tests sans
+# moteur (le moteur macOS se compile en 1 à 3 h).
 name: CI
 
 on:
@@ -59,6 +58,46 @@ jobs:
       - name: Compilation de production
         run: cargo build --release --workspace --features auxioffice/custom-protocol
 
+  windows:
+    name: Windows x86_64 (tests complets)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Cache du moteur LibreOffice
+        uses: actions/cache@v4
+        with:
+          path: .engine/cache
+          key: lo-${{ runner.os }}-${{ hashFiles('engine/libreoffice.lock.json') }}
+      - name: Moteur LibreOffice
+        run: PYTHON=python scripts/fetch-engine.sh
+      - name: Modules Python des documents de test
+        run: python -m pip install python-docx openpyxl python-pptx Pillow
+      - name: Interfaces (npm)
+        run: scripts/ci-npm.sh
+      - name: Tests
+        run: PYTHON=python scripts/test.sh
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D clippy::correctness -D clippy::suspicious
+      - name: Compilation de production
+        run: cargo build --release --workspace --features auxioffice/custom-protocol
+      - name: Journal du moteur (en cas d'échec)
+        if: failure()
+        run: cat .engine/windows-x86_64/msiexec.log 2>/dev/null | tail -40 || true
+
   autres:
     name: ${{ matrix.name }}
     strategy:
@@ -67,8 +106,6 @@ jobs:
         include:
           - name: macOS Apple Silicon (compilation, tests sans moteur)
             os: macos-14
-          - name: Windows x86_64 (compilation, tests sans moteur)
-            os: windows-latest
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     defaults:
