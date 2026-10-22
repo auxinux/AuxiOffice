@@ -115,6 +115,25 @@ def to_french(path: Path):
     shutil.move(tmp, path)
 
 
+def widen_layouts(path: Path, factor: float):
+    """Le modèle de python-pptx est en 4:3 (10 pouces) : passé en 16:9, ses
+    zones de titre et de texte restaient à gauche. Positions et largeurs des
+    masques et des dispositions mises à l'échelle de la nouvelle largeur."""
+    tmp = Path(tempfile.mkdtemp()) / path.name
+    scale = lambda m: f'{m.group(1)}"{round(int(m.group(2)) * factor)}"'
+    with zipfile.ZipFile(path) as src, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if re.match(r"ppt/(slideMasters|slideLayouts)/[^/]+\.xml$", item.filename):
+                t = data.decode("utf-8")
+                t = re.sub(r'(<a:off x=)"(\d+)"', scale, t)
+                t = re.sub(r'(<a:ext cx=)"(\d+)"', scale, t)
+                data = t.encode("utf-8")
+            dst.writestr(item, data)
+    shutil.move(tmp, path)
+
+
+widen_layouts(out / "vierge.pptx", 13.333 / 10)
 to_french(out / "vierge.docx")
 to_french(out / "vierge.pptx")
 
