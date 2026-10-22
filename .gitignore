@@ -3,6 +3,8 @@
 node_modules/
 /app/ui/dist/
 /app/src-tauri/gen/
+/text/ui/dist/
+/text/src-tauri/gen/
 __pycache__/
 *.pyc
 .~lock.*#

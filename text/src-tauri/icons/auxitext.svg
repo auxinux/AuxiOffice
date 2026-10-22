@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7B8591"/><stop offset="1" stop-color="#4A535F"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/><stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="glyph" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F2B713"/><stop offset="1" stop-color="#F26F00"/>
+    </linearGradient>
+    <linearGradient id="swoosh" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F26F00"/><stop offset="1" stop-color="#F2B713"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="232" height="232" rx="54" fill="url(#bg)"/>
+  <rect x="12" y="12" width="232" height="232" rx="54" fill="url(#gloss)"/>
+  <g fill="#000000" fill-opacity="0.28" transform="translate(3 6)"><path transform="translate(78.03 171.12)" d="M91.474609375 -110.234375 89.31640625 -93.0517578125H59.3505859375L47.978515625 0.0H27.060546875L38.349609375 -93.0517578125H8.466796875L10.5419921875 -110.234375Z"/></g>
+  
+  <g fill="#FFFFFF"><path transform="translate(78.03 171.12)" d="M91.474609375 -110.234375 89.31640625 -93.0517578125H59.3505859375L47.978515625 0.0H27.060546875L38.349609375 -93.0517578125H8.466796875L10.5419921875 -110.234375Z"/></g>
+  <rect x="70" y="192" width="122" height="13" rx="6.5" transform="skewX(-12) translate(40.7 0)" fill="url(#swoosh)"/>
+</svg>

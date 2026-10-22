@@ -1,0 +1,23 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=AuxiText
+GenericName=Text Editor
+GenericName[fr]=Éditeur de texte
+Comment=Edit text files
+Comment[fr]=Modifier des fichiers texte
+Keywords=text;editor;plaintext;notepad;code;log;config;markdown;json;xml;
+Keywords[fr]=texte;éditeur;bloc-notes;code;journal;configuration;markdown;json;xml;
+Exec=auxitext %F
+Icon=auxitext
+Terminal=false
+StartupNotify=true
+StartupWMClass=auxitext
+Categories=Utility;TextEditor;
+MimeType=text/plain;text/x-log;text/markdown;text/x-markdown;application/json;application/xml;text/xml;application/yaml;application/x-yaml;text/x-yaml;text/x-shellscript;application/x-shellscript;text/x-python;text/x-python3;text/x-csrc;text/x-chdr;text/x-c++src;text/x-c++hdr;text/x-java;text/x-rust;text/x-go;text/x-php;text/x-sql;text/css;text/html;application/javascript;text/javascript;application/typescript;application/toml;text/x-toml;text/x-ini;text/x-properties;text/x-makefile;text/x-cmake;text/x-diff;text/x-patch;text/csv;text/tab-separated-values;text/x-readme;application/x-desktop;text/x-lua;text/x-perl;text/x-ruby;
+Actions=new-window;
+
+[Desktop Action new-window]
+Name=New Window
+Name[fr]=Nouvelle fenêtre
+Exec=auxitext --new-window

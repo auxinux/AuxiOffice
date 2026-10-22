@@ -1,0 +1,29 @@
+[package]
+name = "auxitext"
+description = "AuxiText — éditeur de texte de l'écosystème AuxiNux"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+publish = false
+
+[lib]
+name = "auxitext_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["image-png"] }
+tauri-plugin-dialog = "2"
+serde.workspace = true
+serde_json.workspace = true
+# Encodages (MIT OU Apache-2.0) et détection des fichiers sans BOM.
+encoding_rs = "0.8"
+chardetng = "0.1"
+
+[features]
+# Interface intégrée à l'exécutable (au lieu du serveur Vite de développement).
+custom-protocol = ["tauri/custom-protocol"]

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "auxitext",
+  "mainBinaryName": "auxitext",
+  "identifier": "ca.auxinux.text",
+  "build": {
+    "frontendDist": "../ui/dist",
+    "devUrl": "http://localhost:5175",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb"],
+    "publisher": "Projet AuxiNux",
+    "copyright": "© 2026 Projet AuxiNux",
+    "homepage": "https://office.auxinux.ca",
+    "category": "Utility",
+    "shortDescription": "Éditeur de texte",
+    "longDescription": "AuxiText est l'éditeur de texte de l'écosystème AuxiNux : onglets, coloration syntaxique, recherche et remplacement, encodages et fins de ligne conservés.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": {
+        "section": "editors",
+        "priority": "optional",
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"],
+        "desktopTemplate": "linux/auxitext.desktop",
+        "files": {
+          "/usr/share/applications/ca.auxinux.AuxiText.desktop": "linux/ca.auxinux.AuxiText.desktop",
+          "/usr/share/icons/hicolor/scalable/apps/auxitext.svg": "icons/auxitext.svg",
+          "/usr/share/metainfo/ca.auxinux.AuxiText.metainfo.xml": "linux/ca.auxinux.AuxiText.metainfo.xml"
+        }
+      }
+    }
+  }
+}
