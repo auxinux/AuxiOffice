@@ -861,76 +861,129 @@ fn run(engine: Engine, out: Out, ready: Value) -> ! {
     }
 }
 
-/// Windows : le module d'affichage de LibreOffice considère comme « fil
-/// principal » celui qui a appelé `lok_init` (le nôtre), et sa fenêtre de
-/// messages interne lui appartient. Le fil de LibreOffice lui envoie des
-/// messages (`SendMessage`) et attend qu'ils soient traités : ce fil doit donc
-/// faire tourner une boucle de messages Win32. Un second fil lit les requêtes
-/// et réveille celui-ci, qui les exécute entre deux messages.
+/// Windows : le module d'affichage de LibreOffice crée ses fenêtres (dont
+/// sa fenêtre de messages `SALCOMWND`) sur son fil « VCL Main ». Appelé depuis
+/// un autre fil, LibreOffice se bloque dès qu'il touche à une fenêtre (par
+/// exemple la barre de formule de Calc : `SetWindowPos` attend le fil VCL Main,
+/// qui attend le verrou global détenu par l'appelant). Les requêtes sont donc
+/// exécutées sur le fil VCL Main : sa fenêtre de messages est sous-classée et
+/// reçoit un message à chaque requête lue par le fil principal.
 #[cfg(not(windows))]
 fn run_windows(engine: Engine, out: Out, ready: Value) -> ! {
     run_threaded(engine, out, ready)
 }
 
 #[cfg(windows)]
-fn run_windows(mut engine: Engine, out: Out, ready: Value) -> ! {
+mod win {
+    use super::*;
     use std::collections::VecDeque;
-    use windows_sys::Win32::System::Threading::{CreateEventW, SetEvent, INFINITE};
-    use windows_sys::Win32::UI::WindowsAndMessaging::{DispatchMessageW, MsgWaitForMultipleObjects, PeekMessageW, TranslateMessage, MSG, PM_REMOVE, QS_ALLINPUT};
+    use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicPtr, AtomicU32, Ordering};
+    use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+    use windows_sys::Win32::System::Threading::GetCurrentProcessId;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        CallWindowProcW, EnumWindows, GetClassNameW, GetWindowThreadProcessId, PostMessageW, RegisterWindowMessageW, SetWindowLongPtrW, GWLP_WNDPROC,
+    };
 
-    // Requêtes lues (None : fin du flux d'entrée).
-    let queue: Arc<Mutex<VecDeque<Option<Frame>>>> = Arc::new(Mutex::new(VecDeque::new()));
-    let event = unsafe { CreateEventW(std::ptr::null(), 0, 0, std::ptr::null()) } as usize;
-    {
-        let queue = queue.clone();
-        std::thread::Builder::new()
-            .name("auxi-engine-lecture".into())
-            .spawn(move || {
-                let mut input = BufReader::new(std::io::stdin().lock());
-                loop {
-                    let frame = match read_frame(&mut input) {
-                        Ok(f) => f,
-                        Err(e) => {
-                            eprintln!("auxi-engine: flux d'entrée invalide : {e}");
-                            None
+    static ENGINE: AtomicPtr<Engine> = AtomicPtr::new(std::ptr::null_mut());
+    static QUEUE: Mutex<VecDeque<Option<Frame>>> = Mutex::new(VecDeque::new());
+    static ORIGINAL: AtomicIsize = AtomicIsize::new(0);
+    static HWND_COM: AtomicIsize = AtomicIsize::new(0);
+    static MSG_ID: AtomicU32 = AtomicU32::new(0);
+    static BUSY: AtomicBool = AtomicBool::new(false);
+
+    unsafe extern "system" fn find(hwnd: HWND, found: LPARAM) -> i32 {
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid == GetCurrentProcessId() {
+            let mut name = [0u16; 32];
+            let n = GetClassNameW(hwnd, name.as_mut_ptr(), name.len() as i32);
+            if String::from_utf16_lossy(&name[..n.max(0) as usize]) == "SALCOMWND" {
+                *(found as *mut isize) = hwnd as isize;
+                return 0;
+            }
+        }
+        1
+    }
+
+    fn post() {
+        unsafe { PostMessageW(HWND_COM.load(Ordering::SeqCst) as HWND, MSG_ID.load(Ordering::SeqCst), 0, 0) };
+    }
+
+    unsafe extern "system" fn proc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) -> LRESULT {
+        if msg == MSG_ID.load(Ordering::SeqCst) {
+            // Une requête peut faire tourner la boucle de LibreOffice, qui
+            // redistribue alors nos messages : ils attendent la fin de celle-ci.
+            if BUSY.swap(true, Ordering::SeqCst) {
+                return 0;
+            }
+            let engine = &mut *ENGINE.load(Ordering::SeqCst);
+            loop {
+                let next = QUEUE.lock().unwrap().pop_front();
+                match next {
+                    Some(Some(frame)) => {
+                        if engine.process(frame) {
+                            std::ptr::read(engine).shutdown();
                         }
-                    };
-                    let end = frame.is_none();
-                    queue.lock().unwrap().push_back(frame);
-                    unsafe { SetEvent(event as _) };
-                    if end {
-                        break;
                     }
+                    Some(None) => std::ptr::read(engine).shutdown(),
+                    None => break,
                 }
-            })
-            .expect("fil de lecture");
+            }
+            BUSY.store(false, Ordering::SeqCst);
+            if !QUEUE.lock().unwrap().is_empty() {
+                post();
+            }
+            return 0;
+        }
+        let original: unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT = std::mem::transmute(ORIGINAL.load(Ordering::SeqCst));
+        CallWindowProcW(Some(original), hwnd, msg, w, l)
     }
-    send(&out, &ready, &[]);
-    loop {
-        // Exécuter les requêtes en attente, une à une : une requête peut
-        // elle-même faire tourner la boucle de messages de LibreOffice.
+
+    pub fn run(engine: Engine, out: Out, ready: Value) -> ! {
+        let mut hwnd: isize = 0;
+        for _ in 0..200 {
+            unsafe { EnumWindows(Some(find), &mut hwnd as *mut isize as LPARAM) };
+            if hwnd != 0 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        if hwnd == 0 {
+            eprintln!("auxi-engine : fenêtre de messages de LibreOffice introuvable ; requêtes exécutées hors du fil VCL Main");
+            run_threaded(engine, out, ready);
+        }
+        let name: Vec<u16> = "AuxiEngineRequete\0".encode_utf16().collect();
+        MSG_ID.store(unsafe { RegisterWindowMessageW(name.as_ptr()) }, Ordering::SeqCst);
+        HWND_COM.store(hwnd, Ordering::SeqCst);
+        ENGINE.store(Box::into_raw(Box::new(engine)), Ordering::SeqCst);
+        let previous = unsafe { SetWindowLongPtrW(hwnd as HWND, GWLP_WNDPROC, proc as *const () as isize) };
+        ORIGINAL.store(previous, Ordering::SeqCst);
+        send(&out, &ready, &[]);
+        let mut input = BufReader::new(std::io::stdin().lock());
         loop {
-            let next = queue.lock().unwrap().pop_front();
-            match next {
-                Some(Some(frame)) => {
-                    if engine.process(frame) {
-                        engine.shutdown();
-                    }
+            let frame = match read_frame(&mut input) {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("auxi-engine: flux d'entrée invalide : {e}");
+                    None
                 }
-                Some(None) => engine.shutdown(),
-                None => break,
-            }
-        }
-        let handles = [event as _];
-        unsafe { MsgWaitForMultipleObjects(1, handles.as_ptr(), 0, INFINITE, QS_ALLINPUT) };
-        let mut msg: MSG = unsafe { std::mem::zeroed() };
-        while unsafe { PeekMessageW(&mut msg, std::ptr::null_mut(), 0, 0, PM_REMOVE) } != 0 {
-            unsafe {
-                TranslateMessage(&msg);
-                DispatchMessageW(&msg);
+            };
+            let end = frame.is_none();
+            QUEUE.lock().unwrap().push_back(frame);
+            post();
+            if end {
+                // Le fil VCL Main termine le processus (Engine::shutdown).
+                loop {
+                    std::thread::park();
+                }
             }
         }
     }
+}
+
+#[cfg(windows)]
+fn run_windows(engine: Engine, out: Out, ready: Value) -> ! {
+    win::run(engine, out, ready)
 }
 
 fn run_threaded(mut engine: Engine, out: Out, ready: Value) -> ! {

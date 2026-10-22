@@ -25,7 +25,9 @@ jobs:
       - run: PYTHON=python scripts/fetch-engine.sh
       - run: python -m pip install python-docx openpyxl python-pptx Pillow && python tests/fixtures/generate.py target/fixtures
       - run: cargo build -p auxi-engine
-      - name: Classeur, boucle de messages
-        run: python .github/diag/winhang.py target/fixtures/budget.xlsx 1
-      - name: Classeur, sans boucle
-        run: python .github/diag/winhang.py target/fixtures/budget.xlsx 0
+      - name: Classeur
+        run: python .github/diag/winhang.py target/fixtures/budget.xlsx
+      - name: Présentation
+        run: python .github/diag/winhang.py target/fixtures/presentation.pptx
+      - name: Texte
+        run: python .github/diag/winhang.py target/fixtures/rapport.docx
