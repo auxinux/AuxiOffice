@@ -230,3 +230,17 @@ Sous macOS, `scripts/build-engine-macos.sh` compile donc LibreOffice (sources of
 comme sous Linux (fil LibreOffice séparé, module svp). Le moteur ne reçoit aucun argument
 (configuration par variables `AUXI_ENGINE_*`) : sous macOS, LibreOffice lit les arguments du
 processus hôte.
+
+## Windows : moteur et boucle de messages
+
+Le MSI officiel de LibreOffice 26.8 sert de moteur tel quel (rendu des tuiles par
+`VirtualDevice` puis copie de l'image, branche `_WIN32` de `doc_paintTile`). Le module
+d'affichage Windows de LibreOffice prend pour « fil principal » celui qui appelle `lok_init`
+(il ne change pas avec `Application::UpdateMainThread`), et sa fenêtre de messages interne
+(`SALCOMWND`) appartient à ce fil. Le fil de LibreOffice lui envoie des messages par
+`SendMessage` (rendre la main, minuteries, événements) et attend leur traitement : le moteur
+fait donc tourner une boucle de messages Win32 sur ce fil et y exécute les requêtes, lues par un
+second fil (`run_windows`). Sans cette boucle, tout ce qui passe par la boucle de LibreOffice
+restait bloqué (chargement des classeurs, présentations et dessins, enregistrement, boîtes de
+dialogue). Le mode « unipoll » n'existe pas sous Windows (le module Windows n'appelle pas ses
+rappels).

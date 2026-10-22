@@ -1,19 +1,44 @@
-# Compiler et tester AuxiOffice
+# Compiler, installer et tester AuxiOffice
 
-## Démarrage rapide (Linux ou Mac Apple Silicon)
+## Installer
+
+### AuxiNuxOS et Debian 13 (paquets)
+
+Les paquets sont publiés dans le dépôt des applications d'AuxiNuxOS
+(`deb https://dep.auxinux.ca/AUXINUXOS APPS main`) :
 
 ```sh
-git clone https://github.com/auxinux/AuxiOffice.git
-cd AuxiOffice
-scripts/dev.sh                 # moteur + interface + compilation + lancement
-scripts/dev.sh ~/Documents/rapport.docx
+sudo auxi install --deb auxioffice   # la suite ; installe aussi AuxiText
+sudo auxi install --deb auxitext     # AuxiText seul (sans LibreOffice ni la suite)
 ```
 
-Au premier lancement, `scripts/dev.sh` télécharge LibreOffice 26.8.1 (vérifié par SHA-256)
-dans `.engine/`, installe les dépendances npm et compile ; les lancements suivants sont
-rapides.
+(`apt install` sur une Debian 13 qui a ce dépôt.) `auxinux-office`, l'ancien nom, est un paquet
+de transition qui installe `auxioffice`. Construire ces paquets : `scripts/build-deb.sh`
+(dans `target/deb/`).
 
-### Sur Mac
+### Windows 11
+
+1. Installer [Git pour Windows](https://git-scm.com/download/win) (fournit Git Bash),
+   [Rust](https://rustup.rs) (avec les outils de compilation C++ de Visual Studio que
+   propose l'installateur) et [Node.js 22](https://nodejs.org) ou plus récent. WebView2 est
+   déjà présent dans Windows 11.
+2. Dans **Git Bash** :
+
+   ```sh
+   git clone https://github.com/auxinux/AuxiOffice.git
+   cd AuxiOffice
+   scripts/install-apps.sh
+   ```
+
+   Le script télécharge LibreOffice 26.8.1 (MSI officiel, vérifié par SHA-256, extrait sans
+   l'installer dans Windows), compile, puis installe sans droits d'administrateur dans
+   `%LOCALAPPDATA%\Programs\AuxiOffice` et `…\AuxiText` : menu Démarrer (dossier AuxiOffice,
+   et AuxiText), « Ouvrir avec » pour les documents. Pour en faire l'application par défaut
+   d'un type de fichier : clic droit → Ouvrir avec → Choisir une autre application.
+3. Mettre à jour : `git pull` puis `scripts/install-apps.sh` ; retirer :
+   `scripts/install-apps.sh --remove`.
+
+### macOS (Apple Silicon)
 
 1. Outils Apple : `xcode-select --install` ou, avec Xcode déjà installé ailleurs,
    `sudo xcode-select -s /chemin/vers/Xcode.app`.
@@ -21,13 +46,34 @@ rapides.
    pkgconf, GNU make, bison, flex, gperf, nasm, gettext, Python 3.13 et ninja.
 3. Rust : `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`.
 4. Node.js 22 ou plus récent (nodejs.org ou `brew install node`).
-5. `scripts/dev.sh`.
+5. ```sh
+   git clone https://github.com/auxinux/AuxiOffice.git
+   cd AuxiOffice
+   scripts/install-apps.sh
+   ```
 
-Le LibreOffice officiel pour Mac ne peut pas servir de moteur (il ne sait pas dessiner les
-pages pour un autre programme, voir ARCHITECTURE.md). Au premier lancement, `dev.sh` appelle
-donc `scripts/build-engine-macos.sh`, qui compile LibreOffice 26.8.1 depuis ses sources
-officielles avec `--enable-headless` : **1 à 3 heures et ~40 Go d'espace disque, une seule
-fois** (une relance reprend la compilation). Le résultat est dans `.engine/macos-aarch64/`.
+Les applications arrivent dans `~/Applications` (AuxiOffice, AuxiWriter, AuxiSheet,
+AuxiPresent, AuxiDraw, AuxiPDF, AuxiText). Le LibreOffice officiel pour Mac ne peut pas servir de
+moteur (il ne sait pas dessiner les pages pour un autre programme, voir ARCHITECTURE.md) : au
+premier lancement, le script appelle `scripts/build-engine-macos.sh`, qui compile LibreOffice
+26.8.1 depuis ses sources officielles avec `--enable-headless` : **1 à 3 heures et ~40 Go
+d'espace disque, une seule fois** (une relance reprend la compilation).
+
+### Linux (développement)
+
+`scripts/install-apps.sh` ajoute les applications au menu (Bureautique, et AuxiText dans
+Utilitaires) en utilisant la compilation du dépôt.
+
+## Démarrage rapide (développement)
+
+```sh
+scripts/dev.sh                 # moteur + interface + compilation + lancement
+scripts/dev.sh ~/Documents/rapport.docx
+```
+
+Au premier lancement, `scripts/dev.sh` prépare le moteur dans `.engine/` (téléchargé sous
+Linux et Windows, compilé sous macOS), installe les dépendances npm et compile ; les
+lancements suivants sont rapides. Sous Windows, lancer les scripts dans Git Bash.
 
 ## Prérequis
 
@@ -43,7 +89,7 @@ Windows : WebView2 (fourni avec Windows 10/11). macOS : Xcode (outils en ligne d
 ## Moteur LibreOffice
 
 ```sh
-scripts/fetch-engine.sh      # Linux x86_64 → .engine/linux-x86_64/
+scripts/fetch-engine.sh      # Linux x86_64 → .engine/linux-x86_64/ ; Windows (Git Bash) → .engine/windows-x86_64/
 scripts/build-engine-macos.sh  # Mac Apple Silicon → .engine/macos-aarch64/ (compilation)
 ```
 
@@ -51,8 +97,9 @@ Le script télécharge les fichiers listés dans `engine/libreoffice.lock.json`,
 SHA-256 et extrait les paquets sans droits administrateur. Il affiche le dossier `program/` à
 utiliser comme `AUXI_LO_PROGRAM`.
 
-Windows : le MSI et sa somme sont épinglés dans `engine/libreoffice.lock.json` ; le script
-d'extraction reste à écrire.
+Windows : le MSI officiel est extrait par une installation administrative (`msiexec /a`),
+sans rien inscrire dans le système. Le moteur y fait tourner la boucle de messages Win32 sur le
+fil qui a initialisé LibreOffice (voir ARCHITECTURE.md).
 
 ## Compiler
 
@@ -81,7 +128,7 @@ application n'a qu'une instance : la relancer transmet ses fichiers à la fenêt
 ## Installer les applications (développement)
 
 ```sh
-scripts/install-apps.sh            # compile puis installe AuxiOffice, AuxiWriter, AuxiSheet, AuxiPresent
+scripts/install-apps.sh            # compile puis installe la suite et AuxiText
 scripts/install-apps.sh --remove
 ```
 
@@ -91,8 +138,10 @@ scripts/install-apps.sh --remove
 - Linux : entrées `ca.auxinux.*.desktop` du menu des applications (Bureautique), icônes, et
   liens `target/release/auxiwriter`… vers `auxioffice` (classe de fenêtre propre à chaque
   application pour la barre des tâches).
-- Windows (paquets à venir) : un raccourci par application, `AuxiOffice.exe --app writer`, ou une
-  copie nommée `AuxiWriter.exe`.
+- Windows : `%LOCALAPPDATA%\Programs\AuxiOffice` contient une copie de l'exécutable par
+  application (`AuxiWriter.exe`… : le nom choisit l'application et Windows groupe ses fenêtres
+  à part), `auxi-engine.exe`, le moteur (`engine\program`) et les modèles ; raccourcis du menu
+  Démarrer et entrées « Ouvrir avec » (registre de l'utilisateur).
 
 Dans un paquet, `AuxiOffice.app` (ou le dossier d'installation) contient le moteur ; sous macOS,
 `AuxiWriter.app`, `AuxiSheet.app` et `AuxiPresent.app` le cherchent dans `AuxiOffice.app` voisin.
@@ -156,12 +205,12 @@ Les modèles vierges (`app/src-tauri/templates`) se régénèrent avec
 
 `.github/workflows/ci.yml` tourne à chaque envoi sur GitHub :
 
-- **Linux x86_64** : moteur LibreOffice épinglé (`scripts/fetch-engine.sh`, mis en cache),
-  `scripts/test.sh` complet (interfaces, coque, moteur avec de vrais documents), Clippy,
-  compilation de production ;
-- **macOS Apple Silicon** et **Windows x86_64** : compilation, tests sans moteur, Clippy,
-  compilation de production (le moteur macOS se compile en 1 à 3 h ; Windows n'a pas encore
-  le sien).
+- **Linux x86_64** et **Windows x86_64** : moteur LibreOffice épinglé
+  (`scripts/fetch-engine.sh`, mis en cache), `scripts/test.sh` complet (interfaces, coque,
+  moteur avec de vrais documents), Clippy, compilation de production ; sous Windows, en plus,
+  `scripts/install-apps.sh` et lancement d'AuxiWriter installé avec un document ;
+- **macOS Apple Silicon** : compilation, tests sans moteur, Clippy, compilation de production
+  (le moteur macOS se compile en 1 à 3 h).
 
 `scripts/ci-npm.sh` installe et compile les deux interfaces (`app/`, `text/`). Aucun paquet
 n'est construit par l'intégration continue.

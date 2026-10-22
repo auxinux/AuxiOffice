@@ -35,7 +35,7 @@ AuxiOffice est un **produit propriétaire du Projet AuxiNux**. Son interface et 
 
 Vérifié sous Linux x86_64 ; Mac Apple Silicon : ouverture et édition vérifiées par
 l'utilisateur. L'intégration continue (GitHub Actions, `.github/workflows/ci.yml`) compile et
-teste chaque envoi sous Linux (avec le vrai moteur LibreOffice), macOS et Windows.
+teste chaque envoi sous Linux et Windows (avec le vrai moteur LibreOffice) et sous macOS.
 
 - ouverture, édition, enregistrement et export PDF de documents DOCX, XLSX et PPTX ;
 - **barre de menus** native (Fichier, Édition, Affichage, Insertion, Format, Tableau ou
@@ -64,13 +64,20 @@ teste chaque envoi sous Linux (avec le vrai moteur LibreOffice), macOS et Window
   enregistrement, impression, document protégé par mot de passe ;
 - glisser-déposer de fichiers sur les fenêtres.
 
-Pas encore fait : moteur Windows (l'application compile sous Windows, mais LibreOffice n'y
-est pas encore extrait ni testé comme moteur ; l'impression y passe par la visionneuse du
-système), animations du diaporama, AuxiCorrect dans AuxiText.
+Pas encore fait : animations du diaporama, AuxiCorrect dans AuxiText, impression directe sous
+Windows (elle passe par la visionneuse du système), paquets d'installation Windows et macOS
+(installation par `scripts/install-apps.sh`).
+
+## Installer
+
+- **AuxiNuxOS** : `sudo auxi install --deb auxioffice` (la suite, avec AuxiText) ou
+  `sudo auxi install --deb auxitext` (l'éditeur seul).
+- **Windows 11** et **macOS** : cloner le dépôt puis lancer `scripts/install-apps.sh` (dans Git
+  Bash sous Windows). Prérequis et détails : [BUILD.md](BUILD.md#installer).
 
 ## Développement
 
-Voir [BUILD.md](BUILD.md). En bref (Linux x86_64 ou Mac Apple Silicon) :
+Voir [BUILD.md](BUILD.md). En bref (Linux x86_64, Windows 11 sous Git Bash, Mac Apple Silicon) :
 
 ```sh
 scripts/dev.sh                   # moteur LibreOffice, compilation, lancement d'AuxiOffice

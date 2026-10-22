@@ -1,5 +1,6 @@
 #!/bin/sh
-# Compile et lance AuxiOffice en mode développement (Linux, macOS).
+# Compile et lance AuxiOffice en mode développement (Linux, macOS, Windows
+# sous Git Bash).
 #   scripts/dev.sh [document]
 # Au premier lancement : télécharge le moteur LibreOffice (environ 300 Mo)
 # et installe les dépendances npm.
@@ -10,11 +11,15 @@ cd "$ROOT"
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64) PLATFORM=linux-x86_64 ;;
   Darwin-arm64) PLATFORM=macos-aarch64 ;;
+  MINGW*-x86_64|MSYS*-x86_64|CYGWIN*-x86_64) PLATFORM=windows-x86_64 ;;
   *) echo "Plateforme non prise en charge : $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
 
+# Python : « python3 », ou « python » sous Windows.
+PY=python3
+command -v python3 >/dev/null && python3 -c "" 2>/dev/null || PY=python
 missing=""
-for tool in cargo npm python3 curl; do
+for tool in cargo npm "$PY" curl; do
   command -v "$tool" >/dev/null || missing="$missing $tool"
 done
 if [ -n "$missing" ]; then
@@ -23,7 +28,7 @@ if [ -n "$missing" ]; then
 fi
 
 # Moteur absent ou d'une autre version que celle épinglée : (re)télécharger.
-wanted=$(python3 -c "import json;print(json.load(open('engine/libreoffice.lock.json'))['version'])")
+wanted=$("$PY" -c "import json;print(json.load(open('engine/libreoffice.lock.json'))['version'])")
 installed=$(cat ".engine/$PLATFORM/version" 2>/dev/null || true)
 if [ "$PLATFORM" = macos-aarch64 ]; then
   # Mac : le LibreOffice officiel ne sait pas dessiner les pages pour un
@@ -34,7 +39,7 @@ if [ "$PLATFORM" = macos-aarch64 ]; then
   fi
 elif [ ! -f ".engine/$PLATFORM/program-dir" ] || [ "$installed" != "$wanted" ]; then
   echo "== Moteur LibreOffice $wanted"
-  scripts/fetch-engine.sh
+  PYTHON=$PY scripts/fetch-engine.sh
 fi
 
 echo "== Interface"
@@ -50,8 +55,10 @@ echo "== Moteur et coque ($PROFILE)"
 cargo build $FLAG -p auxi-engine
 cargo build $FLAG -p auxioffice --features custom-protocol
 
-export AUXI_ENGINE_EXE="$ROOT/target/$PROFILE/auxi-engine"
+EXE=""
+[ "$PLATFORM" = windows-x86_64 ] && EXE=.exe
+export AUXI_ENGINE_EXE="$ROOT/target/$PROFILE/auxi-engine$EXE"
 export AUXI_LO_PROGRAM="$(cat ".engine/$PLATFORM/program-dir")"
 export AUXI_TEMPLATES="$ROOT/app/src-tauri/templates"
 echo "== Lancement d'AuxiOffice"
-exec "$ROOT/target/$PROFILE/auxioffice" "$@"
+exec "$ROOT/target/$PROFILE/auxioffice$EXE" "$@"
