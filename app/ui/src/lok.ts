@@ -161,6 +161,17 @@ export function lokKeyFor(e: KeyLike, mac = false): LokKey | null {
   return null;
 }
 
+/**
+ * Événement « input » produit par une composition (touche morte, méthode de
+ * saisie) : à ignorer, compositionend porte le texte validé. WebKitGTK, après
+ * une touche morte, envoie le caractère composé par « input »
+ * (insertFromComposition) puis par un second compositionend : « ê » arrivait
+ * deux fois.
+ */
+export function isCompositionInput(e: { isComposing?: boolean; inputType?: string }): boolean {
+  return !!e.isComposing || /Composition/.test(e.inputType ?? "");
+}
+
 /** Couleur CSS « #rrggbb » vers l'entier attendu par .uno:Color. */
 export function colorToLong(css: string): number {
   return parseInt(css.replace("#", ""), 16) & 0xffffff;

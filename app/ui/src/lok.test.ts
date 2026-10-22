@@ -115,6 +115,19 @@ describe("impression", () => {
   });
 });
 
+describe("saisie composée", () => {
+  it("ignore les « input » d'une composition (touches mortes)", async () => {
+    const { isCompositionInput } = await import("./lok");
+    // Séquence de WebKitGTK pour ^ puis e : seul compositionend porte « ê ».
+    expect(isCompositionInput({ inputType: "insertCompositionText", isComposing: true })).toBe(true);
+    expect(isCompositionInput({ inputType: "deleteCompositionText", isComposing: true })).toBe(true);
+    expect(isCompositionInput({ inputType: "insertFromComposition", isComposing: true })).toBe(true);
+    expect(isCompositionInput({ inputType: "insertFromComposition", isComposing: false })).toBe(true);
+    expect(isCompositionInput({ inputType: "insertText", isComposing: false })).toBe(false);
+    expect(isCompositionInput({})).toBe(false);
+  });
+});
+
 describe("enregistrer sous", () => {
   const filters = [
     { name: "Document Word", extensions: ["docx"] },

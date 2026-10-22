@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { auxiCorrectStatus, call, onEngineEvent, paint, uno, type AuxiCorrectStatus, type DocInfo, type EngineEvent } from "./engine";
-import { lokKeyFor, parseInvalidation, parseRects, parseState, toFileUrl, TWIPS_PER_PX, type Rect } from "./lok";
+import { isCompositionInput, lokKeyFor, parseInvalidation, parseRects, parseState, toFileUrl, TWIPS_PER_PX, type Rect } from "./lok";
 import { TileView } from "./TileView";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { Action, AppAction } from "./actions";
@@ -363,7 +363,8 @@ export function DocView({ info, active, onModified, onEngineLost, onMessage, reg
   };
 
   const onInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
-    if (composing.current) return;
+    // Texte composé (touches mortes, méthodes de saisie) : envoyé par compositionend.
+    if (composing.current || isCompositionInput(e.nativeEvent as InputEvent)) return;
     const t = e.currentTarget.value;
     e.currentTarget.value = "";
     if (t) {
