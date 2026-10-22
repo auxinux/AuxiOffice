@@ -155,6 +155,57 @@ fn filter_for(path: &str) -> Option<&'static str> {
     })
 }
 
+/// Le fichier est-il un CSV (d'après son extension) ?
+fn is_csv(path: &str) -> bool {
+    Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case("csv"))
+}
+
+/// Options d'import d'un CSV pour LibreOffice (jetons de ScAsciiOptions :
+/// séparateurs, délimiteur de texte, encodage, première ligne, formats de
+/// colonnes, langue, guillemets = texte, nombres spéciaux).
+///
+/// Sans elles, LibreOffice ouvre la boîte « Import de texte » pendant le
+/// chargement : sous LibreOfficeKit, elle n'est jamais affichée et le
+/// chargement reste bloqué. Séparateur et encodage sont donc devinés ici.
+fn csv_import_options(sample: &[u8]) -> String {
+    // Encodage : UTF-16 avec BOM, UTF-8 valide (avec ou sans BOM), sinon Windows-1252.
+    let (charset, text) = if sample.starts_with(&[0xFF, 0xFE]) || sample.starts_with(&[0xFE, 0xFF]) {
+        let le = sample[0] == 0xFF;
+        let units: Vec<u16> = sample[2..].chunks_exact(2).map(|c| if le { u16::from_le_bytes([c[0], c[1]]) } else { u16::from_be_bytes([c[0], c[1]]) }).collect();
+        ("65535", String::from_utf16_lossy(&units))
+    } else {
+        let s = sample.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(sample);
+        match std::str::from_utf8(s) {
+            Ok(t) => ("76", t.to_string()),
+            // Échantillon coupé au milieu d'un caractère : encore de l'UTF-8.
+            Err(e) if e.error_len().is_none() => ("76", String::from_utf8_lossy(&s[..e.valid_up_to()]).into_owned()),
+            Err(_) => ("1", s.iter().map(|&b| b as char).collect()),
+        }
+    };
+    // Séparateur : celui qui revient le même nombre de fois (au moins une)
+    // sur le plus de lignes, hors des champs entre guillemets.
+    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).take(30).collect();
+    let count = |line: &str, sep: char| {
+        let mut quoted = false;
+        line.chars().filter(|&c| {
+            if c == '"' {
+                quoted = !quoted;
+            }
+            c == sep && !quoted
+        }).count()
+    };
+    let mut best = (',', 0usize, 0usize);
+    for sep in [',', ';', '\t', '|'] {
+        let counts: Vec<usize> = lines.iter().map(|l| count(l, sep)).collect();
+        let Some(&first) = counts.first().filter(|&&n| n > 0) else { continue };
+        let same = counts.iter().filter(|&&n| n == first).count();
+        if (same, first) > (best.1, best.2) {
+            best = (sep, same, first);
+        }
+    }
+    format!("{},34,{charset},1,,0,false,true", best.0 as u32)
+}
+
 fn doc_type_name(t: i32) -> &'static str {
     match t {
         sys::LOK_DOCTYPE_TEXT => "text",
@@ -254,7 +305,17 @@ impl Engine {
                 }
                 let read_only_file = std::fs::metadata(path).map(|m| m.permissions().readonly()).unwrap_or(false);
                 *self.password.lock().unwrap() = string(req, "password").map(str::to_owned);
-                let opts = format!("Language={}", self.args.lang);
+                let mut opts = format!("Language={}", self.args.lang);
+                if is_csv(path) {
+                    // Le reste des options devient FilterOptions pour LibreOffice.
+                    let mut sample = Vec::new();
+                    if let Ok(f) = File::open(path) {
+                        use std::io::Read;
+                        let _ = f.take(64 * 1024).read_to_end(&mut sample);
+                    }
+                    opts.push(',');
+                    opts.push_str(&csv_import_options(&sample));
+                }
                 let mut doc = self.office.load(&url, &opts)?;
                 let out = self.out.clone();
                 let deferred = self.deferred.clone();
@@ -468,7 +529,10 @@ impl Engine {
                 if filter_for(path).is_none() {
                     return Err(format!("format non pris en charge : {path}"));
                 }
-                d.save_as(&file_url(path)?, Some(&ext), Some("TakeOwnership"))?;
+                // CSV : virgule et UTF-8 sur toutes les plateformes (sinon
+                // l'encodage du système, Windows-1252 sous Windows).
+                let options = if is_csv(path) { "44,34,76,1,TakeOwnership" } else { "TakeOwnership" };
+                d.save_as(&file_url(path)?, Some(&ext), Some(options))?;
                 (json!({"path": path}), none)
             }
             "save" => {
@@ -538,6 +602,8 @@ struct Item {
     list: bool,
 }
 
+const CSV_FILTER: &str = "/org.openoffice.TypeDetection.Filter/Filters/org.openoffice.TypeDetection.Filter:Filter['Text - txt - csv (StarCalc)']";
+
 const FRENCH: [&str; 6] = ["fr-CA", "fr-FR", "fr-BE", "fr-CH", "fr-LU", "fr-MC"];
 
 fn profile_items(doc_lang: &str, grammar_url: Option<&str>) -> Vec<Item> {
@@ -546,6 +612,12 @@ fn profile_items(doc_lang: &str, grammar_url: Option<&str>) -> Vec<Item> {
         Item { path: "/org.openoffice.Setup/Product", prop: "ooName".into(), value: text("AuxiOffice"), list: false },
         Item { path: "/org.openoffice.Setup/Product", prop: "ooVendor".into(), value: text("Projet AuxiNux"), list: false },
         Item { path: "/org.openoffice.Office.Linguistic/General", prop: "DefaultLocale".into(), value: text(doc_lang), list: false },
+        // Sous LibreOfficeKit, LibreOffice ouvre toujours la boîte « Import de
+        // texte » d'un CSV pendant le chargement (même avec des options) ; sans
+        // vue, elle n'est annoncée nulle part et le chargement reste bloqué.
+        // Sans composant d'interface, il prend les options données au
+        // chargement (voir csv_import_options).
+        Item { path: CSV_FILTER, prop: "UIComponent".into(), value: Some("<value></value>".into()), list: false },
     ];
     const LT: &str = "/org.openoffice.Office.Linguistic/GrammarChecking/LanguageTool";
     const LT_LOCALES: &str = "/org.openoffice.Office.Linguistic/ServiceManager/GrammarCheckers/org.openoffice.lingu.LanguageToolGrammarChecker";
@@ -746,5 +818,26 @@ unsafe fn set_password_raw(kit: usize, url: &str, password: Option<&str>) {
         let u = std::ffi::CString::new(url).unwrap_or_default();
         let p = password.map(|p| std::ffi::CString::new(p).unwrap_or_default());
         f(kit, u.as_ptr(), p.as_ref().map_or(std::ptr::null(), |p| p.as_ptr()));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn csv_separator_and_encoding_are_guessed() {
+        assert_eq!(csv_import_options(b"a,b,c\n1,2,3\n"), "44,34,76,1,,0,false,true");
+        // Point-virgule (tableurs français), virgule décimale et guillemets.
+        assert_eq!(csv_import_options("Nom;Montant\nCafé;1 234,56\n\"a;b\";2\n".as_bytes()), "59,34,76,1,,0,false,true");
+        assert_eq!(csv_import_options(b"a\tb\n1\t2,5\n"), "9,34,76,1,,0,false,true");
+        // Windows-1252 (é = 0xE9), UTF-8 avec BOM, UTF-16.
+        assert_eq!(csv_import_options(b"Caf\xe9;cr\xe8me\n1;2\n"), "59,34,1,1,,0,false,true");
+        assert_eq!(csv_import_options(b"\xEF\xBB\xBFa;b\n"), "59,34,76,1,,0,false,true");
+        let utf16: Vec<u8> = [0xFF, 0xFE].into_iter().chain("x;y\n".encode_utf16().flat_map(u16::to_le_bytes)).collect();
+        assert_eq!(csv_import_options(&utf16), "59,34,65535,1,,0,false,true");
+        // Échantillon coupé au milieu d'un caractère, fichier vide.
+        assert_eq!(csv_import_options(&"é;é\n".as_bytes()[..4]), "59,34,76,1,,0,false,true");
+        assert_eq!(csv_import_options(b""), "44,34,76,1,,0,false,true");
     }
 }

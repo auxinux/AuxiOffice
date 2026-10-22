@@ -137,6 +137,10 @@ Les rappels de LibreOffice (`invalidate_tiles`, `invalidate_visible_cursor`,
 - Un verrou `.~lock.<nom>#` existant fait ouvrir le document **en lecture seule sans le
   signaler** : le moteur le détecte lui-même. Les verrous laissés par un profil d'AuxiOffice
   sont retirés automatiquement.
+- Sous LibreOfficeKit, l'ouverture d'un CSV demande toujours la boîte « Import de texte »,
+  qu'aucune vue n'affiche : le chargement restait bloqué. Le profil retire le composant
+  d'interface du filtre CSV et le moteur donne les options d'import (séparateur et encodage
+  devinés sur le début du fichier).
 - `.uno:SaveAs` est converti en simple export par LibreOfficeKit ; « Enregistrer sous » utilise
   `saveAs` avec l'option `TakeOwnership`.
 - Les événements clavier sont traités de façon asynchrone par LibreOffice.

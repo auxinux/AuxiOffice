@@ -188,6 +188,26 @@ fn writer_edit_save_and_export() {
 }
 
 #[test]
+fn csv_opens_without_the_import_dialog() {
+    let Some((ctx, _)) = setup("csv") else { return };
+    // Point-virgule, virgule décimale, UTF-8 : séparateur et encodage devinés.
+    let csv = ctx.tmp.join("relevé.csv");
+    std::fs::write(&csv, "Nom;Montant;Ville\nCafé;12,5;Québec\n\"a;b\";2;Montréal\n").unwrap();
+    // Sans correctif, LibreOffice attend la réponse à la boîte « Import de texte ».
+    let info = ctx.engine.request(json!({"cmd": "load", "path": csv}), &[], Duration::from_secs(60)).expect("chargement du CSV bloqué").json;
+    assert_eq!(info["type"], "spreadsheet");
+    ctx.call(json!({"cmd": "uno", "command": ".uno:GoToCell", "args": {"ToPoint": {"type": "string", "value": "D2"}}}));
+    ctx.type_text("=B2*2");
+    ctx.key(lok_sys::key::RETURN);
+    ctx.settle();
+    ctx.call(json!({"cmd": "save_in_place"}));
+    let text = std::fs::read_to_string(&csv).expect("CSV réécrit en UTF-8");
+    assert!(text.starts_with("Nom;Montant;Ville"), "{text}");
+    assert!(text.contains("Café;12,5;Québec;25"), "colonnes ou formule mal lues : {text}");
+    assert!(text.contains("\"a;b\";2;Montréal"), "{text}");
+}
+
+#[test]
 fn calc_formula_and_sheets() {
     let Some((ctx, fx)) = setup("calc") else { return };
     let info = ctx.call(json!({"cmd": "load", "path": fx.join("budget.xlsx")}));
