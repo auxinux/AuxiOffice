@@ -853,7 +853,8 @@ fn main() {
 /// scripts/build-engine-macos.sh) ; ce fil-ci lit les requêtes et appelle
 /// LibreOfficeKit.
 fn run(engine: Engine, out: Out, ready: Value) -> ! {
-    if cfg!(windows) {
+    // AUXI_ENGINE_WINLOOP=0 : sans la boucle de messages (diagnostic).
+    if cfg!(windows) && std::env::var("AUXI_ENGINE_WINLOOP").map_or(true, |v| v != "0") {
         run_windows(engine, out, ready)
     } else {
         run_threaded(engine, out, ready)
