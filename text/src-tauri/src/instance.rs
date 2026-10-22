@@ -175,9 +175,12 @@ mod tests {
         assert_eq!(l.files, vec![canon.join("a.txt").to_string_lossy().into_owned(), dir.join("neuf.md").to_string_lossy().into_owned()]);
         assert!(l.new_window);
         let l = parse_args(&s(&["--", "-tiret.txt"]), Path::new("/tmp"));
-        assert_eq!(l.files, vec!["/tmp/-tiret.txt".to_string()]);
-        let l = parse_args(&s(&["file:///tmp/un%20fichier%C3%A9.txt"]), Path::new("/"));
-        assert_eq!(l.files, vec!["/tmp/un fichieré.txt".to_string()]);
+        assert_eq!(l.files, vec![Path::new("/tmp").join("-tiret.txt").to_string_lossy().into_owned()]);
+        #[cfg(unix)]
+        {
+            let l = parse_args(&s(&["file:///tmp/un%20fichier%C3%A9.txt"]), Path::new("/"));
+            assert_eq!(l.files, vec!["/tmp/un fichieré.txt".to_string()]);
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 
