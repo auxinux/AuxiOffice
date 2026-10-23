@@ -64,6 +64,10 @@ teste chaque envoi sous Linux et Windows (avec le vrai moteur LibreOffice) et so
   enregistrement, impression, document protégé par mot de passe ;
 - glisser-déposer de fichiers sur les fenêtres.
 
+**Windows 11 (en cours)** : le moteur LibreOffice s'installe et ouvre les documents de tous les
+types ; l'enregistrement en place (Ctrl+S) ne répond pas encore sous Windows (diagnostic :
+`.github/workflows/diag-windows.yml`).
+
 Pas encore fait : animations du diaporama, AuxiCorrect dans AuxiText, impression directe sous
 Windows (elle passe par la visionneuse du système), paquets d'installation Windows et macOS
 (installation par `scripts/install-apps.sh`).

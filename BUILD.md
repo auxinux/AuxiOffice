@@ -18,6 +18,9 @@ de transition qui installe `auxioffice`. Construire ces paquets : `scripts/build
 
 ### Windows 11
 
+> **En cours (bêta)** : l'installation et l'ouverture des documents fonctionnent ;
+> l'enregistrement en place (Ctrl+S) ne répond pas encore sous Windows.
+
 1. Installer [Git pour Windows](https://git-scm.com/download/win) (fournit Git Bash),
    [Rust](https://rustup.rs) (avec les outils de compilation C++ de Visual Studio que
    propose l'installateur) et [Node.js 22](https://nodejs.org) ou plus récent. WebView2 est

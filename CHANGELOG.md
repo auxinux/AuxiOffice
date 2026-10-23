@@ -14,6 +14,13 @@
   choisies, mot de passe, propriétés, liens vers le navigateur, « Modifier dans AuxiDraw ».
 - Glisser-déposer de fichiers sur les fenêtres ; DOCM, XLSM, PPTM et modèles dans les filtres
   d'ouverture et les documents récents.
+- Paquets Debian : `auxioffice` (avec son moteur, installe `auxitext`), `auxitext` seul,
+  `auxinux-office` (transition) ; publiés dans le dépôt APPS d'AuxiNuxOS.
+- Windows 11 : moteur extrait du MSI officiel, requêtes exécutées sur le fil VCL Main de
+  LibreOffice, installation par `scripts/install-apps.sh` (Git Bash). En cours :
+  l'enregistrement en place ne répond pas encore.
+- macOS et Linux : `scripts/install-apps.sh` installe aussi AuxiText.
+- Présentation vierge 16:9 : zones de titre et de texte centrées.
 - Intégration continue GitHub : Linux (tests complets avec LibreOffice), macOS et Windows
   (compilation et tests sans moteur). Icône Windows ajoutée : la compilation Windows échouait.
 
