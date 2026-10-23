@@ -23,6 +23,7 @@ import { bracketMatching, defaultHighlightStyle, foldGutter, foldKeymap, indentO
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { language } from "./languages";
+import { LINT_PHRASES } from "./spell";
 import { effectiveFontSize, fontStack, type Prefs } from "./prefs";
 import type { Indent } from "./util";
 
@@ -64,6 +65,7 @@ const gutterC = new Compartment();
 const activeLineC = new Compartment();
 const whitespaceC = new Compartment();
 const indentC = new Compartment();
+const spellC = new Compartment();
 
 const lightTheme = EditorView.theme(
   {
@@ -118,7 +120,7 @@ export function createEditor(parent: HTMLElement, text: string, o: EditorOptions
   const state = EditorState.create({
     doc: text,
     extensions: [
-      EditorState.phrases.of(PHRASES),
+      EditorState.phrases.of({ ...PHRASES, ...LINT_PHRASES }),
       keymap.of(o.keys),
       gutterC.of(p.lineNumbers ? [lineNumbers(), foldGutter()] : []),
       activeLineC.of(p.highlightLine ? [highlightActiveLine(), highlightActiveLineGutter()] : []),
@@ -140,6 +142,7 @@ export function createEditor(parent: HTMLElement, text: string, o: EditorOptions
       fontC.of(fontExt(p)),
       wrapC.of(p.wrap ? EditorView.lineWrapping : []),
       indentC.of(indentExt(o.indent)),
+      spellC.of([]),
       EditorView.updateListener.of((u) => {
         if (u.docChanged || u.selectionSet || u.focusChanged) o.onUpdate(u.view, u.docChanged);
       }),
@@ -161,6 +164,11 @@ export function applyPrefs(view: EditorView, p: Prefs, dark: boolean) {
       whitespaceC.reconfigure(p.showWhitespace ? [highlightWhitespace(), highlightTrailingWhitespace()] : []),
     ],
   });
+}
+
+/** Active (extension de spell.ts) ou retire la correction d'AuxiCorrect. */
+export function setSpelling(view: EditorView, ext: Extension | null) {
+  view.dispatch({ effects: spellC.reconfigure(ext ?? []) });
 }
 
 export function setIndent(view: EditorView, indent: Indent) {

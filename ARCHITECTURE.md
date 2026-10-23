@@ -91,7 +91,14 @@
   bandeau « Recharger / Ignorer », ou « fichier supprimé ».
 - Impression : vue imprimable (`#print-area`, CSS `@media print`) puis impression de la page
   par WebKitGTK (dialogue GTK, CUPS).
-- AuxiCorrect n'est pas encore branché sur AuxiText.
+- AuxiCorrect (facultatif) : la coque lit `auxicorrect.json` (clé `auxitext`, relu au retour
+  dans la fenêtre) et appelle `auxicorrect-cli verifier - --json` (`text/src-tauri/src/auxicorrect.rs`,
+  délai maximal 20 s ; seul un tableau JSON valide fait foi). Positions converties des points de
+  code en unités UTF-16. Dans la page, le linter de CodeMirror (`spell.ts`) souligne après une
+  pause de frappe (orthographe en rouge, grammaire en bleu, typographie, style et régional en
+  orange) et propose message, suggestions et « Ignorer » au survol ; texte brut et Markdown
+  seulement, 200 000 caractères au plus. Outils → AuxiCorrect : activer (F7), profil
+  international, ouvrir AuxiCorrect.
 
 ## AuxiCorrect (correction du français)
 

@@ -40,6 +40,25 @@ export interface AppInfo {
   platform: string;
 }
 
+/** État d'AuxiCorrect (réglage commun `auxicorrect.json`, clé `auxitext`). */
+export interface AuxiCorrectStatus {
+  installed: boolean;
+  enabled: boolean;
+  version: string | null;
+  hasApp: boolean;
+}
+
+/** Remarque d'AuxiCorrect, positions en unités UTF-16. */
+export interface Remark {
+  from: number;
+  to: number;
+  category: string;
+  severity: string;
+  message: string;
+  suggestions: string[];
+  rule: string;
+}
+
 export const api = {
   readText: (path: string, encoding?: string, force?: boolean) => invoke<Opened>("read_text", { path, encoding: encoding ?? null, force: force ?? false }),
   writeText: (path: string, text: string, encoding: string, bom: boolean, eol: Eol) => invoke<Stat>("write_text", { path, text, encoding, bom, eol }),
@@ -53,4 +72,7 @@ export const api = {
   appInfo: () => invoke<AppInfo>("app_info"),
   systemTheme: () => invoke<"dark" | "light" | null>("system_theme"),
   printPage: () => invoke<void>("print_page"),
+  auxicorrectStatus: () => invoke<AuxiCorrectStatus>("auxicorrect_status"),
+  auxicorrectCheck: (text: string, international: boolean) => invoke<Remark[]>("auxicorrect_check", { text, international }),
+  auxicorrectOpen: () => invoke<void>("auxicorrect_open"),
 };

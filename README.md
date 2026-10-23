@@ -21,7 +21,8 @@ AuxiText est une application à part (`text/`, paquet `auxitext`) : onglets, col
 syntaxique, recherche et remplacement (expressions régulières), multi-curseurs, encodages
 (UTF-8, UTF-16, Windows-1252, ISO-8859-…) et fins de ligne détectés et conservés,
 enregistrement atomique, thème clair ou sombre qui suit le bureau. « Ouvrir dans AuxiWriter »
-apparaît quand la suite est installée.
+apparaît quand la suite est installée. Avec AuxiCorrect (activé pour AuxiText dans son onglet
+Intégration), le français des textes et du Markdown est corrigé pendant la frappe.
 
 AuxiOffice est un **produit propriétaire du Projet AuxiNux**. Son interface et sa coque sont
 écrites par AuxiNux ; le rendu et l'édition des documents sont confiés à
@@ -68,7 +69,7 @@ teste chaque envoi sous Linux et Windows (avec le vrai moteur LibreOffice) et so
 types ; l'enregistrement en place (Ctrl+S) ne répond pas encore sous Windows (diagnostic :
 `.github/workflows/diag-windows.yml`).
 
-Pas encore fait : animations du diaporama, AuxiCorrect dans AuxiText, impression directe sous
+Pas encore fait : animations du diaporama, impression directe sous
 Windows (elle passe par la visionneuse du système), paquets d'installation Windows et macOS
 (installation par `scripts/install-apps.sh`).
 

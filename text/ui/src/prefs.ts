@@ -19,6 +19,10 @@ export interface Prefs {
   indentWidth: number;
   /** Indentation déduite du contenu de chaque fichier ouvert. */
   detectIndent: boolean;
+  /** Corriger le français avec AuxiCorrect (s'il est installé et activé pour AuxiText). */
+  spelling: boolean;
+  /** Profil français international (sinon québécois). */
+  spellInternational: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -33,6 +37,8 @@ export const DEFAULT_PREFS: Prefs = {
   indentWithTabs: false,
   indentWidth: 4,
   detectIndent: true,
+  spelling: true,
+  spellInternational: false,
 };
 
 export const FONT_SIZES = { min: 6, max: 72 };
@@ -50,7 +56,7 @@ export function sanitizePrefs(raw: unknown): Prefs {
   if (typeof r.fontFamily === "string") p.fontFamily = r.fontFamily.replace(/[;{}<>]/g, "").trim().slice(0, 200);
   if (typeof r.fontSize === "number" && Number.isFinite(r.fontSize)) p.fontSize = clamp(Math.round(r.fontSize), FONT_SIZES.min, FONT_SIZES.max);
   if (typeof r.zoom === "number" && Number.isFinite(r.zoom)) p.zoom = roundZoom(clamp(r.zoom, ZOOM.min, ZOOM.max));
-  for (const k of ["wrap", "lineNumbers", "highlightLine", "showWhitespace", "indentWithTabs", "detectIndent"] as const) {
+  for (const k of ["wrap", "lineNumbers", "highlightLine", "showWhitespace", "indentWithTabs", "detectIndent", "spelling", "spellInternational"] as const) {
     if (typeof r[k] === "boolean") p[k] = r[k] as boolean;
   }
   if (typeof r.indentWidth === "number" && Number.isInteger(r.indentWidth)) p.indentWidth = clamp(r.indentWidth, 1, 16);

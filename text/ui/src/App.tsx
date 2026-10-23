@@ -25,8 +25,9 @@ import {
   selectSelectionMatches,
 } from "@codemirror/search";
 import { accelToKey, flatItems, menuBar } from "./actions";
-import { api, asTextError, type AppInfo, type Stat } from "./api";
-import { applyPrefs, createEditor, replaceContent, sameDoc, setIndent, setLanguage } from "./editor";
+import { api, asTextError, type AppInfo, type AuxiCorrectStatus, type Stat } from "./api";
+import { applyPrefs, createEditor, replaceContent, sameDoc, setIndent, setLanguage, setSpelling } from "./editor";
+import { shouldSpell, spellExtension } from "./spell";
 import { ENCODINGS, EOLS, encodingKey, encodingLabel, eolShort, type Eol } from "./encodings";
 import { detectLanguage, defaultExtension, language, LANGUAGES } from "./languages";
 import { NativeMenu } from "./menus";
@@ -56,6 +57,8 @@ interface Doc {
   encodingForced: boolean;
   lang: string;
   langAuto: boolean;
+  /** Réglage de correction appliqué (« off », « qc », « intl ») : évite de relancer pour rien. */
+  spell: string;
   indent: Indent;
   saved: Text;
   savedMeta: string;
@@ -92,6 +95,10 @@ export default function App() {
   const modalQueue = useRef<(ModalSpec & { resolve: (v: string) => void })[]>([]);
   const infoRef = useRef<AppInfo | null>(null);
   infoRef.current = info;
+  // AuxiCorrect : réglage commun relu au démarrage et au retour dans la fenêtre.
+  const [ac, setAc] = useState<AuxiCorrectStatus | null>(null);
+  const acRef = useRef<AuxiCorrectStatus | null>(null);
+  acRef.current = ac;
   const [popup, setPopup] = useState<{ kind: "lang" | "enc" | "reopen" | "eol" | "indent"; x: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const editors = useRef<HTMLDivElement>(null);
@@ -128,6 +135,38 @@ export default function App() {
     for (const doc of docs.current) applyPrefs(doc.view, p, d);
   }, []);
 
+  /** Active ou retire la correction d'AuxiCorrect d'un document (texte brut, Markdown). */
+  const applySpell = useCallback((d: Doc) => {
+    const p = prefsRef.current;
+    const on = shouldSpell(d.lang, p.spelling && !!acRef.current?.enabled, d.view.state.doc.length);
+    const want = on ? (p.spellInternational ? "intl" : "qc") : "off";
+    if (want === d.spell) return;
+    d.spell = want;
+    setSpelling(
+      d.view,
+      on
+        ? spellExtension(p.spellInternational, (msg) => {
+            d.banner = { kind: "warn", text: `AuxiCorrect n'a pas pu vérifier ce texte : ${msg}` };
+            bump();
+          })
+        : null,
+    );
+  }, []);
+  const applySpellAll = useCallback(() => docs.current.forEach(applySpell), [applySpell]);
+
+  const refreshAuxiCorrect = useCallback(async () => {
+    const s = await api.auxicorrectStatus().catch(() => null);
+    const old = acRef.current;
+    acRef.current = s;
+    setAc(s);
+    applySpellAll();
+    // AuxiCorrect installé ou retiré : son sous-menu apparaît ou disparaît.
+    if (!!old?.installed !== !!s?.installed && menu.current && infoRef.current) {
+      await menu.current.install(menuBar({ writer: infoRef.current.writer, auxicorrect: !!s?.installed })).catch(() => {});
+      await menu.current.setRecent(recentRef.current).catch(() => {});
+    }
+  }, [applySpellAll]);
+
   const savePrefsTimer = useRef(0);
   const setPrefs = useCallback(
     (p: Prefs, persist = true) => {
@@ -144,6 +183,7 @@ export default function App() {
           }
         }
       }
+      if (old.spelling !== p.spelling || old.spellInternational !== p.spellInternational) applySpellAll();
       if (persist) {
         window.clearTimeout(savePrefsTimer.current);
         savePrefsTimer.current = window.setTimeout(() => void api.prefsSave(p).catch((e) => console.warn("préférences", e)), 300);
@@ -186,7 +226,7 @@ export default function App() {
   if (!editorKeys.current.length) {
     // Raccourcis des menus, aussi dans la page (quand la barre native ne les intercepte pas).
     const seen = new Set<string>();
-    for (const it of flatItems(menuBar({ writer: true }))) {
+    for (const it of flatItems(menuBar({ writer: true, auxicorrect: true }))) {
       if (!it.accel) continue;
       const key = accelToKey(it.accel);
       if (seen.has(key)) continue;
@@ -249,6 +289,7 @@ export default function App() {
         encodingForced: o.encodingForced ?? false,
         lang,
         langAuto: true,
+        spell: "off",
         indent,
         saved: view.state.doc,
         savedMeta: "",
@@ -261,9 +302,10 @@ export default function App() {
       d.savedMeta = meta(d);
       docs.current.push(d);
       if (lang !== "plain") void setLanguage(view, lang);
+      applySpell(d);
       return d;
     },
-    [onEditorUpdate],
+    [onEditorUpdate, applySpell],
   );
 
   const activate = useCallback(
@@ -410,6 +452,7 @@ export default function App() {
       if (lang !== d.lang) {
         d.lang = lang;
         void setLanguage(d.view, lang);
+        applySpell(d);
       }
     }
   };
@@ -550,6 +593,7 @@ export default function App() {
     d.lang = id;
     d.langAuto = false;
     void setLanguage(d.view, id);
+    applySpell(d);
     bump();
   };
 
@@ -810,6 +854,19 @@ export default function App() {
           if (list.length > 1) activate(list[(i + (id === "nextTab" ? 1 : -1) + list.length) % list.length].id);
           return;
         }
+        case "spelling":
+        case "spellInternational":
+          if (!acRef.current?.enabled) {
+            return void tell(
+              "AuxiCorrect",
+              acRef.current?.installed
+                ? "AuxiCorrect est installé, mais pas activé pour AuxiText. Ouvrez AuxiCorrect → Paramètres → Intégration et cochez AuxiText."
+                : "AuxiCorrect n'est pas installé.",
+            );
+          }
+          return setPrefs({ ...p, [id]: !p[id] });
+        case "auxicorrectApp":
+          return void api.auxicorrectOpen().catch((e) => tell("AuxiCorrect", String(e)));
         case "stats":
           return void (d && showStats(d));
         case "preferences":
@@ -909,7 +966,10 @@ export default function App() {
       await refreshSystemTheme();
       const m = new NativeMenu((id) => runRef.current(id));
       menu.current = m;
-      await m.install(menuBar({ writer: i.writer })).catch((e) => console.warn("menus", e));
+      const acs = await api.auxicorrectStatus().catch(() => null);
+      acRef.current = acs;
+      setAc(acs);
+      await m.install(menuBar({ writer: i.writer, auxicorrect: !!acs?.installed })).catch((e) => console.warn("menus", e));
       await m.setRecent(list).catch(() => {});
       const files = await api.takeLaunches().catch(() => []);
       if (files.length) await openPaths(files);
@@ -936,6 +996,7 @@ export default function App() {
           if (!focused) return;
           void checkDisk();
           void refreshSystemTheme();
+          void refreshAuxiCorrect();
           void menu.current?.activate();
         }),
       );
@@ -983,6 +1044,8 @@ export default function App() {
       "theme.system": prefs.theme === "system",
       "theme.light": prefs.theme === "light",
       "theme.dark": prefs.theme === "dark",
+      spelling: prefs.spelling && !!ac?.enabled,
+      spellInternational: prefs.spellInternational,
     };
     for (const l of LANGUAGES) states[`lang.${l.id}`] = d?.lang === l.id;
     ENCODINGS.forEach((e, i) => (states[`enc.${i}`] = !!d && encodingKey(e.encoding, e.bom) === encodingKey(d.encoding, d.bom)));
@@ -1102,6 +1165,11 @@ export default function App() {
         {ranges.length > 1 && !selChars && <span className="sel">{ranges.length} curseurs</span>}
         <span className="spacer">{toast ?? ""}</span>
         {d?.readonly && <span className="ro">Lecture seule</span>}
+        {d && d.spell !== "off" && (
+          <button className="sb ac" title={`Correction du français par AuxiCorrect${ac?.version ? ` ${ac.version}` : ""} (F7 pour désactiver)`} onClick={() => run("spelling")}>
+            ✓ AuxiCorrect
+          </button>
+        )}
         {d && (
           <>
             <button className="sb" title="Langage (coloration syntaxique)" onClick={(e) => openPopup("lang", e)}>

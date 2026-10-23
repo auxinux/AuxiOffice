@@ -17,7 +17,7 @@ export interface MenuDef {
   items: MenuEntry[];
 }
 
-export function menuBar(opts: { writer: boolean }): MenuDef[] {
+export function menuBar(opts: { writer: boolean; auxicorrect?: boolean }): MenuDef[] {
   return [
     {
       label: "&Fichier",
@@ -126,6 +126,20 @@ export function menuBar(opts: { writer: boolean }): MenuDef[] {
           ],
         },
         "-",
+        ...(opts.auxicorrect
+          ? [
+              {
+                submenu: "AuxiCorrect",
+                items: [
+                  { id: "spelling", label: "Corriger le français", accel: "F7", check: true },
+                  { id: "spellInternational", label: "Français international (sinon québécois)", check: true },
+                  "-" as const,
+                  { id: "auxicorrectApp", label: "Ouvrir AuxiCorrect…" },
+                ],
+              },
+              "-" as const,
+            ]
+          : []),
         { id: "stats", label: "Statistiques du document…" },
         { id: "preferences", label: "Préférences…", accel: "CmdOrCtrl+," },
       ],

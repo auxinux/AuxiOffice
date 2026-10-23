@@ -5,7 +5,10 @@
 //!
 //! AuxiText ne dépend pas d'AuxiOffice : il s'installe seul. Quand la suite
 //! est présente, « Ouvrir dans AuxiWriter » lance `auxioffice --app writer`.
+//! Quand AuxiCorrect est installé et activé pour AuxiText, il corrige le
+//! français des textes et du Markdown (`auxicorrect`).
 
+mod auxicorrect;
 mod instance;
 mod textio;
 mod theme;
@@ -249,6 +252,29 @@ async fn system_theme() -> Option<&'static str> {
     tauri::async_runtime::spawn_blocking(|| theme::system_is_dark().map(|d| if d { "dark" } else { "light" })).await.ok().flatten()
 }
 
+// --- AuxiCorrect --------------------------------------------------------------
+
+/// État d'AuxiCorrect (réglage commun relu à chaque appel).
+#[tauri::command]
+fn auxicorrect_status() -> auxicorrect::Status {
+    auxicorrect::read_status(&auxicorrect::settings_path())
+}
+
+/// Remarques d'AuxiCorrect sur `text` (positions en unités UTF-16).
+#[tauri::command]
+async fn auxicorrect_check(text: String, international: bool) -> Result<Vec<auxicorrect::Remark>, String> {
+    let status = auxicorrect::read_status(&auxicorrect::settings_path());
+    let cli = status.cli.filter(|_| status.enabled).ok_or("AuxiCorrect n'est pas activé pour AuxiText")?;
+    tauri::async_runtime::spawn_blocking(move || auxicorrect::check(&cli, &text, international)).await.map_err(|e| e.to_string())?
+}
+
+/// Ouvre l'application AuxiCorrect (paramètres, dictionnaire personnel).
+#[tauri::command]
+fn auxicorrect_open() -> Result<(), String> {
+    let app = auxicorrect::read_status(&auxicorrect::settings_path()).app.ok_or("AuxiCorrect n'est pas installé")?;
+    auxicorrect::open_app(&app)
+}
+
 /// Imprime la page (l'interface a préparé sa vue imprimable).
 #[tauri::command]
 fn print_page(window: WebviewWindow) -> Result<(), String> {
@@ -330,7 +356,10 @@ pub fn run() {
             open_in_writer,
             app_info,
             system_theme,
-            print_page
+            print_page,
+            auxicorrect_status,
+            auxicorrect_check,
+            auxicorrect_open
         ])
         .build(context)
         .expect("démarrage d'AuxiText")

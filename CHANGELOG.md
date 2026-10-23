@@ -5,6 +5,11 @@
 - **AuxiOffice ouvre tous les documents dans ses onglets** (texte, classeur, présentation,
   dessin, PDF) au lieu de les confier aux autres applications. AuxiWriter, AuxiSheet…
   restent lancées par le menu du système et par les documents ouverts depuis le bureau.
+- **AuxiCorrect dans AuxiText** : quand AuxiCorrect est installé et AuxiText activé dans son
+  onglet Intégration (`auxicorrect.json`), le français des textes et du Markdown est corrigé
+  pendant la frappe : soulignements, message, suggestions et « Ignorer » au survol ;
+  Outils → AuxiCorrect (F7, profil international, ouvrir AuxiCorrect) ; « ✓ AuxiCorrect » dans
+  la barre d'état. Sans AuxiCorrect, rien ne change.
 - Interface : le nom de LibreOffice n'apparaît plus (accueil, correction, messages) ; seule
   la fenêtre « À propos » le crédite. PDF.js n'est plus nommé à l'accueil d'AuxiPDF.
 
