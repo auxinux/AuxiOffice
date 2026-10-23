@@ -21,12 +21,15 @@
 
 ## Six applications, un exécutable
 
-- **AuxiOffice** est le gestionnaire : créer, ouvrir, documents récents. Il n'ouvre aucun
-  document lui-même (aucun moteur) : il les confie à **AuxiWriter**, **AuxiSheet**,
-  **AuxiPresent**, **AuxiDraw** ou **AuxiPDF**, qui ont chacune leur fenêtre, leur icône, leur
-  accueil, leurs documents récents et leurs menus. Un fichier d'un autre type ouvert dans
-  l'une part dans la bonne (exception : AuxiDraw garde les PDF qu'on lui confie, pour les
-  modifier).
+- **AuxiOffice** ouvre tous les types de documents dans ses propres onglets (créer, ouvrir,
+  glisser-déposer, récents) ; menus et ruban suivent le type de l'onglet actif.
+- **AuxiWriter**, **AuxiSheet**, **AuxiPresent**, **AuxiDraw**, **AuxiPDF** sont lancées par le
+  menu des applications du système ou par un document ouvert depuis le bureau (types de
+  fichiers associés à chacune, jamais à AuxiOffice) : chacune a sa fenêtre, son icône, son
+  accueil et ses menus ; un fichier d'un autre type ouvert dans l'une part dans la bonne
+  (exception : AuxiDraw garde les PDF qu'on lui confie, pour les modifier).
+- AuxiCorrect ne s'applique qu'aux moteurs des documents texte : dans AuxiOffice, le moteur
+  de réserve sert aux autres types et un document texte reçoit un moteur réglé pour lui.
 - Même exécutable, application choisie au lancement (`app/src-tauri/src/apps.rs`) : `--app`,
   `AUXI_APP` ou nom de l'exécutable / du paquet `.app`.
 - **Instance unique par application** : la première écoute sur `127.0.0.1` (port et jeton

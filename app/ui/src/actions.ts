@@ -352,7 +352,7 @@ function newMenu(app: AppKind): MenuEntry {
   return { submenu: "Nouveau", items };
 }
 
-const fileMenu_ = (app: AppKind): MenuDef => ({
+const fileMenu_ = (app: AppKind, type: DocType): MenuDef => ({
   label: "Fichier",
   items: [
     newMenu(app),
@@ -361,7 +361,7 @@ const fileMenu_ = (app: AppKind): MenuDef => ({
     a("Enregistrer", "save", { accel: "CmdOrCtrl+S" }),
     a("Enregistrer sous…", "saveAs", { accel: "CmdOrCtrl+Shift+S" }),
     a("Exporter en PDF…", "exportPdf"),
-    ...(app === "draw" ? [A.exportImage] : []),
+    ...(type === "drawing" ? [A.exportImage] : []),
     a("Imprimer…", "print", { accel: "CmdOrCtrl+P" }),
     "-",
     A.docProps,
@@ -442,7 +442,7 @@ const viewItems = (sheet = false): MenuEntry[] => [
 
 export function menusFor(type: DocType | null, app: AppKind = "office"): MenuDef[] {
   if (type === "pdf") return pdfMenus();
-  const fileMenu = type ? fileMenu_(app) : homeFileMenu(app);
+  const fileMenu = type ? fileMenu_(app, type) : homeFileMenu(app);
   const editBase: MenuEntry[] = [A.undo, A.redo, "-", A.pasteSpecial, A.selectAll, "-", A.find];
   const language: MenuEntry = {
     submenu: "Langue",

@@ -28,19 +28,19 @@ export function AuxiCorrectOptionsDialog({ onClose, onMessage }: { onClose: () =
         </h2>
         <p className={`ac-state ${st.active ? "on" : "off"}`}>
           {!st.installed
-            ? "AuxiCorrect n'est pas installé : la correction est faite par LibreOffice."
+            ? "AuxiCorrect n'est pas installé : la correction est faite par le correcteur intégré."
             : !usable
               ? "AuxiCorrect est installé mais pas activé pour AuxiOffice : dans AuxiCorrect, ouvrez Paramètres → Intégration, cochez AuxiOffice, puis redémarrez AuxiWriter."
               : st.writerOnly
-                ? "AuxiCorrect souligne les fautes dans AuxiWriter. Ici, LibreOffice ne vérifie que l'orthographe ; le dictionnaire d'AuxiCorrect reste disponible."
+                ? "AuxiCorrect souligne les fautes dans AuxiWriter. Ici, le correcteur intégré ne vérifie que l'orthographe ; le dictionnaire d'AuxiCorrect reste disponible."
                 : st.active
                   ? "AuxiCorrect corrige le français de vos documents : orthographe, grammaire, typographie et particularités du français québécois."
-                  : "AuxiCorrect est désactivé : la correction est faite par LibreOffice."}
+                  : "AuxiCorrect est désactivé : la correction est faite par le correcteur intégré."}
         </p>
         <fieldset disabled={!usable}>
           <label className="row">
             <input type="checkbox" checked={o.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
-            Corriger le français avec AuxiCorrect (au lieu du correcteur de LibreOffice)
+            Corriger le français avec AuxiCorrect (au lieu du correcteur intégré)
           </label>
           <div className="row">
             <span className="label">Profil</span>

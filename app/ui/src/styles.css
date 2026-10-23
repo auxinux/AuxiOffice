@@ -36,6 +36,8 @@ button, select, input { font: inherit; color: inherit; }
 .tab.kind-text .dot { background: var(--writer); }
 .tab.kind-spreadsheet .dot { background: var(--sheet); }
 .tab.kind-presentation .dot { background: var(--present); }
+.tab.kind-drawing .dot { background: #7B4FC4; }
+.tab.kind-pdf .dot { background: #C8283C; }
 .tab .close { border: 0; background: transparent; padding: 0 2px; font-size: 16px; line-height: 1; opacity: .55; cursor: pointer; }
 .tab .close:hover { opacity: 1; color: var(--orange); }
 .tabbar-fill { flex: 1; }

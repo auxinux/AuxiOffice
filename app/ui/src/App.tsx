@@ -1,6 +1,8 @@
-// Fenêtre principale. AuxiOffice (le gestionnaire) : accueil seul, chaque
-// document part dans son application. AuxiWriter, AuxiSheet, AuxiPresent,
-// AuxiDraw, AuxiPDF : onglet Accueil et un onglet par document de leur type.
+// Fenêtre principale. AuxiOffice : accueil et un onglet par document, de
+// tous les types (texte, classeur, présentation, dessin, PDF). AuxiWriter,
+// AuxiSheet, AuxiPresent, AuxiDraw, AuxiPDF (lancées depuis le menu du système
+// ou par un document du bureau) : onglet Accueil et un onglet par document de
+// leur type ; un document d'un autre type part dans son application.
 
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -115,7 +117,7 @@ export function App() {
       }
       setBusy(`Ouverture de ${fileName(path)}…`);
       try {
-        if (appRef.current === "pdf") {
+        if (appRef.current === "pdf" || (appRef.current === "office" && /\.pdf$/i.test(path))) {
           const info = await openPdf(path);
           setTabs((ts) => [...ts, { info, path, modified: false, lost: false }]);
           setActive(info.doc);
@@ -167,7 +169,7 @@ export function App() {
       if (!files.length) return;
       try {
         const mine = await routeFiles(files);
-        if (mine.length < files.length) notify(appRef.current === "office" ? "Ouverture dans l'application du document…" : "Document ouvert dans son application.");
+        if (mine.length < files.length) notify("Document ouvert dans son application.");
         for (const f of mine) await openPath(f);
       } catch (e) {
         notify(`${e}`, "error");
@@ -181,11 +183,16 @@ export function App() {
     if (path) await openFiles(Array.isArray(path) ? path : [path]);
   }, [openFiles]);
 
+  const openPdfDialog = useCallback(async () => {
+    const path = await open({ multiple: true, filters: [{ name: "Documents PDF", extensions: ["pdf"] }] });
+    if (path) await openFiles(Array.isArray(path) ? path : [path]);
+  }, [openFiles]);
+
   const createNew = useCallback(
     async (kind: NewKind) => {
       try {
-        if (APP_DOC[appRef.current] !== kind) {
-          // Un autre type : son application (AuxiOffice n'ouvre pas de document).
+        if (appRef.current !== "office" && APP_DOC[appRef.current] !== kind) {
+          // Un autre type : son application (AuxiOffice, lui, ouvre tout).
           await launchApp(APP_FOR_DOC[kind], [], true);
           notify(`Ouverture d'${APP_NAMES[APP_FOR_DOC[kind]]}…`);
           return;
@@ -218,8 +225,8 @@ export function App() {
       off = await onLaunch(() => void handle());
       const first = await takeLaunches();
       for (const l of first) await runLaunch(l);
-      // Moteur de réserve, une fois l'interface affichée (pas dans le gestionnaire).
-      if (info.kind !== "office" && info.kind !== "pdf") window.setTimeout(() => void warmEngine(), first.length ? 4000 : 800);
+      // Moteur de réserve, une fois l'interface affichée (pas dans AuxiPDF).
+      if (info.kind !== "pdf") window.setTimeout(() => void warmEngine(), first.length ? 4000 : 800);
     })();
     return () => off?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -473,7 +480,6 @@ export function App() {
 
   return (
     <div className={`app app-${app}`}>
-      {app !== "office" && (
       <div className="tabbar" role="tablist">
         <div role="tab" className={`tab tab-home ${active === 0 ? "active" : ""}`} onClick={() => setActive(0)} aria-selected={active === 0}>
           <img src={`/icons/auxi${app}.svg`} alt="" />
@@ -506,10 +512,9 @@ export function App() {
           </div>
         )}
       </div>
-      )}
 
       <div className="content">
-        {active === 0 && <Home app={app} recents={recents} onNew={createNew} onOpen={openDialog} onOpenPath={(p) => void openFiles([p])} onAuxiCorrect={() => setAcOptions(true)} />}
+        {active === 0 && <Home app={app} recents={recents} onNew={createNew} onOpen={openDialog} onOpenPdf={() => void openPdfDialog()} onOpenPath={(p) => void openFiles([p])} onAuxiCorrect={() => setAcOptions(true)} />}
         {tabs.map((t) =>
           t.lost ? (
             active === t.info.doc && (
@@ -590,7 +595,7 @@ export function App() {
             {app === "pdf" ? (
               <p>Affichage des PDF : PDF.js de Mozilla (licence Apache 2.0).</p>
             ) : (
-              <p>Moteur de documents : LibreOffice. LibreOffice est une marque déposée de The Document Foundation.</p>
+              <p>Comprend des logiciels libres, dont LibreOffice (MPL 2.0).</p>
             )}
             <p>© 2026 Projet AuxiNux · office.auxinux.ca</p>
             <button onClick={() => setAbout(false)}>Fermer</button>

@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## Non publié
+
+- **AuxiOffice ouvre tous les documents dans ses onglets** (texte, classeur, présentation,
+  dessin, PDF) au lieu de les confier aux autres applications. AuxiWriter, AuxiSheet…
+  restent lancées par le menu du système et par les documents ouverts depuis le bureau.
+- Interface : le nom de LibreOffice n'apparaît plus (accueil, correction, messages) ; seule
+  la fenêtre « À propos » le crédite. PDF.js n'est plus nommé à l'accueil d'AuxiPDF.
+
 ## 0.2.0-beta.1 — AuxiDraw, AuxiPDF, AuxiText
 
 - **AuxiDraw**, dessin vectoriel et mise en page : dessin vierge Lettre US, formes, lignes,

@@ -9,7 +9,7 @@ Applications (macOS) ou le menu de démarrage (Linux, Windows) :
 
 | Application | Rôle | Formats |
 |---|---|---|
-| **AuxiOffice** | gestionnaire : créer, ouvrir, documents récents ; chaque document part dans son application | — |
+| **AuxiOffice** | la suite dans une fenêtre : tous les types de documents dans ses onglets | tous ceux ci-dessous |
 | **AuxiWriter** | traitement de texte | DOCX, DOCM (macros conservées), DOC, ODT, RTF, TXT ; export PDF |
 | **AuxiSheet** | tableur | XLSX, XLSM (macros conservées), XLS, ODS, CSV ; export PDF |
 | **AuxiPresent** | présentations | PPTX, PPTM, PPT, ODP ; export PDF |

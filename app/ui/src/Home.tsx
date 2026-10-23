@@ -1,4 +1,4 @@
-// Accueil. Dans AuxiOffice (le gestionnaire) : les applications, ouvrir un
+// Accueil. Dans AuxiOffice : créer un document de chaque type, ouvrir un
 // fichier, tous les documents récents. Dans AuxiWriter, AuxiSheet, AuxiPresent
 // ou AuxiDraw : un document vierge, ouvrir, les documents récents de ce type.
 // Dans AuxiPDF : ouvrir et les PDF récents.
@@ -15,6 +15,8 @@ interface Props {
   recents: string[];
   onNew: (kind: NewKind) => void;
   onOpen: () => void;
+  /** AuxiOffice : ouvrir un PDF dans un onglet. */
+  onOpenPdf?: () => void;
   onOpenPath: (path: string) => void;
   onAuxiCorrect: () => void;
 }
@@ -44,7 +46,7 @@ export function recentsFor(app: AppKind, recents: string[]) {
   return recents.filter((p) => (k.exts as readonly string[]).includes(extOf(p)) || (doc === "text" && !others.includes(extOf(p))));
 }
 
-export function Home({ app, recents, onNew, onOpen, onOpenPath, onAuxiCorrect }: Props) {
+export function Home({ app, recents, onNew, onOpen, onOpenPdf, onOpenPath, onAuxiCorrect }: Props) {
   const own = KINDS.find((k) => k.kind === APP_DOC[app]);
   const list = recentsFor(app, recents);
   const [ac, setAc] = useState<AuxiCorrectStatus | null>(null);
@@ -77,7 +79,7 @@ export function Home({ app, recents, onNew, onOpen, onOpenPath, onAuxiCorrect }:
               ),
           )}
           {!own && (
-            <button className="new-card" onClick={() => void launchApp("pdf")}>
+            <button className="new-card" onClick={() => (onOpenPdf ? onOpenPdf() : void launchApp("pdf"))}>
               <img src="/icons/auxipdf.svg" alt="" />
               <span className="label">Lire un PDF</span>
               <span className="app">AuxiPDF</span>
@@ -112,15 +114,10 @@ export function Home({ app, recents, onNew, onOpen, onOpenPath, onAuxiCorrect }:
       </section>
       <footer>
         {APP_NAMES[app]} · <a href="https://office.auxinux.ca" target="_blank" rel="noreferrer">office.auxinux.ca</a> ·{" "}
-        {app === "pdf" ? (
-          "Affichage des PDF : PDF.js (Mozilla)"
-        ) : (
-          <>
-            Moteur de documents : LibreOffice ·{" "}
-            <button className="link" onClick={onAuxiCorrect}>
-              Correction : {ac?.enabledForAuxiOffice ? `AuxiCorrect ${ac.version ?? ""}${ac.options.enabled ? "" : " (désactivé)"}` : "LibreOffice"}
-            </button>
-          </>
+        {app !== "pdf" && (
+          <button className="link" onClick={onAuxiCorrect}>
+            Correction : {ac?.enabledForAuxiOffice ? `AuxiCorrect ${ac.version ?? ""}${ac.options.enabled ? "" : " (désactivé)"}` : "correcteur intégré"}
+          </button>
         )}
       </footer>
     </div>

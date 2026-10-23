@@ -33,14 +33,14 @@ struct Corrector {
 }
 
 impl Corrector {
-    /// Le serveur ne sert qu'à AuxiWriter (LibreOffice ne vérifie la
-    /// grammaire que dans les documents texte).
+    /// Le serveur ne sert qu'aux documents texte (AuxiWriter, et AuxiOffice
+    /// qui les ouvre aussi) : LibreOffice ne vérifie la grammaire que là.
     fn start(data_dir: &Path, kind: AppKind) -> Corrector {
         let shared = auxicorrect::read_shared(&auxicorrect::shared_settings_path());
         let options_file = data_dir.join("auxicorrect-options.json");
         let options = auxicorrect::read_options(&options_file);
         let mut c = Corrector { shared, options_file, checker: None, url: None };
-        if let (true, true, Some(cli)) = (kind == AppKind::Writer, c.shared.enabled, c.shared.cli.clone()) {
+        if let (true, true, Some(cli)) = (matches!(kind, AppKind::Writer | AppKind::Office), c.shared.enabled, c.shared.cli.clone()) {
             let checker = Arc::new(auxicorrect::Checker { cli, options: Mutex::new(options) });
             match auxicorrect::serve(checker.clone()) {
                 Ok(url) => {
@@ -63,7 +63,7 @@ impl Corrector {
     /// Adresse à donner au moteur : documents texte, AuxiCorrect activé des
     /// deux côtés (AuxiCorrect → Intégration, et options d'AuxiOffice).
     fn engine_url(&self, kind: AppKind) -> Option<String> {
-        if kind != AppKind::Writer || !self.options().enabled {
+        if !matches!(kind, AppKind::Writer | AppKind::Office) || !self.options().enabled {
             return None;
         }
         self.url.clone()
@@ -115,7 +115,9 @@ fn prepare_spare(app: &AppHandle) {
             return;
         }
         let profile = state.alloc_slot();
-        let Ok(cfg) = engine_config(&app, profile) else {
+        // La réserve d'AuxiOffice sert à tous les types : sans AuxiCorrect.
+        let kind = app.state::<AppState>().kind;
+        let Ok(cfg) = engine_config(&app, profile, kind == AppKind::Writer) else {
             state.free_slot(profile);
             return;
         };
@@ -144,10 +146,15 @@ fn prepare_spare(app: &AppHandle) {
     });
 }
 
-/// Moteur pour le document `id` : la réserve si elle est prête, sinon un neuf.
-fn take_engine(app: &AppHandle, id: u64) -> Result<(Engine, usize), String> {
+/// Moteur pour le document `id` : la réserve si elle est prête (et réglée
+/// comme il faut pour ce document), sinon un neuf. `text` : document texte
+/// (AuxiCorrect ne vaut que pour eux).
+fn take_engine(app: &AppHandle, id: u64, text: bool) -> Result<(Engine, usize), String> {
     let state = app.state::<Engines>();
-    let spare = state.spare.lock().unwrap().take();
+    let kind = app.state::<AppState>().kind;
+    let grammar = |text: bool| if text { app.state::<Mutex<Corrector>>().lock().unwrap().engine_url(kind) } else { None };
+    let spare_fits = grammar(kind == AppKind::Writer) == grammar(text);
+    let spare = if spare_fits { state.spare.lock().unwrap().take() } else { None };
     if let Some((engine, slot, profile)) = spare {
         if engine.is_alive() {
             slot.store(id, Ordering::Relaxed);
@@ -156,7 +163,7 @@ fn take_engine(app: &AppHandle, id: u64) -> Result<(Engine, usize), String> {
         state.free_slot(profile);
     }
     let profile = state.alloc_slot();
-    let spawned = engine_config(app, profile).and_then(|cfg| {
+    let spawned = engine_config(app, profile, text).and_then(|cfg| {
         let emitter = app.clone();
         Engine::spawn(&cfg, Box::new(move |mut ev| {
             ev["doc"] = json!(id);
@@ -267,13 +274,13 @@ fn dev_platform() -> Option<&'static str> {
     }
 }
 
-fn engine_config(app: &AppHandle, slot: usize) -> Result<EngineConfig, String> {
+fn engine_config(app: &AppHandle, slot: usize, text: bool) -> Result<EngineConfig, String> {
     let Locations { engine_exe, program_dir, .. } = locate()?;
     if !engine_exe.exists() {
         return Err(format!("moteur introuvable : {}", engine_exe.display()));
     }
     if !program_dir.exists() {
-        return Err(format!("LibreOffice introuvable : {}", program_dir.display()));
+        return Err(format!("moteur de documents introuvable : {}", program_dir.display()));
     }
     // Profils propres à chaque application : AuxiWriter et AuxiSheet tournent
     // dans des processus distincts et ne doivent pas se partager un profil.
@@ -282,7 +289,7 @@ fn engine_config(app: &AppHandle, slot: usize) -> Result<EngineConfig, String> {
     let profile_root = data_dir.as_ref().map(|d| d.join("moteur").join(kind.slug()));
     let profile_dir = profile_root.as_ref().map(|d| d.join(format!("profil-{slot}")));
     let log_file = data_dir.as_ref().map(|d| d.join("moteur.log"));
-    let grammar_url = app.state::<Mutex<Corrector>>().lock().unwrap().engine_url(kind);
+    let grammar_url = if text { app.state::<Mutex<Corrector>>().lock().unwrap().engine_url(kind) } else { None };
     Ok(EngineConfig {
         engine_exe,
         program_dir,
@@ -308,7 +315,8 @@ fn user_name() -> String {
 async fn doc_open(app: AppHandle, state: State<'_, Engines>, path: String, ignore_lock: Option<bool>, password: Option<String>) -> Result<Value, String> {
     let id = state.next.fetch_add(1, Ordering::Relaxed) + 1;
     let a = app.clone();
-    let (engine, profile) = tauri::async_runtime::spawn_blocking(move || take_engine(&a, id)).await.map_err(|e| e.to_string())??;
+    let text = AppKind::for_path(&path) == AppKind::Writer;
+    let (engine, profile) = tauri::async_runtime::spawn_blocking(move || take_engine(&a, id, text)).await.map_err(|e| e.to_string())??;
     let engine = Arc::new(engine);
     state.doc_slots.lock().unwrap().insert(id, profile);
     // Préparer déjà le moteur du document suivant.
@@ -627,7 +635,7 @@ fn corrector_status(c: &Corrector, kind: AppKind) -> Value {
         "settingsFile": c.shared.file,
         "running": c.url.is_some(),
         "active": c.engine_url(kind).is_some(),
-        "writerOnly": kind != AppKind::Writer,
+        "writerOnly": !matches!(kind, AppKind::Writer | AppKind::Office),
         "options": c.options(),
     })
 }
@@ -705,15 +713,16 @@ fn launch_app(state: State<'_, AppState>, kind: AppKind, files: Vec<String>, new
 
 /// Répartit des fichiers entre les applications : retourne ceux que celle-ci
 /// ouvre et confie les autres à la bonne (un classeur ouvert depuis
-/// AuxiWriter part dans AuxiSheet ; AuxiOffice confie tout).
+/// AuxiWriter part dans AuxiSheet ; AuxiOffice garde tout).
 #[tauri::command]
 fn route_files(state: State<'_, AppState>, files: Vec<String>) -> Result<Vec<String>, String> {
     let mut mine = Vec::new();
     let mut others: Vec<(AppKind, Vec<String>)> = Vec::new();
     for f in files {
         let k = AppKind::for_path(&f);
-        // AuxiDraw modifie aussi les PDF (« Modifier dans AuxiDraw »).
-        if k == state.kind || (state.kind == AppKind::Draw && k == AppKind::Pdf) {
+        // AuxiOffice ouvre tous les types dans ses onglets ; AuxiDraw modifie
+        // aussi les PDF (« Modifier dans AuxiDraw »).
+        if state.kind == AppKind::Office || k == state.kind || (state.kind == AppKind::Draw && k == AppKind::Pdf) {
             mine.push(f);
         } else if let Some(o) = others.iter_mut().find(|(o, _)| *o == k) {
             o.1.push(f);
