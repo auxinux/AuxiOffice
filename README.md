@@ -36,7 +36,8 @@ AuxiOffice est un **produit propriétaire du Projet AuxiNux**. Son interface et 
 
 Vérifié sous Linux x86_64 ; Mac Apple Silicon : ouverture et édition vérifiées par
 l'utilisateur. L'intégration continue (GitHub Actions, `.github/workflows/ci.yml`) compile et
-teste chaque envoi sous Linux et Windows (avec le vrai moteur LibreOffice) et sous macOS.
+teste chaque envoi sous Linux x86_64 et ARM64 et sous Windows (avec le vrai moteur LibreOffice),
+et sous macOS.
 
 - ouverture, édition, enregistrement et export PDF de documents DOCX, XLSX et PPTX ;
 - **barre de menus** native (Fichier, Édition, Affichage, Insertion, Format, Tableau ou
@@ -75,8 +76,8 @@ Windows (elle passe par la visionneuse du système), paquets d'installation Wind
 
 ## Installer
 
-- **AuxiNuxOS** : `sudo auxi install --deb auxioffice` (la suite, avec AuxiText) ou
-  `sudo auxi install --deb auxitext` (l'éditeur seul).
+- **AuxiNuxOS** (amd64 et ARM64) : `sudo auxi install --deb auxioffice` (la suite, avec
+  AuxiText) ou `sudo auxi install --deb auxitext` (l'éditeur seul).
 - **Windows 11** et **macOS** : cloner le dépôt puis lancer `scripts/install-apps.sh` (dans Git
   Bash sous Windows). Prérequis et détails : [BUILD.md](BUILD.md#installer).
 

@@ -1,35 +1,53 @@
 #!/bin/sh
-# Paquets Debian (amd64, Debian 13 / AuxiNuxOS) :
+# Paquets Debian (Debian 13 / AuxiNuxOS ; amd64 ou arm64, selon la machine) :
 #   auxitext        éditeur de texte, installable seul (sans LibreOffice) ;
 #   auxioffice      la suite (AuxiOffice, AuxiWriter, AuxiSheet, AuxiPresent,
 #                   AuxiDraw, AuxiPDF) avec son moteur LibreOffice ; installe
 #                   aussi auxitext ;
 #   auxinux-office  paquet de transition (ancien nom) qui installe auxioffice.
 #
-#   scripts/build-deb.sh            → target/deb/*.deb
+#   scripts/build-deb.sh              → target/deb/*.deb (les trois paquets)
+#   scripts/build-deb.sh --auxitext   → auxitext seul (moteur inutile)
 #
-# Prérequis : moteur (scripts/fetch-engine.sh), Rust, Node.js, dpkg-deb, fakeroot.
+# Compilation native : sur un PC x86_64, paquets amd64 ; sur une machine ARM64
+# (aarch64), paquets arm64 avec le moteur LibreOffice pour ARM64.
+# Prérequis : moteur (scripts/fetch-engine.sh, sauf --auxitext), Rust,
+# Node.js, dpkg-deb, fakeroot.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
 # 0.2.0-beta.1 → 0.2.0~beta.1 : pour dpkg, une bêta précède la version finale.
 VERSION=$(sed 's/-\(alpha\|beta\|rc\)/~\1/' VERSION | tr -d '\n')
-ARCH=amd64
+case "$(uname -m)" in
+  x86_64) ARCH=amd64 PLATFORM=linux-x86_64 ;;
+  aarch64|arm64) ARCH=arm64 PLATFORM=linux-aarch64 ;;
+  *) echo "Architecture non prise en charge : $(uname -m)" >&2; exit 1 ;;
+esac
+TEXT_ONLY=""
+[ "${1:-}" = "--auxitext" ] && TEXT_ONLY=1
 OUT="$ROOT/target/deb"
 WORK="$ROOT/target/deb-work"
 MAINTAINER="AuxiNux <repo@auxinux.ca>"
 HOMEPAGE="https://office.auxinux.ca"
-ENGINE=$(cat .engine/linux-x86_64/program-dir 2>/dev/null || true)
-[ -n "$ENGINE" ] && [ -d "$ENGINE" ] || { echo "Moteur absent : lancer d'abord scripts/fetch-engine.sh" >&2; exit 1; }
-LO_ROOT=$(dirname "$ENGINE")
+if [ -z "$TEXT_ONLY" ]; then
+  ENGINE=$(cat ".engine/$PLATFORM/program-dir" 2>/dev/null || true)
+  [ -n "$ENGINE" ] && [ -d "$ENGINE" ] || { echo "Moteur absent ($PLATFORM) : lancer d'abord scripts/fetch-engine.sh" >&2; exit 1; }
+  LO_ROOT=$(dirname "$ENGINE")
+fi
 
-echo "== Interfaces"
-for dir in app text; do
+echo "== Interfaces ($ARCH)"
+DIRS="app text"
+[ -n "$TEXT_ONLY" ] && DIRS=text
+for dir in $DIRS; do
   (cd "$dir" && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npm run --silent build)
 done
-echo "== Compilation (release)"
-cargo build --release -p auxi-engine -p auxioffice -p auxitext --features auxioffice/custom-protocol,auxitext/custom-protocol
+echo "== Compilation (release, $ARCH)"
+if [ -n "$TEXT_ONLY" ]; then
+  cargo build --release -p auxitext --features auxitext/custom-protocol
+else
+  cargo build --release -p auxi-engine -p auxioffice -p auxitext --features auxioffice/custom-protocol,auxitext/custom-protocol
+fi
 
 rm -rf "$WORK"
 mkdir -p "$OUT" "$WORK"
@@ -96,6 +114,10 @@ control "$T" auxitext "libc6 (>= 2.41), libwebkit2gtk-4.1-0, libgtk-3-0t64" \
   "Replaces: auxinux-office (<< 0.2)" "Breaks: auxinux-office (<< 0.2)"
 postinst "$T"
 build "$T" auxitext "$ARCH"
+if [ -n "$TEXT_ONLY" ]; then
+  echo "Paquet prêt dans $OUT"
+  exit 0
+fi
 
 # --- auxioffice ------------------------------------------------------------
 echo "== auxioffice"

@@ -10,6 +10,7 @@ cd "$ROOT"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64) PLATFORM=linux-x86_64 ;;
+  Linux-aarch64|Linux-arm64) PLATFORM=linux-aarch64 ;;
   Darwin-arm64) PLATFORM=macos-aarch64 ;;
   MINGW*-x86_64|MSYS*-x86_64|CYGWIN*-x86_64) PLATFORM=windows-x86_64 ;;
   *) echo "Plateforme non prise en charge : $(uname -s) $(uname -m)" >&2; exit 1 ;;

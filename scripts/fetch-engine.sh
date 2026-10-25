@@ -3,7 +3,7 @@
 # engine/libreoffice.lock.json, dans .engine/<plateforme>/.
 # Chaque fichier est vérifié par SHA-256. Aucun droit administrateur requis.
 #
-# Plateformes : Linux x86_64 (paquets .deb extraits), Windows x86_64 (MSI
+# Plateformes : Linux x86_64 et ARM64 (paquets .deb extraits), Windows x86_64 (MSI
 # officiel extrait par une installation administrative, sous Git Bash).
 # Sous macOS, le moteur se compile : scripts/build-engine-macos.sh.
 #
@@ -16,6 +16,7 @@ CACHE="$ROOT/.engine/cache"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64) PLATFORM=linux-x86_64 ;;
+  Linux-aarch64|Linux-arm64) PLATFORM=linux-aarch64 ;;
   Darwin-arm64) PLATFORM=macos-aarch64 ;;
   MINGW*-x86_64|MSYS*-x86_64|CYGWIN*-x86_64) PLATFORM=windows-x86_64 ;;
   *) echo "Plateforme non prise en charge : $(uname -s) $(uname -m)" >&2; exit 1 ;;

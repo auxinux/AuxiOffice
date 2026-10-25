@@ -13,8 +13,14 @@ sudo auxi install --deb auxitext     # AuxiText seul (sans LibreOffice ni la sui
 ```
 
 (`apt install` sur une Debian 13 qui a ce dépôt.) `auxinux-office`, l'ancien nom, est un paquet
-de transition qui installe `auxioffice`. Construire ces paquets : `scripts/build-deb.sh`
-(dans `target/deb/`).
+de transition qui installe `auxioffice`.
+
+Construire ces paquets : `scripts/build-deb.sh` (dans `target/deb/`), sur la machine de
+l'architecture visée — **amd64** sur un PC x86_64, **arm64** sur une machine ARM64 (le moteur
+LibreOffice ARM64 officiel est téléchargé par `scripts/fetch-engine.sh`).
+`scripts/build-deb.sh --auxitext` ne construit qu'AuxiText (sans moteur). Sans machine ARM64 :
+GitHub → Actions → « Paquets Debian » → Run workflow construit les paquets amd64 et arm64 dans
+un conteneur Debian 13 et les joint au lancement (`.github/workflows/paquets-debian.yml`).
 
 ### Windows 11
 
@@ -92,7 +98,7 @@ Windows : WebView2 (fourni avec Windows 10/11). macOS : Xcode (outils en ligne d
 ## Moteur LibreOffice
 
 ```sh
-scripts/fetch-engine.sh      # Linux x86_64 → .engine/linux-x86_64/ ; Windows (Git Bash) → .engine/windows-x86_64/
+scripts/fetch-engine.sh      # Linux x86_64 ou ARM64 → .engine/linux-x86_64/ ou linux-aarch64/ ; Windows (Git Bash) → .engine/windows-x86_64/
 scripts/build-engine-macos.sh  # Mac Apple Silicon → .engine/macos-aarch64/ (compilation)
 ```
 
@@ -208,7 +214,7 @@ Les modèles vierges (`app/src-tauri/templates`) se régénèrent avec
 
 `.github/workflows/ci.yml` tourne à chaque envoi sur GitHub :
 
-- **Linux x86_64** et **Windows x86_64** : moteur LibreOffice épinglé
+- **Linux x86_64**, **Linux ARM64** et **Windows x86_64** : moteur LibreOffice épinglé
   (`scripts/fetch-engine.sh`, mis en cache), `scripts/test.sh` complet (interfaces, coque,
   moteur avec de vrais documents), Clippy, compilation de production ; sous Windows, en plus,
   `scripts/install-apps.sh` et lancement d'AuxiWriter installé avec un document ;

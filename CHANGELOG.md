@@ -5,6 +5,10 @@
 - **AuxiOffice ouvre tous les documents dans ses onglets** (texte, classeur, présentation,
   dessin, PDF) au lieu de les confier aux autres applications. AuxiWriter, AuxiSheet…
   restent lancées par le menu du système et par les documents ouverts depuis le bureau.
+- **Linux ARM64** : moteur LibreOffice ARM64 officiel épinglé (`fetch-engine.sh`),
+  `build-deb.sh` produit des paquets arm64 sur une machine ARM64 (`--auxitext` : AuxiText
+  seul) ; tests complets sur la machine ARM64 de GitHub ; workflow manuel « Paquets
+  Debian » (amd64 et arm64, conteneur Debian 13).
 - **AuxiCorrect dans AuxiText** : quand AuxiCorrect est installé et AuxiText activé dans son
   onglet Intégration (`auxicorrect.json`), le français des textes et du Markdown est corrigé
   pendant la frappe : soulignements, message, suggestions et « Ignorer » au survol ;

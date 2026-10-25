@@ -268,6 +268,7 @@ fn locate() -> Result<Locations, String> {
 fn dev_platform() -> Option<&'static str> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => Some("linux-x86_64"),
+        ("linux", "aarch64") => Some("linux-aarch64"),
         ("macos", "aarch64") => Some("macos-aarch64"),
         ("windows", "x86_64") => Some("windows-x86_64"),
         _ => None,

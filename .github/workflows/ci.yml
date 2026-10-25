@@ -2,8 +2,8 @@
 # virtuelles de GitHub (Linux, macOS, Windows). Aucun paquet n'est construit
 # ici : les paquets sont faits sur chaque système par l'équipe.
 #
-# Linux et Windows : tests complets, y compris ceux du moteur avec le vrai
-# LibreOffice (scripts/fetch-engine.sh). macOS : compilation et tests sans
+# Linux (x86_64 et ARM64) et Windows : tests complets, y compris ceux du
+# moteur avec le vrai LibreOffice (scripts/fetch-engine.sh). macOS : compilation et tests sans
 # moteur (le moteur macOS se compile en 1 à 3 h).
 name: CI
 
@@ -25,6 +25,42 @@ jobs:
   linux:
     name: Linux x86_64 (tests complets)
     runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Paquets système
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev \
+            libxml2-utils python3-pip fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea
+          python3 -m pip install --user --break-system-packages python-docx openpyxl python-pptx Pillow
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Cache du moteur LibreOffice
+        uses: actions/cache@v4
+        with:
+          path: .engine/cache
+          key: lo-${{ runner.os }}-${{ hashFiles('engine/libreoffice.lock.json') }}
+      - name: Moteur LibreOffice
+        run: scripts/fetch-engine.sh
+      - name: Interfaces (npm)
+        run: scripts/ci-npm.sh
+      - name: Tests
+        run: PYTHON=python3 scripts/test.sh
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D clippy::correctness -D clippy::suspicious
+      - name: Compilation de production
+        run: cargo build --release --workspace --features auxioffice/custom-protocol
+
+  linux-arm64:
+    name: Linux ARM64 (tests complets)
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
