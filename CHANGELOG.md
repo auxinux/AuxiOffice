@@ -1,6 +1,6 @@
 # Journal des modifications
 
-## Non publié
+## 0.2.0-beta.2
 
 - **AuxiOffice ouvre tous les documents dans ses onglets** (texte, classeur, présentation,
   dessin, PDF) au lieu de les confier aux autres applications. AuxiWriter, AuxiSheet…
