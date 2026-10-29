@@ -47,6 +47,28 @@ un conteneur Debian 13 et les joint au lancement (`.github/workflows/paquets-deb
 3. Mettre à jour : `git pull` puis `scripts/install-apps.sh` ; retirer :
    `scripts/install-apps.sh --remove`.
 
+#### Exécutables et installateurs Windows
+
+`scripts/build-win.sh` (Git Bash) ou `scripts\build-win.ps1` (PowerShell, qui lance le
+premier dans le Bash de Git pour Windows) compile sans rien installer dans Windows :
+
+| Git Bash | PowerShell | Résultat dans `target\windows\` |
+|---|---|---|
+| `scripts/build-win.sh` | `scripts\build-win.ps1` | `AuxiOffice\` (AuxiOffice.exe, AuxiWriter.exe… avec le moteur dans `engine\`) et `AuxiText\AuxiText.exe` |
+| `scripts/build-win.sh --auxitext` | `scripts\build-win.ps1 -AuxiText` | `AuxiText\` seulement (sans moteur, rapide) |
+| `scripts/build-win.sh --installer` | `scripts\build-win.ps1 -Installer` | les deux dossiers, plus `AuxiOffice-<version>-windows-x64-setup.exe` et `AuxiText-<version>-windows-x64-setup.exe` |
+| `scripts/build-win.sh --auxitext --installer` | `scripts\build-win.ps1 -AuxiText -Installer` | AuxiText et son installateur |
+
+Les dossiers se lancent tels quels (copie possible sur une clé USB). Les installateurs
+(Inno Setup, scripts `scripts/windows/*.iss`) installent pour l'utilisateur courant, sans
+droits d'administrateur, au même endroit et avec les mêmes raccourcis et entrées « Ouvrir
+avec » que `scripts/install-apps.sh` ; on les retire dans Paramètres → Applications.
+L'installateur d'AuxiOffice n'inclut pas AuxiText : chacun a le sien.
+
+`--installer` demande Inno Setup 6 : `winget install JRSoftware.InnoSetup` (ou
+`ISCC_EXE=<chemin de ISCC.exe>`). Si PowerShell refuse le script :
+`powershell -ExecutionPolicy Bypass -File scripts\build-win.ps1 -Installer`.
+
 ### macOS (Apple Silicon)
 
 1. Outils Apple : `xcode-select --install` ou, avec Xcode déjà installé ailleurs,

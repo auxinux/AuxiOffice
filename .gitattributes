@@ -1,0 +1,3 @@
+# Les scripts shell gardent des fins de ligne LF, même clonés sous Windows
+# (Git pour Windows convertit en CRLF par défaut, ce que Bash refuse).
+*.sh text eol=lf

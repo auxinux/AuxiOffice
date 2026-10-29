@@ -148,6 +148,21 @@ jobs:
           D="$(cygpath -u "$APPDATA")/ca.auxinux.office"
           cat "$D/moteur.log" "$D/interface.log" 2>/dev/null | tail -30 || true
           ! grep -qi "erreur\|error" "$D/interface.log" 2>/dev/null
+      - name: Exécutables (build-win.sh) et installateur d'AuxiText
+        run: |
+          scripts/build-win.sh
+          test -f target/windows/AuxiOffice/AuxiWriter.exe
+          test -f target/windows/AuxiOffice/auxi-engine.exe
+          test -f target/windows/AuxiOffice/engine/program/soffice.exe
+          test -f target/windows/AuxiText/AuxiText.exe
+          [ -f "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" ] || choco install innosetup -y --no-progress
+          scripts/build-win.sh --auxitext --installer
+          setup=$(ls target/windows/AuxiText-*-windows-x64-setup.exe)
+          "$setup" //VERYSILENT //SUPPRESSMSGBOXES //NORESTART
+          P="$(cygpath -u "$LOCALAPPDATA")/Programs"
+          test -f "$P/AuxiText/AuxiText.exe"
+          test -f "$P/AuxiText/unins000.exe"
+          reg query 'HKCU\Software\Classes\.md\OpenWithProgids' | grep -q AuxiText.Document
       - name: Journaux (en cas d'échec)
         if: failure()
         run: |

@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## Non publié
+
+- **Windows : `scripts/build-win.sh` et `scripts\build-win.ps1`** compilent les exécutables
+  dans `target\windows\` (la suite et son moteur, AuxiText) ; `--auxitext` / `-AuxiText` :
+  AuxiText seul ; `--installer` / `-Installer` : en plus, les installateurs Inno Setup
+  d'AuxiOffice et d'AuxiText (pour l'utilisateur, sans droits d'administrateur).
+- `.gitattributes` : les scripts `.sh` gardent leurs fins de ligne LF dans un clone Windows.
+
 ## 0.2.0-beta.2
 
 - **AuxiOffice ouvre tous les documents dans ses onglets** (texte, classeur, présentation,
