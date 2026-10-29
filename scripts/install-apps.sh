@@ -169,25 +169,7 @@ TEXT_BIN="$ROOT/target/release/auxitext$EXE"
 
 # --- macOS -------------------------------------------------------------------
 
-doc_types() {
-  # $1 = writer|sheet|present|draw|pdf → CFBundleDocumentTypes
-  role=Editor
-  case $1 in
-    writer) label="Document texte"; utis="org.openxmlformats.wordprocessingml.document org.openxmlformats.wordprocessingml.document.macroenabled com.microsoft.word.doc org.oasis-open.opendocument.text public.rtf org.openxmlformats.wordprocessingml.template" ;;
-    sheet) label="Classeur"; utis="org.openxmlformats.spreadsheetml.sheet com.microsoft.excel.xls org.oasis-open.opendocument.spreadsheet public.comma-separated-values-text org.openxmlformats.spreadsheetml.sheet.macroenabled" ;;
-    present) label="Présentation"; utis="org.openxmlformats.presentationml.presentation org.openxmlformats.presentationml.presentation.macroenabled com.microsoft.powerpoint.ppt org.oasis-open.opendocument.presentation org.openxmlformats.presentationml.slideshow" ;;
-    draw) label="Dessin"; utis="org.oasis-open.opendocument.graphics org.oasis-open.opendocument.graphics-template com.microsoft.visio.drawing" ;;
-    pdf) label="Document PDF"; role=Viewer; utis="com.adobe.pdf" ;;
-    *) return 0 ;;
-  esac
-  printf '  <key>CFBundleDocumentTypes</key>\n  <array>\n    <dict>\n'
-  printf '      <key>CFBundleTypeName</key><string>%s</string>\n' "$label"
-  printf '      <key>CFBundleTypeRole</key><string>%s</string>\n' "$role"
-  printf '      <key>LSHandlerRank</key><string>Alternate</string>\n'
-  printf '      <key>LSItemContentTypes</key>\n      <array>\n'
-  for u in $utis; do printf '        <string>%s</string>\n' "$u"; done
-  printf '      </array>\n    </dict>\n  </array>\n'
-}
+. "$ROOT/scripts/lib/macos-apps.sh"
 
 install_macos() {
   version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
@@ -196,96 +178,15 @@ install_macos() {
     n=$(name "$a")
     app="$DEST/$n.app"
     say "$n → $app"
-    rm -rf "$app"
-    mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-    cp "$BIN" "$app/Contents/MacOS/$n"
+    mac_app "$a" "$DEST" "$BIN" "$version"
     # Moteur, LibreOffice et modèles : ceux du dépôt.
     echo "$ROOT" > "$app/Contents/Resources/dev-root"
-    # Icône : jeu de tailles → .icns
-    set_dir=$(mktemp -d)/$n.iconset
-    mkdir -p "$set_dir"
-    src="$ROOT/app/src-tauri/icons/macos/auxi$a.png"
-    for s in 16 32 128 256 512; do
-      sips -z $s $s "$src" --out "$set_dir/icon_${s}x${s}.png" >/dev/null
-      sips -z $((s * 2)) $((s * 2)) "$src" --out "$set_dir/icon_${s}x${s}@2x.png" >/dev/null
-    done
-    iconutil -c icns "$set_dir" -o "$app/Contents/Resources/$n.icns"
-    rm -rf "$(dirname "$set_dir")"
-    cat > "$app/Contents/Info.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleName</key><string>$n</string>
-  <key>CFBundleDisplayName</key><string>$n</string>
-  <key>CFBundleIdentifier</key><string>ca.auxinux.$a</string>
-  <key>CFBundleExecutable</key><string>$n</string>
-  <key>CFBundleIconFile</key><string>$n</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>$version</string>
-  <key>CFBundleVersion</key><string>$version</string>
-  <key>CFBundleDevelopmentRegion</key><string>fr</string>
-  <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
-  <key>LSMinimumSystemVersion</key><string>11.0</string>
-  <key>NSHighResolutionCapable</key><true/>
-$(doc_types "$a")
-</dict>
-</plist>
-PLIST
     codesign --force -s - "$app" >/dev/null 2>&1 || echo "  (signature locale impossible : l'application peut demander une confirmation au premier lancement)"
   done
   # AuxiText : application autonome (son propre exécutable).
   app="$DEST/AuxiText.app"
   say "AuxiText → $app"
-  rm -rf "$app"
-  mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-  cp "$TEXT_BIN" "$app/Contents/MacOS/AuxiText"
-  set_dir=$(mktemp -d)/AuxiText.iconset
-  mkdir -p "$set_dir"
-  for s in 16 32 128 256 512; do
-    sips -z $s $s "$ROOT/branding/generated/png/512x512/auxitext.png" --out "$set_dir/icon_${s}x${s}.png" >/dev/null
-    sips -z $((s * 2)) $((s * 2)) "$ROOT/branding/generated/png/512x512/auxitext.png" --out "$set_dir/icon_${s}x${s}@2x.png" >/dev/null
-  done
-  iconutil -c icns "$set_dir" -o "$app/Contents/Resources/AuxiText.icns"
-  rm -rf "$(dirname "$set_dir")"
-  cat > "$app/Contents/Info.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleName</key><string>AuxiText</string>
-  <key>CFBundleDisplayName</key><string>AuxiText</string>
-  <key>CFBundleIdentifier</key><string>ca.auxinux.text</string>
-  <key>CFBundleExecutable</key><string>AuxiText</string>
-  <key>CFBundleIconFile</key><string>AuxiText</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>$version</string>
-  <key>CFBundleVersion</key><string>$version</string>
-  <key>CFBundleDevelopmentRegion</key><string>fr</string>
-  <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
-  <key>LSMinimumSystemVersion</key><string>11.0</string>
-  <key>NSHighResolutionCapable</key><true/>
-  <key>CFBundleDocumentTypes</key>
-  <array>
-    <dict>
-      <key>CFBundleTypeName</key><string>Texte</string>
-      <key>CFBundleTypeRole</key><string>Editor</string>
-      <key>LSHandlerRank</key><string>Alternate</string>
-      <key>LSItemContentTypes</key>
-      <array>
-        <string>public.plain-text</string>
-        <string>public.source-code</string>
-        <string>public.script</string>
-        <string>public.json</string>
-        <string>public.xml</string>
-        <string>net.daringfireball.markdown</string>
-        <string>public.log</string>
-      </array>
-    </dict>
-  </array>
-</dict>
-</plist>
-PLIST
+  mac_text_app "$DEST" "$TEXT_BIN" "$version"
   codesign --force -s - "$app" >/dev/null 2>&1 || true
   LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
   for a in $APPS; do [ -x "$LSREG" ] && "$LSREG" -f "$DEST/$(name "$a").app" || true; done

@@ -149,6 +149,8 @@ jobs:
           cat "$D/moteur.log" "$D/interface.log" 2>/dev/null | tail -30 || true
           ! grep -qi "erreur\|error" "$D/interface.log" 2>/dev/null
       - name: Exécutables (build-win.sh) et installateur d'AuxiText
+        # Indépendant des tests : s'exécute même si une étape précédente a échoué.
+        if: ${{ !cancelled() }}
         run: |
           scripts/build-win.sh
           test -f target/windows/AuxiOffice/AuxiWriter.exe
@@ -199,3 +201,13 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D clippy::correctness -D clippy::suspicious
       - name: Compilation de production
         run: cargo build --release --workspace --features auxioffice/custom-protocol
+      - name: Image disque d'AuxiText (build.sh --auxitext --installer)
+        run: |
+          scripts/build.sh --auxitext --installer
+          dmg=$(ls target/macos/AuxiText-*-macos-arm64.dmg)
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg"
+          test -x "$mnt/AuxiText.app/Contents/MacOS/AuxiText"
+          test -L "$mnt/Applications"
+          codesign --verify --deep --verbose "$mnt/AuxiText.app"
+          hdiutil detach "$mnt"

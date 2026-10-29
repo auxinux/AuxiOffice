@@ -1,6 +1,8 @@
 ﻿; Installateur Windows d'AuxiOffice (Inno Setup 6), compilé par scripts/build-win.sh --installer.
 ; Définitions passées par le script : AppVersion, NumVersion, RepoDir, SourceDir
-; (target\windows\AuxiOffice) et RegistryFile (entrées « Ouvrir avec » générées).
+; (target\windows\AuxiOffice), RegistryFile (entrées « Ouvrir avec » générées) et
+; AuxiTextSetup (installateur d'AuxiText, embarqué et lancé sans fenêtre : AuxiText
+; reste une application à part, désinstallée séparément).
 ; Installation pour l'utilisateur courant, sans droits d'administrateur, au même endroit
 ; que scripts/install-apps.sh : %LOCALAPPDATA%\Programs\AuxiOffice.
 
@@ -35,6 +37,7 @@ WizardStyle=modern
 Name: "fr"; MessagesFile: "compiler:Languages\French.isl"
 
 [Tasks]
+Name: "auxitext"; Description: "Installer aussi AuxiText (éditeur de texte)"; GroupDescription: "Applications :"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [InstallDelete]
@@ -43,6 +46,7 @@ Type: filesandordirs; Name: "{app}\engine"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#AuxiTextSetup}"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: auxitext
 
 [Icons]
 Name: "{group}\AuxiOffice"; Filename: "{app}\AuxiOffice.exe"; IconFilename: "{app}\icons\auxioffice.ico"; WorkingDir: "{userdocs}"
@@ -57,4 +61,5 @@ Name: "{autodesktop}\AuxiOffice"; Filename: "{app}\AuxiOffice.exe"; IconFilename
 #include RegistryFile
 
 [Run]
+Filename: "{tmp}\{#ExtractFileName(AuxiTextSetup)}"; Parameters: "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART"; StatusMsg: "Installation d'AuxiText…"; Tasks: auxitext; Flags: waituntilterminated
 Filename: "{app}\AuxiOffice.exe"; Description: "{cm:LaunchProgram,AuxiOffice}"; Flags: nowait postinstall skipifsilent

@@ -2,10 +2,13 @@
 
 ## Non publié
 
-- **Windows : `scripts/build-win.sh` et `scripts\build-win.ps1`** compilent les exécutables
-  dans `target\windows\` (la suite et son moteur, AuxiText) ; `--auxitext` / `-AuxiText` :
-  AuxiText seul ; `--installer` / `-Installer` : en plus, les installateurs Inno Setup
-  d'AuxiOffice et d'AuxiText (pour l'utilisateur, sans droits d'administrateur).
+- **Installateurs pour les trois systèmes, par un seul script** : `scripts/build.sh` (Git Bash,
+  Terminal) ou `scripts/build.ps1` (PowerShell) ; `--auxitext` / `-AuxiText` : AuxiText seul ;
+  `--installer` / `-Installer` : les installateurs. Windows : installateurs Inno Setup
+  d'AuxiOffice (qui installe aussi AuxiText) et d'AuxiText, pour l'utilisateur, sans droits
+  d'administrateur (`scripts/build-win.sh`). macOS : applications autonomes (moteur dans
+  AuxiOffice.app) et images disque `.dmg` (`scripts/build-mac.sh`). Linux : paquets `.deb`
+  (`scripts/build-deb.sh`).
 - `.gitattributes` : les scripts `.sh` gardent leurs fins de ligne LF dans un clone Windows.
 
 ## 0.2.0-beta.2

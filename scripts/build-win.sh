@@ -6,7 +6,8 @@
 #                                                  et son moteur) et target/windows/AuxiText/
 #   scripts/build-win.sh --auxitext              → AuxiText seul (moteur inutile)
 #   scripts/build-win.sh --installer             → les deux, plus leurs installateurs
-#                                                  target/windows/*-setup.exe
+#                                                  target/windows/*-setup.exe (celui
+#                                                  d'AuxiOffice installe aussi AuxiText)
 #   scripts/build-win.sh --auxitext --installer  → AuxiText et son installateur
 #   scripts/build-win.sh --help                  → cette aide (aussi -h, -help)
 #
@@ -35,7 +36,7 @@ for arg in "$@"; do
   case $(printf '%s' "$arg" | tr '[:upper:]' '[:lower:]') in
     --auxitext|-auxitext) TEXT_ONLY=1 ;;
     --installer|-installer|--installateur|-installateur) INSTALLER=1 ;;
-    -h|--help|-help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help|-help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "option inconnue : $arg (voir scripts/build-win.sh --help)" ;;
   esac
 done
@@ -158,15 +159,17 @@ progid() {
   done
 }
 
-# iscc <script .iss> <dossier source> <fichier [Registry] généré>
+# iscc <script .iss> <dossier source> <fichier [Registry] généré> [/Dnom=valeur…]
 iscc() {
-  say "Installateur : $(basename "$1" .iss)"
+  iss=$1 src=$2 reg=$3
+  shift 3
+  say "Installateur : $(basename "$iss" .iss)"
   # MSYS2_ARG_CONV_EXCL : les options /D… ne doivent pas être prises pour des chemins.
   MSYS2_ARG_CONV_EXCL='*' "$ISCC" /Q \
     "/DAppVersion=$VERSION" "/DNumVersion=$NUM_VERSION" \
-    "/DRepoDir=$(cygpath -w "$ROOT")" "/DSourceDir=$(cygpath -w "$2")" \
-    "/DRegistryFile=$(cygpath -w "$3")" "/O$(cygpath -w "$OUT")" \
-    "$(cygpath -w "$1")"
+    "/DRepoDir=$(cygpath -w "$ROOT")" "/DSourceDir=$(cygpath -w "$src")" \
+    "/DRegistryFile=$(cygpath -w "$reg")" "/O$(cygpath -w "$OUT")" \
+    "$@" "$(cygpath -w "$iss")"
 }
 
 # shellcheck disable=SC2046 # une extension par argument
@@ -181,7 +184,10 @@ if [ -z "$TEXT_ONLY" ]; then
     # shellcheck disable=SC2046
     progid "AuxiOffice.$n" "Document $n" "$n.exe" "icons\\auxi$a.ico" $(win_exts "$a") >> "$OUT/registre-auxioffice.iss"
   done
-  iscc scripts/windows/auxioffice.iss "$OUT/AuxiOffice" "$OUT/registre-auxioffice.iss"
+  # L'installateur d'AuxiOffice embarque celui d'AuxiText et le lance : AuxiText
+  # reste une application à part (mise à jour et désinstallation séparées).
+  iscc scripts/windows/auxioffice.iss "$OUT/AuxiOffice" "$OUT/registre-auxioffice.iss" \
+    "/DAuxiTextSetup=$(cygpath -w "$OUT/AuxiText-$VERSION-windows-x64-setup.exe")"
 fi
 
 say "Terminé"
