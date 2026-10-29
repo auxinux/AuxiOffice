@@ -8,6 +8,7 @@
 #   scripts/build-win.sh --installer             → les deux, plus leurs installateurs
 #                                                  target/windows/*-setup.exe
 #   scripts/build-win.sh --auxitext --installer  → AuxiText et son installateur
+#   scripts/build-win.sh --help                  → cette aide (aussi -h, -help)
 #
 # Depuis PowerShell : scripts\build-win.ps1 [-AuxiText] [-Installer] (même chose).
 #
@@ -34,7 +35,7 @@ for arg in "$@"; do
   case $(printf '%s' "$arg" | tr '[:upper:]' '[:lower:]') in
     --auxitext|-auxitext) TEXT_ONLY=1 ;;
     --installer|-installer|--installateur|-installateur) INSTALLER=1 ;;
-    -h|--help|-help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help|-help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "option inconnue : $arg (voir scripts/build-win.sh --help)" ;;
   esac
 done
