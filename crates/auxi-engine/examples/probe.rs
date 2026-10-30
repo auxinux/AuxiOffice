@@ -58,6 +58,7 @@ fn main() {
                 profile_root: None,
                 grammar_url: None,
                 launcher: vec![],
+                grammar_socket: None,
             },
             Box::new(move |e: Value| {
                 if std::env::var_os("PROBE_EVENTS").is_some() {

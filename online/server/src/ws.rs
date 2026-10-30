@@ -4,19 +4,21 @@
 //!
 //! Trame binaire du serveur : numéro de requête (u32, petit-boutiste),
 //! un octet de format (0 : brut, 1 : zlib), puis les octets RGBA.
+//!
+//! Premier message du serveur : `{"event": "hello", "session": …, "docs": […]}`.
+//! Après une coupure, l'interface se reconnecte avec `/ws?resume=<session>` :
+//! ses documents, restés ouverts, reprennent là où ils étaient.
 
 use crate::engines::WsOut;
 use crate::AppState;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde_json::{json, Value};
 use std::io::Write;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-static NEXT_CONN: AtomicU64 = AtomicU64::new(1);
 
 /// L'origine de la page doit être le serveur lui-même (pas de WebSocket
 /// ouvert depuis un autre site avec le témoin de l'utilisateur).
@@ -27,7 +29,12 @@ fn same_origin(headers: &HeaderMap) -> bool {
     !host.is_empty() && origin_host.eq_ignore_ascii_case(host)
 }
 
-pub async fn handler(ws: WebSocketUpgrade, State(app): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+#[derive(serde::Deserialize)]
+pub struct WsQuery {
+    resume: Option<String>,
+}
+
+pub async fn handler(ws: WebSocketUpgrade, State(app): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<WsQuery>) -> Response {
     if !same_origin(&headers) {
         return (StatusCode::FORBIDDEN, "origine refusée").into_response();
     }
@@ -35,14 +42,19 @@ pub async fn handler(ws: WebSocketUpgrade, State(app): State<Arc<AppState>>, hea
     let Some(user) = app.auth.session_user(token.as_deref()) else {
         return (StatusCode::UNAUTHORIZED, "session expirée").into_response();
     };
-    ws.max_message_size(64 * 1024 * 1024).on_upgrade(move |socket| session(socket, app, user.id))
+    ws.max_message_size(64 * 1024 * 1024).on_upgrade(move |socket| session(socket, app, user.id, q.resume))
 }
 
-async fn session(socket: WebSocket, app: Arc<AppState>, user: String) {
+async fn session(socket: WebSocket, app: Arc<AppState>, user: String, resume: Option<String>) {
     use futures_util::{SinkExt, StreamExt};
-    let conn = NEXT_CONN.fetch_add(1, Ordering::Relaxed);
     let (mut sink, mut stream) = socket.split();
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<WsOut>();
+    let (session, docs) = app.pool.attach(&user, resume.as_deref(), tx.clone());
+    let _ = tx.send(WsOut::Text(json!({"event": "hello", "session": session, "docs": docs}).to_string()));
+    // Documents repris : tout redessiner (des tuiles ont pu manquer pendant la coupure).
+    for doc in docs {
+        let _ = tx.send(WsOut::Text(json!({"event": "engine", "payload": {"doc": doc, "event": "callback", "type": 0, "name": "invalidate_tiles", "payload": "EMPTY"}}).to_string()));
+    }
     let writer = tokio::spawn(async move {
         while let Some(m) = rx.recv().await {
             let msg = match m {
@@ -62,12 +74,12 @@ async fn session(socket: WebSocket, app: Arc<AppState>, user: String) {
             continue;
         };
         let Ok(req) = serde_json::from_str::<Value>(&text) else { continue };
-        let (app, user, tx) = (app.clone(), user.clone(), tx.clone());
+        let (app, user, tx, session) = (app.clone(), user.clone(), tx.clone(), session.clone());
         tokio::spawn(async move {
             let id = req.get("id").and_then(Value::as_u64).unwrap_or(0);
             let out = tokio::task::spawn_blocking({
                 let tx = tx.clone();
-                move || handle(&app, &user, conn, tx, req)
+                move || handle(&app, &user, &session, tx, req)
             })
             .await
             .unwrap_or_else(|e| Err(e.to_string()));
@@ -80,8 +92,7 @@ async fn session(socket: WebSocket, app: Arc<AppState>, user: String) {
         });
     }
     writer.abort();
-    let pool = app.pool.clone();
-    let _ = tokio::task::spawn_blocking(move || pool.close_conn(conn)).await;
+    app.pool.detach(&session);
 }
 
 enum Reply {
@@ -89,14 +100,14 @@ enum Reply {
     Bin(Vec<u8>),
 }
 
-fn handle(app: &AppState, user: &str, conn: u64, tx: crate::engines::Outbox, req: Value) -> Result<Reply, String> {
+fn handle(app: &AppState, user: &str, session: &str, tx: crate::engines::Outbox, req: Value) -> Result<Reply, String> {
     let id = req.get("id").and_then(Value::as_u64).unwrap_or(0) as u32;
     let doc = req.get("doc").and_then(Value::as_u64).unwrap_or(0);
     let s = |k: &str| req.get(k).and_then(Value::as_str).map(str::to_owned);
     match req.get("cmd").and_then(Value::as_str).unwrap_or("") {
         "doc_open" => {
             let path = s("path").ok_or("champ path manquant")?;
-            app.pool.open(&app.store, user, conn, tx, &path, s("password").filter(|p| !p.is_empty())).map(Reply::Json)
+            app.pool.open(&app.store, user, session, tx, &path, s("password").filter(|p| !p.is_empty())).map(Reply::Json)
         }
         "doc_call" => app.pool.call(&app.store, user, doc, req.get("req").cloned().unwrap_or(Value::Null)).map(Reply::Json),
         "doc_paint" => {

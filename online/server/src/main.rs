@@ -8,8 +8,26 @@
 mod api;
 mod auth;
 mod engines;
+mod grammar;
 mod storage;
 mod ws;
+
+// AuxiCorrect : les mêmes modules que l'application de bureau (AuxiWriter
+// et AuxiText), qui appellent l'outil `auxicorrect-cli` d'AuxiCorrect.
+#[allow(dead_code)]
+#[path = "../../../app/src-tauri/src/auxicorrect.rs"]
+mod auxicorrect;
+#[allow(dead_code)]
+#[path = "../../../text/src-tauri/src/auxicorrect.rs"]
+mod text_auxicorrect;
+
+/// Pour `auxicorrect::serve` (inutilisé ici) : jeton aléatoire.
+#[allow(dead_code)]
+mod apps {
+    pub fn new_token() -> String {
+        crate::auth::random_token()
+    }
+}
 
 use axum::routing::{get, post};
 use axum::Router;
@@ -35,6 +53,8 @@ pub struct AppState {
     pub pool: Arc<Pool>,
     pub secure_cookies: bool,
     pub quota_mb: u64,
+    /// AuxiCorrect : `auxicorrect-cli` et sa version, s'il est installé.
+    pub auxicorrect: Option<(PathBuf, Option<String>)>,
     downloads: Mutex<HashMap<String, Download>>,
 }
 
@@ -77,9 +97,13 @@ Options (aussi en variables AUXI_ONLINE_<OPTION>, ex. AUXI_ONLINE_LISTEN) :
   --max-docs <n>            documents ouverts par utilisateur (défaut 6)
   --spares <n>              moteurs de réserve démarrés d'avance (défaut 1)
   --idle-minutes <n>        fermeture d'un document inactif (défaut 120)
+  --resume-seconds <n>      après une coupure, délai de reconnexion avant de fermer les
+                            documents de l'onglet (défaut 180)
   --quota-mb <n>            espace par utilisateur (défaut 2048)
   --max-open-mb <n>         taille maximale d'un document ouvert (défaut 200)
   --lang <langue>           langue des moteurs (défaut fr-FR)
+  --auxicorrect-cli <outil> correcteur AuxiCorrect (défaut : celui déclaré par AuxiCorrect dans
+                            ~/.config/auxinux/auxicorrect.json) ; « none » : sans AuxiCorrect
   --engine <fichier>        auxi-engine (sinon AUXI_ENGINE_EXE ou détection)
   --lo-program <dossier>    dossier program/ du moteur de documents (sinon AUXI_LO_PROGRAM)
   --templates <dossier>     modèles vierges (sinon AUXI_TEMPLATES)
@@ -295,6 +319,18 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         eprintln!("auxi-online : ATTENTION, interface introuvable : {} (cd online/web && npm run build)", web.display());
     }
     let sandbox = detect_sandbox(&args.get("sandbox").unwrap_or_else(|| "auto".into()))?;
+    let auxicorrect = match args.get("auxicorrect-cli").as_deref() {
+        Some("none") => None,
+        Some(p) => Some((PathBuf::from(p), None)).filter(|(p, _)| p.is_file()),
+        None => {
+            let shared = auxicorrect::read_shared(&auxicorrect::shared_settings_path());
+            shared.cli.map(|c| (c, shared.version))
+        }
+    };
+    match &auxicorrect {
+        Some((cli, _)) => eprintln!("auxi-online : AuxiCorrect : {}", cli.display()),
+        None => eprintln!("auxi-online : sans AuxiCorrect (correcteur intégré seulement)"),
+    }
     let setup = Setup {
         engine_exe,
         program_dir,
@@ -306,6 +342,8 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         max_per_user: args.num("max-docs", 6).max(1) as usize,
         spares: args.num("spares", 1) as usize,
         max_open_mb: args.num("max-open-mb", 200),
+        auxicorrect: auxicorrect.as_ref().map(|(c, _)| c.clone()),
+        files_root: data.join("files"),
     };
     std::fs::create_dir_all(&setup.root).map_err(|e| e.to_string())?;
     let no_auth = args.on("no-auth");
@@ -320,20 +358,22 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         pool: pool.clone(),
         secure_cookies: args.on("secure-cookies"),
         quota_mb: args.num("quota-mb", 2048),
+        auxicorrect,
         downloads: Mutex::new(HashMap::new()),
     });
     pool.refill();
 
     // Documents inactifs : fermés (leur moteur libéré) après le délai.
     let idle = Duration::from_secs(args.num("idle-minutes", 120) * 60);
+    let grace = Duration::from_secs(args.num("resume-seconds", 180));
     let p = pool.clone();
     tokio::spawn(async move {
-        let mut t = tokio::time::interval(Duration::from_secs(60));
+        let mut t = tokio::time::interval(Duration::from_secs(20));
         loop {
             t.tick().await;
             let p = p.clone();
             let _ = tokio::task::spawn_blocking(move || {
-                p.reap(idle);
+                p.reap(idle, grace);
                 p.refill();
             })
             .await;
@@ -358,6 +398,9 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         .route("/api/kv/{name}", get(api::kv_get).put(api::kv_put))
         .route("/api/download/{token}", get(api::download))
         .route("/api/log", post(api::log))
+        .route("/api/auxicorrect", get(api::auxicorrect_get).put(api::auxicorrect_put))
+        .route("/api/auxicorrect/lookup", post(api::auxicorrect_lookup))
+        .route("/api/auxicorrect/check", post(api::auxicorrect_check))
         .route("/ws", get(ws::handler))
         .fallback_service(statics)
         .layer(axum::extract::DefaultBodyLimit::max(args.num("max-open-mb", 200) as usize * 1024 * 1024))

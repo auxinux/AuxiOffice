@@ -40,6 +40,7 @@ fn setup_with(name: &str, grammar_url: Option<String>) -> Option<(Ctx, PathBuf)>
             profile_root: None,
             grammar_url,
             launcher: vec![],
+            grammar_socket: None,
         },
         Box::new(move |e| ev.lock().unwrap().push(e)),
     )
@@ -400,6 +401,7 @@ fn stale_lock_from_a_sibling_profile_is_removed() {
             profile_root: Some(root.clone()),
             grammar_url: None,
             launcher: vec![],
+            grammar_socket: None,
         },
         Box::new(|_| {}),
     )
@@ -499,6 +501,7 @@ fn export_still_works_after_a_previous_engine_crash() {
             profile_root: None,
             grammar_url: None,
             launcher: vec![],
+            grammar_socket: None,
         },
         Box::new(|_| {}),
     )

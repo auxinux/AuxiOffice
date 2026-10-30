@@ -86,6 +86,7 @@ export const files = {
   newDocument: (kind: string) => postJson<{ path: string }>("/api/new", { kind }),
   kvGet: <T>(name: string) => getJson<T | null>(`/api/kv/${name}`),
   kvPut: (name: string, value: unknown) => postJson(`/api/kv/${name}`, value, "PUT"),
+  auxicorrect: () => getJson<{ available: boolean; version: string | null; options: { enabled: boolean; international: boolean; variant: string; style: boolean; regional: boolean } }>("/api/auxicorrect"),
   log: (message: string) => void fetch("/api/log", { method: "POST", credentials: "same-origin", headers: MUTATE, body: message }).catch(() => undefined),
 };
 

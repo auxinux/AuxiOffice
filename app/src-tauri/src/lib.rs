@@ -310,6 +310,7 @@ fn engine_config(app: &AppHandle, slot: usize, text: bool) -> Result<EngineConfi
         profile_root,
         grammar_url,
         launcher: vec![],
+        grammar_socket: None,
     })
 }
 

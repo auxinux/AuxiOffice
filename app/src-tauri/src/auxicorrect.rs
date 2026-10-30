@@ -256,24 +256,35 @@ fn handle(mut conn: TcpStream, prefix: &str, checker: &Checker) -> std::io::Resu
     let Some(route) = target.strip_prefix(prefix) else {
         return reply(&mut conn, 404, "{}");
     };
+    let opts = checker.options.lock().unwrap().clone();
+    let (status, body) = respond(method, route, &body, &checker.cli, Some(&opts));
+    reply(&mut conn, status, &body)
+}
+
+/// Réponse du protocole LanguageTool (`route` : chemin après `…/v2/`).
+/// `opts` à None : correction désactivée, aucune remarque. Partagé avec le
+/// serveur d'AuxiOffice Online.
+pub fn respond(method: &str, route: &str, body: &[u8], cli: &Path, opts: Option<&Options>) -> (u16, String) {
     match (method, route) {
         ("POST", "check") => {
-            let form = parse_form(&String::from_utf8_lossy(&body));
+            let Some(opts) = opts else {
+                return (200, json!({"software": {"name": "AuxiCorrect", "version": "AuxiOffice"}, "matches": []}).to_string());
+            };
+            let form = parse_form(&String::from_utf8_lossy(body));
             let text = form.iter().find(|(k, _)| k == "text").map(|(_, v)| v.as_str()).unwrap_or("");
-            let opts = checker.options.lock().unwrap().clone();
-            match check(&checker.cli, &opts, text) {
-                Ok(v) => reply(&mut conn, 200, &v.to_string()),
+            match check(cli, opts, text) {
+                Ok(v) => (200, v.to_string()),
                 Err(e) => {
                     eprintln!("AuxiCorrect : {e}");
-                    reply(&mut conn, 500, "{}")
+                    (500, "{}".into())
                 }
             }
         }
         ("GET", "languages") => {
             let langs: Vec<Value> = ["fr", "fr-CA", "fr-FR", "fr-BE", "fr-CH"].iter().map(|c| json!({"name": "Français", "code": "fr", "longCode": c})).collect();
-            reply(&mut conn, 200, &Value::from(langs).to_string())
+            (200, Value::from(langs).to_string())
         }
-        _ => reply(&mut conn, 404, "{}"),
+        _ => (404, "{}".into()),
     }
 }
 

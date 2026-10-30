@@ -34,6 +34,9 @@ pub struct EngineConfig {
     /// Programme qui lance le moteur, suivi de ses arguments (bac à sable
     /// d'AuxiOffice Online) ; vide : le moteur est lancé directement.
     pub launcher: Vec<std::ffi::OsString>,
+    /// Prise Unix du correcteur AuxiCorrect (AuxiOffice Online, moteur sans
+    /// réseau) ; remplace `grammar_url`.
+    pub grammar_socket: Option<PathBuf>,
 }
 
 /// Dernières lignes écrites par le moteur sur sa sortie d'erreur.
@@ -82,6 +85,10 @@ impl Engine {
         match &cfg.grammar_url {
             Some(u) => cmd.env("AUXI_ENGINE_GRAMMAR_URL", u),
             None => cmd.env_remove("AUXI_ENGINE_GRAMMAR_URL"),
+        };
+        match &cfg.grammar_socket {
+            Some(s) => cmd.env("AUXI_ENGINE_GRAMMAR_SOCKET", s),
+            None => cmd.env_remove("AUXI_ENGINE_GRAMMAR_SOCKET"),
         };
         // Aucun accès réseau ni dialogue système depuis le moteur.
         // Langues pour lesquelles LibreOffice active correcteur et césure.

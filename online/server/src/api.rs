@@ -269,6 +269,69 @@ pub async fn log(State(app): State<Arc<AppState>>, method: Method, headers: Head
     Ok(Json(json!({})))
 }
 
+// --- AuxiCorrect -----------------------------------------------------------------
+
+fn auxicorrect_state(app: &AppState, user: &str) -> Value {
+    let opts = crate::grammar::user_options(&app.pool.setup.files_root, user);
+    json!({
+        "available": app.auxicorrect.is_some(),
+        "version": app.auxicorrect.as_ref().and_then(|(_, v)| v.clone()),
+        "options": opts,
+    })
+}
+
+pub async fn auxicorrect_get(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    Ok(Json(auxicorrect_state(&app, &u.id)))
+}
+
+/// Options d'AuxiCorrect de l'utilisateur : elles valent aussitôt pour les
+/// paragraphes vérifiés ensuite, y compris dans les documents déjà ouverts.
+pub async fn auxicorrect_put(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(o): Json<crate::auxicorrect::Options>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    crate::grammar::save_user_options(&app.pool.setup.files_root, &u.id, &o)?;
+    Ok(Json(auxicorrect_state(&app, &u.id)))
+}
+
+fn cli(app: &AppState) -> ApiResult<std::path::PathBuf> {
+    app.auxicorrect.as_ref().map(|(c, _)| c.clone()).ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "AuxiCorrect n'est pas installé sur ce serveur.".into()))
+}
+
+#[derive(Deserialize)]
+pub struct Lookup {
+    what: String,
+    word: String,
+}
+
+/// Dictionnaire : définition, synonymes, antonymes, conjugaison.
+pub async fn auxicorrect_lookup(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<Lookup>) -> ApiResult<Json<Value>> {
+    user(&app, &headers, &method)?;
+    let cli = cli(&app)?;
+    if b.word.chars().count() > 80 {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "mot trop long".into()));
+    }
+    let text = blocking(move || crate::auxicorrect::lookup(&cli, &b.what, &b.word)).await?;
+    Ok(Json(json!({"text": text})))
+}
+
+#[derive(Deserialize)]
+pub struct Check {
+    text: String,
+    #[serde(default)]
+    international: bool,
+}
+
+/// Vérification d'un texte d'AuxiText (remarques, positions UTF-16).
+pub async fn auxicorrect_check(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<Check>) -> ApiResult<Json<Value>> {
+    user(&app, &headers, &method)?;
+    let cli = cli(&app)?;
+    if b.text.len() > 2 << 20 {
+        return Err(ApiError(StatusCode::PAYLOAD_TOO_LARGE, "texte trop long pour la vérification".into()));
+    }
+    let remarks = blocking(move || crate::text_auxicorrect::check(&cli, &b.text, b.international)).await?;
+    Ok(Json(json!(remarks)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
