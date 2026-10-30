@@ -211,3 +211,31 @@ jobs:
           test -L "$mnt/Applications"
           codesign --verify --deep --verbose "$mnt/AuxiText.app"
           hdiutil detach "$mnt"
+
+  online:
+    # AuxiOffice Online : modules WebAssembly (AuxiText, AuxiSheet Lite),
+    # interface web (applications du bureau reconstruites avec les shims de
+    # online/web) et serveur. Détecte un changement de app/ui ou text/ui qui
+    # casserait la version web.
+    name: AuxiOffice Online (web et serveur)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            online/sheet-wasm
+      - name: wasm-bindgen
+        run: cargo install --locked wasm-bindgen-cli --version "$(sed -n 's/^wasm-bindgen = "=\(.*\)"/\1/p' online/textio-wasm/Cargo.toml)"
+      - name: Construction (online/build.sh --debug)
+        run: online/build.sh --debug
+      - name: Tests du serveur
+        run: cargo test -p auxi-online -p auxitext-textio-wasm

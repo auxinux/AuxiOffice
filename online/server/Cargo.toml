@@ -1,0 +1,22 @@
+[package]
+name = "auxi-online"
+description = "AuxiOffice Online : serveur web (comptes, documents, moteurs isolés) de web.office.auxinux.ca"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+auxi-engine = { path = "../../crates/auxi-engine" }
+serde.workspace = true
+serde_json.workspace = true
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "fs"] }
+tower-http = { version = "0.6", features = ["fs", "set-header"] }
+argon2 = "0.5"
+rand = "0.8"
+flate2 = "1"
+url = "2"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }

@@ -1,0 +1,21 @@
+# AuxiOffice Online (web.office.auxinux.ca) — /etc/systemd/system/auxioffice-online.service
+[Unit]
+Description=AuxiOffice Online
+After=network.target
+
+[Service]
+User=auxioffice
+Group=auxioffice
+WorkingDirectory=/var/lib/auxioffice-online
+ExecStart=/opt/auxioffice-online/auxi-online --listen 127.0.0.1:8090 --data /var/lib/auxioffice-online --secure-cookies --max-engines 24 --max-docs 6 --spares 2
+Restart=on-failure
+RestartSec=3
+# Les moteurs ont besoin des espaces de noms utilisateur (bubblewrap) :
+# pas de NoNewPrivileges/PrivateUsers qui les empêcheraient.
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

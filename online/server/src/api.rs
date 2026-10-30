@@ -1,0 +1,283 @@
+//! API HTTP : session, fichiers de l'utilisateur, documents vierges,
+//! réglages (préférences, récents) et téléchargements temporaires.
+//!
+//! Toute requête qui modifie quelque chose doit porter l'en-tête `X-Auxi`
+//! (un autre site ne peut pas l'ajouter sans autorisation CORS) en plus du
+//! témoin de session SameSite=Strict.
+
+use crate::auth::{cookie_token, User, COOKIE};
+use crate::AppState;
+use axum::body::Bytes;
+use axum::extract::{Path as UrlPath, Query, State};
+use axum::http::{header, HeaderMap, HeaderValue, Method, StatusCode};
+use axum::response::{IntoResponse, Response};
+use axum::Json;
+use serde::Deserialize;
+use serde_json::{json, Value};
+use std::sync::Arc;
+
+pub struct ApiError(StatusCode, String);
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        (self.0, Json(json!({"error": self.1}))).into_response()
+    }
+}
+
+impl From<String> for ApiError {
+    fn from(e: String) -> Self {
+        ApiError(StatusCode::BAD_REQUEST, e)
+    }
+}
+
+type ApiResult<T> = Result<T, ApiError>;
+
+fn user(app: &AppState, headers: &HeaderMap, method: &Method) -> ApiResult<User> {
+    if method != Method::GET && method != Method::HEAD && !headers.contains_key("x-auxi") {
+        return Err(ApiError(StatusCode::FORBIDDEN, "requête refusée (en-tête X-Auxi manquant)".into()));
+    }
+    let u = app.auth.session_user(cookie_token(headers).as_deref()).ok_or_else(|| ApiError(StatusCode::UNAUTHORIZED, "Session expirée : reconnectez-vous.".into()))?;
+    app.store.ensure_user(&u.id).map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(u)
+}
+
+/// Travail sur le disque hors des fils de tokio.
+async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> ApiResult<T> {
+    tokio::task::spawn_blocking(f).await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?.map_err(ApiError::from)
+}
+
+pub async fn me(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap) -> Response {
+    let base = json!({"auth": app.auth.enabled(), "version": env!("CARGO_PKG_VERSION")});
+    match user(&app, &headers, &method) {
+        Ok(u) => {
+            let mut v = base;
+            v["user"] = json!({"email": u.email, "name": u.name});
+            let (store, id) = (app.store.clone(), u.id.clone());
+            let used = tokio::task::spawn_blocking(move || store.usage(&id)).await.unwrap_or(0);
+            v["usage"] = json!({"used": used, "quota": u.quota_mb.unwrap_or(app.quota_mb) * 1024 * 1024});
+            Json(v).into_response()
+        }
+        Err(_) => (StatusCode::UNAUTHORIZED, Json(base)).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct Login {
+    email: String,
+    password: String,
+}
+
+fn session_cookie(app: &AppState, value: &str, max_age: u64) -> HeaderValue {
+    let secure = if app.secure_cookies { "; Secure" } else { "" };
+    HeaderValue::from_str(&format!("{COOKIE}={value}; Path=/; HttpOnly; SameSite=Strict; Max-Age={max_age}{secure}")).unwrap()
+}
+
+pub async fn login(State(app): State<Arc<AppState>>, headers: HeaderMap, Json(body): Json<Login>) -> ApiResult<Response> {
+    if !headers.contains_key("x-auxi") {
+        return Err(ApiError(StatusCode::FORBIDDEN, "requête refusée".into()));
+    }
+    let a = app.clone();
+    let (token, u) = tokio::task::spawn_blocking(move || a.auth.login(&body.email, &body.password))
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(|e| ApiError(StatusCode::UNAUTHORIZED, e))?;
+    let mut r = Json(json!({"user": {"email": u.email, "name": u.name}})).into_response();
+    r.headers_mut().insert(header::SET_COOKIE, session_cookie(&app, &token, app.auth.ttl().as_secs()));
+    Ok(r)
+}
+
+pub async fn logout(State(app): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if let Some(t) = cookie_token(&headers) {
+        app.auth.logout(&t);
+    }
+    let mut r = Json(json!({})).into_response();
+    r.headers_mut().insert(header::SET_COOKIE, session_cookie(&app, "", 0));
+    r
+}
+
+#[derive(Deserialize)]
+pub struct PathQ {
+    path: String,
+    #[serde(default)]
+    download: Option<String>,
+}
+
+pub async fn list(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Query(q): Query<PathQ>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let store = app.store.clone();
+    let path = crate::storage::normalize(&q.path)?;
+    let p = path.clone();
+    let entries = blocking(move || store.list(&u.id, &p)).await?;
+    Ok(Json(json!({"path": path, "entries": entries})))
+}
+
+/// Type MIME d'après l'extension (affichage dans le navigateur).
+fn mime_for(name: &str) -> &'static str {
+    match name.rsplit('.').next().unwrap_or("").to_ascii_lowercase().as_str() {
+        "pdf" => "application/pdf",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "txt" | "md" | "csv" | "log" => "text/plain; charset=utf-8",
+        _ => "application/octet-stream",
+    }
+}
+
+/// `filename*` d'un en-tête Content-Disposition (RFC 5987).
+fn disposition(kind: &str, name: &str) -> HeaderValue {
+    let enc: String = name
+        .bytes()
+        .map(|b| if b.is_ascii_alphanumeric() || b"-._~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") })
+        .collect();
+    let ascii: String = name.chars().map(|c| if c.is_ascii_graphic() && c != '"' && c != '\\' || c == ' ' { c } else { '_' }).collect();
+    HeaderValue::from_str(&format!("{kind}; filename=\"{ascii}\"; filename*=UTF-8''{enc}")).unwrap_or(HeaderValue::from_static("attachment"))
+}
+
+pub async fn read(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Query(q): Query<PathQ>) -> ApiResult<Response> {
+    let u = user(&app, &headers, &method)?;
+    let store = app.store.clone();
+    let path = crate::storage::normalize(&q.path)?;
+    let p = path.clone();
+    let bytes = blocking(move || store.read(&u.id, &p)).await.map_err(|e| ApiError(StatusCode::NOT_FOUND, e.1))?;
+    let name = crate::storage::file_name(&path).to_string();
+    let mut r = bytes.into_response();
+    let h = r.headers_mut();
+    h.insert(header::CONTENT_TYPE, HeaderValue::from_static(if q.download.is_some() { "application/octet-stream" } else { mime_for(&name) }));
+    h.insert(header::CONTENT_DISPOSITION, disposition(if q.download.is_some() { "attachment" } else { "inline" }, &name));
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(r)
+}
+
+pub async fn write(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Query(q): Query<PathQ>, body: Bytes) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let quota = u.quota_mb.unwrap_or(app.quota_mb) * 1024 * 1024;
+    let store = app.store.clone();
+    let path = crate::storage::normalize(&q.path)?;
+    let stat = blocking(move || {
+        let old = store.stat(&u.id, &path).size;
+        if store.usage(&u.id) + body.len() as u64 > quota + old {
+            return Err("Espace de stockage plein : supprimez des fichiers pour continuer.".into());
+        }
+        store.write(&u.id, &path, &body)
+    })
+    .await?;
+    Ok(Json(json!(stat)))
+}
+
+#[derive(Deserialize)]
+pub struct Paths {
+    paths: Vec<String>,
+}
+
+pub async fn stat(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<Paths>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let store = app.store.clone();
+    let stats = blocking(move || Ok(b.paths.iter().map(|p| store.stat(&u.id, p)).collect::<Vec<_>>())).await?;
+    Ok(Json(json!(stats)))
+}
+
+#[derive(Deserialize)]
+pub struct One {
+    path: String,
+}
+
+pub async fn mkdir(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<One>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let store = app.store.clone();
+    blocking(move || store.mkdir(&u.id, &b.path)).await?;
+    Ok(Json(json!({})))
+}
+
+#[derive(Deserialize)]
+pub struct Move {
+    from: String,
+    to: String,
+}
+
+pub async fn rename(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<Move>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let store = app.store.clone();
+    blocking(move || store.rename(&u.id, &b.from, &b.to)).await?;
+    Ok(Json(json!({})))
+}
+
+pub async fn delete(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<One>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let store = app.store.clone();
+    blocking(move || store.delete(&u.id, &b.path)).await?;
+    Ok(Json(json!({})))
+}
+
+#[derive(Deserialize)]
+pub struct New {
+    kind: String,
+}
+
+pub async fn new_document(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<New>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let a = app.clone();
+    let path = blocking(move || a.pool.new_document(&a.store, &u.id, &b.kind)).await?;
+    Ok(Json(json!({"path": path})))
+}
+
+fn kv_path(name: &str) -> ApiResult<String> {
+    if name.is_empty() || name.len() > 40 || !name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "nom de réglage invalide".into()));
+    }
+    Ok(format!("/.auxi/{name}.json"))
+}
+
+/// Réglages de l'utilisateur (préférences d'AuxiText, documents récents…).
+pub async fn kv_get(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, UrlPath(name): UrlPath<String>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let path = kv_path(&name)?;
+    let store = app.store.clone();
+    let v = blocking(move || Ok(store.read(&u.id, &path).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok()).unwrap_or(Value::Null))).await?;
+    Ok(Json(v))
+}
+
+pub async fn kv_put(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, UrlPath(name): UrlPath<String>, Json(v): Json<Value>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let path = kv_path(&name)?;
+    let bytes = serde_json::to_vec(&v).unwrap();
+    if bytes.len() > 1024 * 1024 {
+        return Err(ApiError(StatusCode::PAYLOAD_TOO_LARGE, "réglage trop volumineux".into()));
+    }
+    let store = app.store.clone();
+    blocking(move || store.write(&u.id, &path, &bytes).map(|_| ())).await?;
+    Ok(Json(json!({})))
+}
+
+/// Fichier préparé par le serveur (PDF à imprimer), utilisable une fois
+/// par son propriétaire pendant quelques minutes.
+pub async fn download(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, UrlPath(token): UrlPath<String>) -> ApiResult<Response> {
+    let u = user(&app, &headers, &method)?;
+    let d = app.take_download(&token, &u.id).ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "fichier expiré".into()))?;
+    let mut r = d.bytes.into_response();
+    r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static(d.mime));
+    r.headers_mut().insert(header::CONTENT_DISPOSITION, disposition("inline", &d.name));
+    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(r)
+}
+
+pub async fn log(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, body: String) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let line: String = body.chars().take(4000).collect();
+    eprintln!("interface [{}] : {}", u.id, line.replace('\n', " ⏎ "));
+    Ok(Json(json!({})))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nom_telecharge() {
+        let v = disposition("attachment", "Été 2026.pdf");
+        assert_eq!(v.to_str().unwrap(), "attachment; filename=\"_t_ 2026.pdf\"; filename*=UTF-8''%C3%89t%C3%A9%202026.pdf");
+        assert!(kv_path("../x").is_err());
+        assert_eq!(kv_path("prefs-text").ok().unwrap(), "/.auxi/prefs-text.json");
+    }
+}

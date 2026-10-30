@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["crates/lok-sys", "crates/auxi-engine", "app/src-tauri", "text/src-tauri"]
+members = ["crates/lok-sys", "crates/auxi-engine", "app/src-tauri", "text/src-tauri", "online/server", "online/textio-wasm"]
+# Tableur d'AuxiOffice Online (IronCalc → WebAssembly) : construit à part par
+# online/build.sh, pour ne pas alourdir la compilation de l'application de bureau.
+exclude = ["online/sheet-wasm"]
 
 [workspace.package]
 version = "0.2.0-beta.2"

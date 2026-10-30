@@ -31,6 +31,9 @@ pub struct EngineConfig {
     /// Serveur de correction du français (AuxiCorrect, protocole LanguageTool)
     /// que LibreOffice doit interroger ; None : correcteur de LibreOffice.
     pub grammar_url: Option<String>,
+    /// Programme qui lance le moteur, suivi de ses arguments (bac à sable
+    /// d'AuxiOffice Online) ; vide : le moteur est lancé directement.
+    pub launcher: Vec<std::ffi::OsString>,
 }
 
 /// Dernières lignes écrites par le moteur sur sa sortie d'erreur.
@@ -58,7 +61,14 @@ impl Engine {
     pub fn spawn(cfg: &EngineConfig, on_event: EventSink) -> Result<Engine, String> {
         // Configuration par l'environnement, jamais par arguments : LibreOffice
         // lit les arguments du processus sous macOS (voir auxi-engine).
-        let mut cmd = Command::new(&cfg.engine_exe);
+        let mut cmd = match cfg.launcher.split_first() {
+            Some((prog, args)) => {
+                let mut c = Command::new(prog);
+                c.args(args).arg(&cfg.engine_exe);
+                c
+            }
+            None => Command::new(&cfg.engine_exe),
+        };
         cmd.env("AUXI_ENGINE_PROGRAM_DIR", &cfg.program_dir).env("AUXI_ENGINE_LANG", &cfg.lang);
         match &cfg.profile_dir {
             Some(p) => cmd.env("AUXI_ENGINE_PROFILE", p),
