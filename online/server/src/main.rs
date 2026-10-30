@@ -351,8 +351,16 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
     std::fs::create_dir_all(&setup.root).map_err(|e| e.to_string())?;
     let no_auth = args.on("no-auth");
     let users_file = data.join("users.json");
-    if !no_auth && auth::load_users(&users_file).is_empty() {
-        eprintln!("auxi-online : aucun compte. Créez-en un : auxi-online user add <courriel> --data {}", data.display());
+    if !no_auth {
+        let mut users = auth::load_users(&users_file);
+        if users.is_empty() {
+            eprintln!("auxi-online : aucun compte. Créez-en un : auxi-online user add <courriel> --data {}", data.display());
+        } else if !users.iter().any(|u| u.admin) {
+            // Comptes créés avant le rôle d'administrateur : le premier le reçoit.
+            users[0].admin = true;
+            auth::save_users(&users_file, &users)?;
+            eprintln!("auxi-online : {} devient administrateur (premier compte)", users[0].email);
+        }
     }
     let pool = Arc::new(Pool::new(setup));
     let app = Arc::new(AppState {
