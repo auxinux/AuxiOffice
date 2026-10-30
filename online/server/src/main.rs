@@ -410,6 +410,15 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         .route("/api/auxicorrect/check", post(api::auxicorrect_check))
         .route("/ws", get(ws::handler))
         .fallback_service(statics)
+        // Pages HTML toujours revérifiées : après une mise à jour, le navigateur
+        // charge la nouvelle interface (les scripts ont des noms qui changent).
+        .layer(axum::middleware::map_response(|mut r: axum::response::Response| async move {
+            let html = r.headers().get(axum::http::header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).is_some_and(|t| t.starts_with("text/html"));
+            if html {
+                r.headers_mut().insert(axum::http::header::CACHE_CONTROL, axum::http::HeaderValue::from_static("no-cache"));
+            }
+            r
+        }))
         .layer(axum::extract::DefaultBodyLimit::max(args.num("max-open-mb", 200) as usize * 1024 * 1024))
         .layer(tower_http::set_header::SetResponseHeaderLayer::overriding(axum::http::header::X_CONTENT_TYPE_OPTIONS, axum::http::HeaderValue::from_static("nosniff")))
         .layer(tower_http::set_header::SetResponseHeaderLayer::overriding(axum::http::header::REFERRER_POLICY, axum::http::HeaderValue::from_static("same-origin")))
