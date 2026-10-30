@@ -1,7 +1,9 @@
 # AuxiOffice Online
 
-La suite AuxiOffice dans le navigateur, pour **web.office.auxinux.ca** : AuxiOffice,
-AuxiWriter, AuxiSheet, AuxiPresent, AuxiDraw, AuxiPDF, AuxiText, et **AuxiSheet Lite**.
+La suite AuxiOffice dans le navigateur, pour **web.office.auxinux.ca** : AuxiMail (lien vers
+le webmail, adresse réglée dans l'administration), AuxiWriter, AuxiSheet, AuxiPresent,
+AuxiDraw, AuxiPDF, AuxiText et **AuxiCorrect** (correcteur et dictionnaire, en ligne
+seulement), plus **AuxiSheet Lite** (bouton « Lite » des classeurs .xlsx).
 
 Les applications sont **celles du bureau**, sans copie de leur code : la même interface
 React (`app/ui`, `text/ui`) est construite une seconde fois pour le web, avec les modules de
@@ -16,6 +18,7 @@ du menu Fichier), mêmes menus, ruban, boîtes de dialogue, AuxiCorrect.
 |---|---|---|
 | **AuxiText** | Navigateur : CodeMirror + encodages en **Rust → WebAssembly** (`textio-wasm`, le même `textio.rs` que sur le bureau) | Garder les octets du fichier |
 | **AuxiPDF** | Navigateur : PDF.js (lecture, formulaires, annotations) | Garder le fichier |
+| **AuxiCorrect** | Interface dans le navigateur ; correction par `auxicorrect-cli` sur le serveur | Vérifier le texte, dictionnaire |
 | **AuxiSheet Lite** | Navigateur : **IronCalc** (tableur en Rust → WebAssembly), lecture et écriture .xlsx comprises (`sheet-wasm`) | Garder le fichier |
 | AuxiWriter, AuxiSheet, AuxiPresent, AuxiDraw | Interface, menus et boîtes dans le navigateur ; mise en page fidèle par le moteur de documents, **un processus isolé par document ouvert** | Moteur `auxi-engine`, tuiles compressées (≈ 5 Ko par tuile de 256 px) |
 
@@ -118,8 +121,12 @@ auxi-online user list --data …
 Le mot de passe est lu dans `AUXI_PASSWORD`, sinon sur l'entrée standard. **Le premier compte
 créé est administrateur** (`--admin` pour les suivants, ou `auxi-online user admin <courriel>`).
 
-Dans le portail, chacun peut **changer son mot de passe** ; les administrateurs ont une section
-**Administration** : créer un compte, changer son nom, son mot de passe, son espace ou son rôle,
+Dans le portail, le menu du compte (nom en haut à droite) mène à **Mon profil** (nom, mot de
+passe, espace utilisé, options d'AuxiCorrect) et, pour les administrateurs, à
+**Administration** : onglet **Réglages** (espace par défaut d'un compte, 1 Go au départ ;
+documents ouverts par compte ; fermeture des documents inactifs ; adresse d'AuxiMail),
+onglet **Serveur** (état : moteurs, documents, espace, bac à sable, AuxiCorrect) et onglet
+**Comptes** : créer un compte, changer son nom, son mot de passe, son espace ou son rôle,
 le supprimer (en gardant ou non ses fichiers). Un nouveau mot de passe ferme les sessions du
 compte. Les sessions sont gardées dans `sessions.json` (empreinte SHA-256 des jetons
 seulement) : un redémarrage du serveur ne déconnecte personne. Prévu ensuite : connexion

@@ -2,10 +2,10 @@
 // applications et « Mes fichiers » (envoi, téléchargement, renommage…).
 // Page légère, sans cadriciel : elle s'affiche avant tout le reste.
 
-import { APPS, appFor, appUrl, isLiteSheet, launch, type AppId } from "../shared/apps";
+import { APPS, appFor, appUrl, isLiteSheet, launch, PORTAL_APPS, type AppId } from "../shared/apps";
 import { form, messageBox, prompt, toast } from "../shared/dialogs";
 import { fileIcon } from "../shared/icons";
-import { baseName, dirName, files, formatSize, joinPath, upload, type Account, type Entry, type Me } from "../shared/http";
+import { baseName, dirName, files, formatSize, joinPath, upload, type Account, type AcOptions, type Entry, type Me, type Settings } from "../shared/http";
 import "../shared/online.css";
 import "./portal.css";
 
@@ -84,87 +84,279 @@ let cwd = sessionStorage.getItem("auxi-portail-dossier") ?? "/Documents";
 const CREATE: { app: AppId; label: string; icon: string }[] = [
   { app: "writer", label: "Document texte", icon: "/icons/mime-document.svg" },
   { app: "sheet", label: "Classeur", icon: "/icons/mime-spreadsheet.svg" },
-  { app: "sheetlite", label: "Classeur Lite", icon: "/icons/auxisheet.svg" },
   { app: "present", label: "Présentation", icon: "/icons/mime-presentation.svg" },
   { app: "draw", label: "Dessin", icon: "/icons/mime-drawing.svg" },
   { app: "text", label: "Fichier texte", icon: "/auxitext.svg" },
 ];
 
 
-async function showDashboard() {
+/** Vue du portail d'après l'adresse : « #profil », « #admin », « #admin/reglages »… */
+function view(): string {
+  return location.hash.replace(/^#\/?/, "");
+}
+window.addEventListener("hashchange", () => void showDashboard());
+
+function initials(name: string): string {
+  return (
+    name
+      .split(/[\s@.]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]!.toUpperCase())
+      .join("") || "?"
+  );
+}
+
+/** Menu du compte : profil, administration, déconnexion. */
+function userMenu(): HTMLElement {
   const user = me.user!;
+  const panel = h(
+    "div",
+    { className: "user-menu", role: "menu" },
+    h("div", { className: "user-menu-head" }, h("strong", {}, user.name || user.email), h("span", { className: "muted" }, user.email)),
+    h("a", { href: "#profil", role: "menuitem" }, "Mon profil"),
+    user.admin && h("a", { href: "#admin", role: "menuitem" }, "Administration"),
+    h("div", { className: "sep" }),
+    h(
+      "button",
+      {
+        role: "menuitem",
+        onclick: async () => {
+          await files.logout().catch(() => undefined);
+          location.hash = "";
+          showLogin();
+        },
+      },
+      "Déconnexion",
+    ),
+  );
+  const btn = h("button", { className: "user-btn", "aria-haspopup": "menu", title: "Mon compte" }, h("span", { className: "avatar" }, initials(user.name || user.email)), h("span", { className: "user-name" }, user.name || user.email), h("span", { className: "caret" }, "▾"));
+  const wrap = h("div", { className: "user-wrap" }, btn, panel);
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    wrap.classList.toggle("open");
+  });
+  document.addEventListener("click", () => wrap.classList.remove("open"));
+  panel.addEventListener("click", () => wrap.classList.remove("open"));
+  return wrap;
+}
+
+async function showDashboard() {
+  me = await files.me().catch(() => me);
+  if (!me.user) return showLogin();
   const usage = me.usage;
   const pct = usage ? Math.min(100, Math.round((usage.used / Math.max(1, usage.quota)) * 100)) : 0;
+  const v = view();
   const header = h(
     "header",
     { className: "top" },
-    logo(),
+    h("a", { href: "#", className: "home-link" }, logo()),
     h("span", { className: "spacer" }),
     usage && h("span", { className: "usage", title: `${formatSize(usage.used)} sur ${formatSize(usage.quota)}` }, h("span", { className: "bar" }, h("span", { style: `width:${pct}%` })), `${formatSize(usage.used)} / ${formatSize(usage.quota)}`),
-    h("span", { className: "user" }, user.name || user.email),
-    me.auth && h("button", { className: "secondary", onclick: () => void changePassword() }, "Mon mot de passe"),
-    me.auth &&
-      h(
-        "button",
-        {
-          className: "secondary",
-          onclick: async () => {
-            await files.logout().catch(() => undefined);
-            showLogin();
-          },
-        },
-        "Déconnexion",
-      ),
+    me.auth ? userMenu() : h("span", { className: "user" }, me.user.name),
   );
+  const main = h("main", {});
+  root.replaceChildren(h("div", { className: "page" }, header, main, footer()));
+  if (v === "profil" && me.auth) return renderProfile(main);
+  if (v.startsWith("admin") && me.user.admin) return renderAdminPage(main, v.split("/")[1] ?? "comptes");
+  await renderHome(main);
+}
 
+async function renderHome(main: HTMLElement) {
   const create = h(
     "section",
     { className: "create" },
     h("h2", {}, "Créer"),
     h("div", { className: "tiles" }, ...CREATE.map((c) => h("button", { className: "tile", onclick: () => launch(c.app, [], true) }, h("img", { src: c.icon, alt: "" }), h("span", {}, c.label)))),
   );
+  const tile = (id: AppId) => {
+    const a = APPS.find((x) => x.id === id)!;
+    if (id === "mail") {
+      const url = me.auximail ?? "";
+      return url
+        ? h("a", { className: "tile app", href: url, target: "_blank", rel: "noopener" }, h("img", { src: a.icon, alt: "" }), h("span", { className: "name" }, a.name), h("span", { className: "blurb" }, a.blurb))
+        : h("div", { className: "tile app soon", title: "AuxiMail n'est pas encore offert sur ce serveur." }, h("img", { src: a.icon, alt: "" }), h("span", { className: "name" }, a.name), h("span", { className: "blurb" }, "Bientôt"));
+    }
+    if (id === "correct" && me.auxicorrect === false) {
+      return h("div", { className: "tile app soon", title: "AuxiCorrect n'est pas installé sur ce serveur." }, h("img", { src: a.icon, alt: "" }), h("span", { className: "name" }, a.name), h("span", { className: "blurb" }, "Non installé"));
+    }
+    return h("a", { className: "tile app", href: appUrl(id), target: "_blank" }, h("img", { src: a.icon, alt: "" }), h("span", { className: "name" }, a.name), h("span", { className: "blurb" }, a.blurb));
+  };
+  const apps = h("section", { className: "apps" }, h("h2", {}, "Applications"), h("div", { className: "tiles" }, ...PORTAL_APPS.map(tile)));
+  const browser = h("section", { className: "browser" });
+  main.replaceChildren(create, apps, browser);
+  await renderFiles(browser);
+}
 
-  const apps = h(
-    "section",
-    { className: "apps" },
-    h("h2", {}, "Applications"),
+// --- Mon profil -------------------------------------------------------------------
+
+async function renderProfile(main: HTMLElement) {
+  const user = me.user!;
+  const usage = me.usage;
+  const name = h("input", { className: "auxi-input", value: user.name }) as HTMLInputElement;
+  const saveName = h("button", { className: "primary", onclick: async () => {
+    try {
+      await files.setProfile(name.value);
+      toast("Nom enregistré.");
+      void showDashboard();
+    } catch (e) {
+      toast(errText(e), 6000);
+    }
+  } }, "Enregistrer");
+  const pw = { old: h("input", { type: "password", className: "auxi-input", autocomplete: "current-password" }) as HTMLInputElement, next: h("input", { type: "password", className: "auxi-input", autocomplete: "new-password" }) as HTMLInputElement, again: h("input", { type: "password", className: "auxi-input", autocomplete: "new-password" }) as HTMLInputElement };
+  const pwMsg = h("div", { className: "form-msg" });
+  const changePw = h("button", { className: "primary", onclick: async () => {
+    pwMsg.textContent = "";
+    if (pw.next.value !== pw.again.value) return void (pwMsg.textContent = "Les deux nouveaux mots de passe diffèrent.");
+    try {
+      await files.changePassword(pw.old.value, pw.next.value);
+      pw.old.value = pw.next.value = pw.again.value = "";
+      toast("Mot de passe changé. Vos autres sessions ont été fermées.");
+    } catch (e) {
+      pwMsg.textContent = errText(e);
+    }
+  } }, "Changer le mot de passe");
+  const card = (title: string, ...body: (Node | string | false | null)[]) => h("section", { className: "card" }, h("h2", {}, title), ...body);
+  const field = (label: string, input: HTMLElement) => h("label", { className: "form-field" }, h("span", {}, label), input);
+  const pct = usage ? Math.min(100, Math.round((usage.used / Math.max(1, usage.quota)) * 100)) : 0;
+
+  const acBox = card("AuxiCorrect", h("p", { className: "muted" }, "Chargement…"));
+  main.replaceChildren(
+    h("div", { className: "page-title" }, h("a", { href: "#" }, "← Accueil"), h("h1", {}, "Mon profil")),
     h(
       "div",
-      { className: "tiles" },
-      ...APPS.map((a) => h("a", { className: "tile app", href: appUrl(a.id), target: "_blank" }, h("img", { src: a.icon, alt: "" }), h("span", { className: "name" }, a.name), h("span", { className: "blurb" }, a.blurb))),
+      { className: "cards" },
+      card("Identité", field("Nom affiché", name), field("Courriel", h("input", { className: "auxi-input", value: user.email, disabled: true })), h("div", { className: "form-actions" }, saveName)),
+      card("Espace de stockage", usage ? h("div", { className: "big-usage" }, h("span", { className: "bar" }, h("span", { style: `width:${pct}%` })), h("span", {}, `${formatSize(usage.used)} utilisés sur ${formatSize(usage.quota)} (${pct} %)`)) : "", h("p", { className: "muted" }, "Pour plus d'espace, adressez-vous à l'administrateur.")),
+      card("Mot de passe", field("Mot de passe actuel", pw.old), field("Nouveau mot de passe (8 caractères au moins)", pw.next), field("Nouveau mot de passe, encore", pw.again), pwMsg, h("div", { className: "form-actions" }, changePw)),
+      acBox,
     ),
   );
+  name.addEventListener("keydown", (e) => e.key === "Enter" && saveName.click());
 
-  const browser = h("section", { className: "browser" });
-  const adminBox = user.admin ? h("section", { className: "browser admin" }) : null;
-  root.replaceChildren(h("div", { className: "page" }, header, h("main", {}, create, apps, browser, adminBox), footer()));
-  await renderFiles(browser);
-  if (adminBox) await renderAdmin(adminBox);
+  // Options d'AuxiCorrect du compte (AuxiWriter, AuxiText, AuxiCorrect).
+  try {
+    const ac = await files.auxicorrect();
+    if (!ac.available) {
+      acBox.replaceChildren(h("h2", {}, "AuxiCorrect"), h("p", { className: "muted" }, "AuxiCorrect n'est pas installé sur ce serveur : la correction est faite par le correcteur intégré."));
+      return;
+    }
+    const o: AcOptions = { ...ac.options };
+    const save = async () => {
+      try {
+        await files.setAuxicorrect(o);
+        toast("Options d'AuxiCorrect enregistrées.", 2000);
+      } catch (e) {
+        toast(errText(e), 6000);
+      }
+    };
+    const check = (label: string, key: "enabled" | "international" | "style" | "regional") => {
+      const c = h("input", { type: "checkbox" }) as HTMLInputElement;
+      c.checked = o[key];
+      c.onchange = () => {
+        o[key] = c.checked;
+        void save();
+      };
+      return h("label", { className: "auxi-check" }, c, label);
+    };
+    const variant = h("select", { className: "auxi-input" }, ...[["toutes", "Toutes les graphies"], ["classique", "Orthographe classique"], ["1990", "Orthographe rectifiée (1990)"]].map(([v, l]) => h("option", { value: v }, l))) as HTMLSelectElement;
+    variant.value = o.variant;
+    variant.onchange = () => {
+      o.variant = variant.value;
+      void save();
+    };
+    acBox.replaceChildren(
+      h("h2", {}, `AuxiCorrect ${ac.version ?? ""}`),
+      check("Corriger le français avec AuxiCorrect (au lieu du correcteur intégré)", "enabled"),
+      check("Français international (sinon : québécois)", "international"),
+      check("Signaler les particularités régionales (québécismes, anglicismes…)", "regional"),
+      check("Suggestions de style", "style"),
+      field("Variante orthographique", variant),
+      h("p", { className: "muted" }, "Ces options valent dans AuxiWriter, AuxiText et AuxiCorrect, aussitôt."),
+    );
+  } catch (e) {
+    acBox.replaceChildren(h("h2", {}, "AuxiCorrect"), h("p", { className: "muted" }, errText(e)));
+  }
+}
+
+// --- Administration ---------------------------------------------------------------
+
+async function renderAdminPage(main: HTMLElement, tab: string) {
+  const tabs: [string, string][] = [
+    ["comptes", "Comptes"],
+    ["reglages", "Réglages"],
+    ["serveur", "Serveur"],
+  ];
+  const body = h("section", { className: "card wide" });
+  main.replaceChildren(
+    h("div", { className: "page-title" }, h("a", { href: "#" }, "← Accueil"), h("h1", {}, "Administration")),
+    h("nav", { className: "tabs" }, ...tabs.map(([id, label]) => h("a", { href: `#admin/${id}`, className: tab === id ? "active" : "" }, label))),
+    body,
+  );
+  if (tab === "reglages") return renderSettings(body);
+  if (tab === "serveur") return renderStatus(body);
+  return renderAdmin(body);
+}
+
+async function renderSettings(box: HTMLElement) {
+  let st: Settings;
+  try {
+    st = await files.settings();
+  } catch (e) {
+    box.replaceChildren(h("p", {}, errText(e)));
+    return;
+  }
+  const num = (v: number) => h("input", { type: "number", className: "auxi-input", value: String(v), min: "1" }) as HTMLInputElement;
+  const quota = num(st.default_quota_mb);
+  const docs = num(st.max_docs_per_user);
+  const idle = num(st.idle_minutes);
+  const mail = h("input", { type: "url", className: "auxi-input", value: st.auximail_url, placeholder: "https://mail.auxinux.ca" }) as HTMLInputElement;
+  const msg = h("div", { className: "form-msg" });
+  const field = (label: string, input: HTMLElement, hint: string) => h("label", { className: "form-field" }, h("span", {}, label), input, h("small", { className: "muted" }, hint));
+  const save = h("button", { className: "primary", onclick: async () => {
+    msg.textContent = "";
+    try {
+      await files.setSettings({ default_quota_mb: Number(quota.value), max_docs_per_user: Number(docs.value), idle_minutes: Number(idle.value), auximail_url: mail.value });
+      toast("Réglages enregistrés.");
+    } catch (e) {
+      msg.textContent = errText(e);
+    }
+  } }, "Enregistrer");
+  box.replaceChildren(
+    h("h2", {}, "Réglages du serveur"),
+    field("Espace par défaut d'un compte (Mo)", quota, `1024 Mo = 1 Go. Les comptes sans espace particulier l'utilisent (${formatSize(Number(st.default_quota_mb) * 1024 * 1024)} maintenant).`),
+    field("Documents ouverts en même temps par compte", docs, "Chaque document de bureautique ouvert occupe un moteur sur le serveur (150 à 300 Mo de mémoire)."),
+    field("Fermeture des documents inactifs (minutes)", idle, "Un document sans activité depuis ce délai est fermé et son moteur libéré (les modifications non enregistrées sont perdues)."),
+    field("Adresse d'AuxiMail", mail, "Le webmail ouvert par la tuile AuxiMail du portail. Vide : la tuile indique « Bientôt »."),
+    msg,
+    h("div", { className: "form-actions" }, save),
+  );
+}
+
+async function renderStatus(box: HTMLElement) {
+  try {
+    const s = await files.status();
+    const up = s.uptime_s;
+    const uptime = up < 3600 ? `${Math.round(up / 60)} min` : up < 86400 ? `${Math.floor(up / 3600)} h ${Math.round((up % 3600) / 60)} min` : `${Math.floor(up / 86400)} j ${Math.floor((up % 86400) / 3600)} h`;
+    const row = (k: string, v: string) => h("div", { className: "kv" }, h("span", { className: "muted" }, k), h("span", {}, v));
+    box.replaceChildren(
+      h("div", { className: "browser-head" }, h("h2", {}, "État du serveur"), h("span", { className: "spacer" }), h("button", { className: "secondary", onclick: () => void renderStatus(box) }, "Actualiser")),
+      row("Version", s.version),
+      row("En marche depuis", uptime),
+      row("Comptes", String(s.accounts)),
+      row("Espace utilisé (tous les comptes)", formatSize(s.storage)),
+      row("Documents ouverts", String(s.docs_open)),
+      row("Moteurs en marche", `${s.engines_running} sur ${s.engines_max} au plus (dont ${s.spares} de réserve)`),
+      row("Bac à sable des moteurs", s.sandbox === "aucun" ? "aucun (à éviter sur un serveur public)" : s.sandbox),
+      row("AuxiCorrect", s.auxicorrect ? `${s.auxicorrect.version ?? "installé"} — ${s.auxicorrect.cli}` : "non installé"),
+      row("Taille maximale d'un document", `${s.max_open_mb} Mo`),
+    );
+  } catch (e) {
+    box.replaceChildren(h("p", {}, errText(e)));
+  }
 }
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-async function changePassword() {
-  const done = await form(
-    "Changer mon mot de passe",
-    [
-      { name: "old", label: "Mot de passe actuel", type: "password" },
-      { name: "new", label: "Nouveau mot de passe (8 caractères au moins)", type: "password" },
-      { name: "again", label: "Nouveau mot de passe, encore", type: "password" },
-    ],
-    "Changer",
-    async (v) => {
-      if (v.new !== v.again) return "Les deux nouveaux mots de passe diffèrent.";
-      try {
-        await files.changePassword(String(v.old), String(v.new));
-        return null;
-      } catch (e) {
-        return errText(e);
-      }
-    },
-  );
-  if (done) toast("Mot de passe changé. Vos autres sessions ont été fermées.");
-}
 
 // --- Administration des comptes ---------------------------------------------------
 
@@ -248,7 +440,7 @@ async function renderAdmin(box: HTMLElement) {
   };
 
   box.replaceChildren(
-    h("div", { className: "browser-head" }, h("h2", {}, "Administration : comptes"), h("span", { className: "spacer" }), h("button", { className: "primary", onclick: () => void add() }, "Nouveau compte…")),
+    h("div", { className: "browser-head" }, h("h2", {}, "Comptes"), h("span", { className: "spacer" }), h("button", { className: "primary", onclick: () => void add() }, "Nouveau compte…")),
     h(
       "div",
       { className: "file-list accounts" },
@@ -329,6 +521,10 @@ async function renderFiles(box: HTMLElement) {
           { className: "act lite", title: "Ouvrir dans AuxiSheet Lite : calculé dans votre navigateur, sans moteur sur le serveur", onclick: (ev: Event) => (ev.stopPropagation(), launch("sheetlite", [p])) },
           "Lite",
         ),
+      !e.dir &&
+        me.auxicorrect !== false &&
+        /\.(txt|md|markdown|text)$/i.test(e.name) &&
+        h("button", { className: "act lite", title: "Corriger ce texte dans AuxiCorrect", onclick: (ev: Event) => (ev.stopPropagation(), launch("correct", [p])) }, "Corriger"),
       !e.dir && h("a", { className: "act", href: files.url(p, true), title: "Télécharger sur cet ordinateur", onclick: (ev: Event) => ev.stopPropagation() }, "⬇"),
       h(
         "button",

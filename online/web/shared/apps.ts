@@ -2,9 +2,10 @@
 // (même répartition que `AppKind::for_path` de l'application de bureau).
 
 export type OfficeKind = "office" | "writer" | "sheet" | "present" | "draw" | "pdf";
-export type AppId = OfficeKind | "text" | "sheetlite";
+export type AppId = OfficeKind | "text" | "sheetlite" | "correct" | "mail";
 
 export const APPS: { id: AppId; name: string; icon: string; blurb: string }[] = [
+  { id: "mail", name: "AuxiMail", icon: "/auximail.svg", blurb: "Courriel" },
   { id: "office", name: "AuxiOffice", icon: "/icons/auxioffice.svg", blurb: "Le lanceur de la suite" },
   { id: "writer", name: "AuxiWriter", icon: "/icons/auxiwriter.svg", blurb: "Traitement de texte" },
   { id: "sheet", name: "AuxiSheet", icon: "/icons/auxisheet.svg", blurb: "Tableur" },
@@ -13,7 +14,11 @@ export const APPS: { id: AppId; name: string; icon: string; blurb: string }[] = 
   { id: "pdf", name: "AuxiPDF", icon: "/icons/auxipdf.svg", blurb: "Lecture et annotation de PDF" },
   { id: "sheetlite", name: "AuxiSheet Lite", icon: "/icons/auxisheet.svg", blurb: "Tableur léger, calculé dans votre navigateur" },
   { id: "text", name: "AuxiText", icon: "/auxitext.svg", blurb: "Éditeur de texte et de code" },
+  { id: "correct", name: "AuxiCorrect", icon: "/auxicorrect.svg", blurb: "Correcteur et dictionnaire du français" },
 ];
+
+/** Applications du portail d'AuxiOffice Online, dans l'ordre. */
+export const PORTAL_APPS: AppId[] = ["mail", "writer", "sheet", "present", "draw", "pdf", "text", "correct"];
 
 /** Classeurs que AuxiSheet Lite sait ouvrir. */
 export const isLiteSheet = (path: string) => extension(path) === "xlsx";
@@ -59,11 +64,11 @@ export function appFor(path: string): AppId {
 /** Adresse d'une application, avec des fichiers à ouvrir ou un document vierge. */
 export function appUrl(id: AppId, files: string[] = [], newDoc = false): string {
   const p = new URLSearchParams();
-  if (id !== "text" && id !== "sheetlite") p.set("app", id);
+  if (id !== "text" && id !== "sheetlite" && id !== "correct" && id !== "mail") p.set("app", id);
   for (const f of files) p.append("open", f);
   if (newDoc) p.set("new", "1");
   const qs = p.toString();
-  const dir = id === "text" ? "/text/" : id === "sheetlite" ? "/sheet/" : "/office/";
+  const dir = id === "text" ? "/text/" : id === "sheetlite" ? "/sheet/" : id === "correct" ? "/correct/" : "/office/";
   return `${dir}${qs ? `?${qs}` : ""}`;
 }
 

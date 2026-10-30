@@ -44,7 +44,8 @@ pub struct Setup {
     pub root: PathBuf,
     pub sandbox: Sandbox,
     pub max_engines: usize,
-    pub max_per_user: usize,
+    /// Documents ouverts par compte (réglable depuis l'administration).
+    pub max_per_user: AtomicUsize,
     pub spares: usize,
     pub max_open_mb: u64,
     /// `auxicorrect-cli` d'AuxiCorrect (correction du français), si installé.
@@ -345,7 +346,7 @@ impl Pool {
         {
             let docs = self.docs.lock().unwrap();
             let mine = docs.values().filter(|d| d.user == user).count();
-            if mine >= self.setup.max_per_user {
+            if mine >= self.setup.max_per_user.load(Ordering::Relaxed) {
                 return Err(format!("Vous avez déjà {mine} documents ouverts : fermez-en un pour en ouvrir un autre."));
             }
             if docs.values().any(|d| d.user == user && d.state.lock().unwrap().vpath == vpath) {

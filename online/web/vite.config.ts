@@ -1,8 +1,9 @@
-// Construction de l'interface d'AuxiOffice Online, en quatre passes :
+// Construction de l'interface d'AuxiOffice Online, en cinq passes :
 //   --mode portal : portail (connexion, applications, Mes documents) → dist/
 //   --mode office : les applications de bureautique (app/ui) → dist/office/
 //   --mode text   : AuxiText (text/ui) → dist/text/
 //   --mode sheet  : AuxiSheet Lite (IronCalc, entièrement dans le navigateur) → dist/sheet/
+//   --mode correct: AuxiCorrect (correcteur et dictionnaire) → dist/correct/
 //
 // Les applications sont celles du bureau, sans aucune copie de leur code :
 // les modules de Tauri (@tauri-apps/*) y sont remplacés par les équivalents
@@ -63,6 +64,16 @@ export default defineConfig(({ mode }) => {
       publicDir: false as const,
       plugins: [react()],
       build: { outDir: resolve(dist, "sheet"), emptyOutDir: true, target: "es2022", chunkSizeWarningLimit: 1500 },
+    };
+  }
+  if (mode === "correct") {
+    // AuxiCorrect : correcteur et dictionnaire (AuxiCorrect tourne sur le serveur).
+    return {
+      ...common,
+      root: resolve(here, "correct"),
+      base: "/correct/",
+      publicDir: false as const,
+      build: { outDir: resolve(dist, "correct"), emptyOutDir: true, target: "es2022" },
     };
   }
   if (mode === "text") {

@@ -4,7 +4,7 @@
   "version": "0.2.0-beta.2",
   "type": "module",
   "scripts": {
-    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc --noEmit && vite build --mode portal && vite build --mode office && vite build --mode text && vite build --mode sheet",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc --noEmit && vite build --mode portal && vite build --mode office && vite build --mode text && vite build --mode sheet && vite build --mode correct",
     "typecheck": "tsc --noEmit",
     "dev": "vite --mode office"
   },

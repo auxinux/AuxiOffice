@@ -9,6 +9,7 @@ mod api;
 mod auth;
 mod engines;
 mod grammar;
+mod settings;
 mod storage;
 mod ws;
 
@@ -52,7 +53,9 @@ pub struct AppState {
     pub store: storage::Storage,
     pub pool: Arc<Pool>,
     pub secure_cookies: bool,
-    pub quota_mb: u64,
+    pub settings: settings::Store,
+    pub started: Instant,
+    pub sandbox_name: &'static str,
     /// AuxiCorrect : `auxicorrect-cli` et sa version, s'il est installé.
     pub auxicorrect: Option<(PathBuf, Option<String>)>,
     downloads: Mutex<HashMap<String, Download>>,
@@ -95,13 +98,14 @@ Options (aussi en variables AUXI_ONLINE_<OPTION>, ex. AUXI_ONLINE_LISTEN) :
   --secure-cookies          témoin « Secure » (derrière HTTPS : à activer en production)
   --sandbox auto|bwrap|none bac à sable des moteurs (défaut auto : bubblewrap s'il fonctionne)
   --max-engines <n>         moteurs simultanés sur le serveur (défaut 16)
-  --max-docs <n>            documents ouverts par utilisateur (défaut 6)
+  --max-docs <n>            documents ouverts par compte (défaut 6)
   --spares <n>              moteurs de réserve démarrés d'avance (défaut 1)
   --idle-minutes <n>        fermeture d'un document inactif (défaut 120)
   --resume-seconds <n>      après une coupure, délai de reconnexion avant de fermer les
                             documents de l'onglet (défaut 180)
-  --quota-mb <n>            espace par utilisateur (défaut 2048)
+  --quota-mb <n>            espace par défaut d'un compte (défaut 1024)
   --max-open-mb <n>         taille maximale d'un document ouvert (défaut 200)
+  --auximail-url <adresse>  adresse d'AuxiMail (webmail) pour le portail
   --lang <langue>           langue des moteurs (défaut fr-FR)
   --auxicorrect-cli <outil> correcteur AuxiCorrect (défaut : celui déclaré par AuxiCorrect dans
                             ~/.config/auxinux/auxicorrect.json) ; « none » : sans AuxiCorrect
@@ -342,7 +346,7 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         root: data.join("engines"),
         sandbox: sandbox.clone(),
         max_engines: args.num("max-engines", 16).max(1) as usize,
-        max_per_user: args.num("max-docs", 6).max(1) as usize,
+        max_per_user: std::sync::atomic::AtomicUsize::new(6),
         spares: args.num("spares", 1) as usize,
         max_open_mb: args.num("max-open-mb", 200),
         auxicorrect: auxicorrect.as_ref().map(|(c, _)| c.clone()),
@@ -368,21 +372,36 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         store: storage::Storage::new(data.join("files")),
         pool: pool.clone(),
         secure_cookies: args.on("secure-cookies"),
-        quota_mb: args.num("quota-mb", 2048),
+        settings: settings::Store::load(
+            data.join("settings.json"),
+            settings::Settings {
+                default_quota_mb: args.num("quota-mb", 1024),
+                max_docs_per_user: args.num("max-docs", 6).clamp(1, 50) as usize,
+                idle_minutes: args.num("idle-minutes", 120).clamp(5, 10_080),
+                auximail_url: args.get("auximail-url").unwrap_or_default(),
+            },
+        ),
+        started: Instant::now(),
+        sandbox_name: match sandbox {
+            Sandbox::Bwrap(_) => "bubblewrap",
+            Sandbox::None => "aucun",
+        },
         auxicorrect,
         downloads: Mutex::new(HashMap::new()),
     });
     pool.refill();
 
     // Documents inactifs : fermés (leur moteur libéré) après le délai.
-    let idle = Duration::from_secs(args.num("idle-minutes", 120) * 60);
     let grace = Duration::from_secs(args.num("resume-seconds", 180));
+    pool.setup.max_per_user.store(app.settings.get().max_docs_per_user, std::sync::atomic::Ordering::Relaxed);
     let p = pool.clone();
+    let a = app.clone();
     tokio::spawn(async move {
         let mut t = tokio::time::interval(Duration::from_secs(20));
         loop {
             t.tick().await;
             let p = p.clone();
+            let idle = Duration::from_secs(a.settings.get().idle_minutes * 60);
             let _ = tokio::task::spawn_blocking(move || {
                 p.reap(idle, grace);
                 p.refill();
@@ -403,6 +422,9 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         .route("/api/admin/users", get(api::admin_list).post(api::admin_add))
         .route("/api/admin/users/update", post(api::admin_update))
         .route("/api/admin/users/delete", post(api::admin_delete))
+        .route("/api/admin/settings", get(api::admin_settings).put(api::admin_settings_put))
+        .route("/api/admin/status", get(api::admin_status))
+        .route("/api/me/profile", post(api::update_profile))
         .route("/api/files", get(api::list))
         .route("/api/file", get(api::read).put(api::write))
         .route("/api/stat", post(api::stat))

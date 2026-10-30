@@ -11,5 +11,5 @@
     "types": ["vite/client"],
     "jsx": "react-jsx"
   },
-  "include": ["shims", "shared", "portal", "sheet", "wasm/*.d.ts"]
+  "include": ["shims", "shared", "portal", "sheet", "correct", "wasm/*.d.ts"]
 }

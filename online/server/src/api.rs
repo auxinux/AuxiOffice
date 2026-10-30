@@ -47,14 +47,15 @@ async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Sen
 }
 
 pub async fn me(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap) -> Response {
-    let base = json!({"auth": app.auth.enabled(), "version": env!("CARGO_PKG_VERSION")});
+    let auximail = app.settings.get().auximail_url;
+    let base = json!({"auth": app.auth.enabled(), "version": env!("CARGO_PKG_VERSION"), "auximail": auximail, "auxicorrect": app.auxicorrect.is_some()});
     match user(&app, &headers, &method) {
         Ok(u) => {
             let mut v = base;
             v["user"] = json!({"email": u.email, "name": u.name, "admin": u.admin});
             let (store, id) = (app.store.clone(), u.id.clone());
             let used = tokio::task::spawn_blocking(move || store.usage(&id)).await.unwrap_or(0);
-            v["usage"] = json!({"used": used, "quota": u.quota_mb.unwrap_or(app.quota_mb) * 1024 * 1024});
+            v["usage"] = json!({"used": used, "quota": u.quota_mb.unwrap_or(app.settings.get().default_quota_mb) * 1024 * 1024});
             Json(v).into_response()
         }
         Err(_) => (StatusCode::UNAUTHORIZED, Json(base)).into_response(),
@@ -152,7 +153,7 @@ pub async fn read(State(app): State<Arc<AppState>>, method: Method, headers: Hea
 
 pub async fn write(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Query(q): Query<PathQ>, body: Bytes) -> ApiResult<Json<Value>> {
     let u = user(&app, &headers, &method)?;
-    let quota = u.quota_mb.unwrap_or(app.quota_mb) * 1024 * 1024;
+    let quota = u.quota_mb.unwrap_or(app.settings.get().default_quota_mb) * 1024 * 1024;
     let store = app.store.clone();
     let path = crate::storage::normalize(&q.path)?;
     let stat = blocking(move || {
@@ -298,15 +299,16 @@ fn admin(app: &AppState, headers: &HeaderMap, method: &Method) -> ApiResult<User
 pub async fn admin_list(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap) -> ApiResult<Json<Value>> {
     admin(&app, &headers, &method)?;
     let a = app.clone();
+    let default = app.settings.get().default_quota_mb;
     let list = blocking(move || {
         Ok(a.auth
             .list()
             .iter()
-            .map(|u| json!({"email": u.email, "name": u.name, "admin": u.admin, "quota_mb": u.quota_mb.unwrap_or(a.quota_mb), "custom_quota": u.quota_mb.is_some(), "used": a.store.usage(&u.id)}))
+            .map(|u| json!({"email": u.email, "name": u.name, "admin": u.admin, "quota_mb": u.quota_mb.unwrap_or(default), "custom_quota": u.quota_mb.is_some(), "used": a.store.usage(&u.id)}))
             .collect::<Vec<_>>())
     })
     .await?;
-    Ok(Json(json!({"users": list, "default_quota_mb": app.quota_mb})))
+    Ok(Json(json!({"users": list, "default_quota_mb": default})))
 }
 
 #[derive(Deserialize)]
@@ -386,6 +388,62 @@ pub async fn admin_delete(State(app): State<Arc<AppState>>, method: Method, head
     })
     .await?;
     Ok(Json(json!({})))
+}
+
+#[derive(Deserialize)]
+pub struct Profile {
+    name: String,
+}
+
+/// Son propre profil (nom affiché).
+pub async fn update_profile(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<Profile>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    if b.name.trim().is_empty() {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "Le nom ne peut pas être vide.".into()));
+    }
+    let a = app.clone();
+    blocking(move || a.auth.set_profile(&u.email, Some(b.name), None, None)).await?;
+    Ok(Json(json!({})))
+}
+
+/// Réglages du serveur (administrateurs).
+pub async fn admin_settings(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap) -> ApiResult<Json<Value>> {
+    admin(&app, &headers, &method)?;
+    Ok(Json(json!(app.settings.get())))
+}
+
+pub async fn admin_settings_put(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(s): Json<crate::settings::Settings>) -> ApiResult<Json<Value>> {
+    admin(&app, &headers, &method)?;
+    let a = app.clone();
+    let saved = blocking(move || a.settings.set(s)).await?;
+    app.pool.setup.max_per_user.store(saved.max_docs_per_user, std::sync::atomic::Ordering::Relaxed);
+    Ok(Json(json!(saved)))
+}
+
+/// État du serveur (administrateurs) : moteurs, documents, espace, options.
+pub async fn admin_status(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap) -> ApiResult<Json<Value>> {
+    admin(&app, &headers, &method)?;
+    let a = app.clone();
+    let (accounts, storage) = blocking(move || {
+        let users = a.auth.list();
+        let total: u64 = users.iter().map(|u| a.store.usage(&u.id)).sum();
+        Ok((users.len(), total))
+    })
+    .await?;
+    let setup = &app.pool.setup;
+    Ok(Json(json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "uptime_s": app.started.elapsed().as_secs(),
+        "accounts": accounts,
+        "storage": storage,
+        "engines_running": app.pool.running(),
+        "engines_max": setup.max_engines,
+        "docs_open": app.pool.open_count(),
+        "spares": setup.spares,
+        "sandbox": app.sandbox_name,
+        "auxicorrect": app.auxicorrect.as_ref().map(|(c, v)| json!({"cli": c, "version": v})),
+        "max_open_mb": setup.max_open_mb,
+    })))
 }
 
 // --- AuxiCorrect -----------------------------------------------------------------

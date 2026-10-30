@@ -56,6 +56,17 @@ export interface Stat {
   size: number;
 }
 
+/** Remarque d'AuxiCorrect (positions en unités UTF-16, comme les chaînes JavaScript). */
+export interface Remark {
+  from: number;
+  to: number;
+  category: string;
+  severity: string;
+  message: string;
+  suggestions: string[];
+  rule: string;
+}
+
 export interface Account {
   email: string;
   name: string;
@@ -65,9 +76,41 @@ export interface Account {
   used: number;
 }
 
+export interface AcOptions {
+  enabled: boolean;
+  international: boolean;
+  variant: string;
+  style: boolean;
+  regional: boolean;
+}
+
+export interface Settings {
+  default_quota_mb: number;
+  max_docs_per_user: number;
+  idle_minutes: number;
+  auximail_url: string;
+}
+
+export interface Status {
+  version: string;
+  uptime_s: number;
+  accounts: number;
+  storage: number;
+  engines_running: number;
+  engines_max: number;
+  docs_open: number;
+  spares: number;
+  sandbox: string;
+  auxicorrect: { cli: string; version: string | null } | null;
+  max_open_mb: number;
+}
+
 export interface Me {
   auth: boolean;
   version: string;
+  /** Adresse d'AuxiMail (vide : pas encore offert). */
+  auximail?: string;
+  auxicorrect?: boolean;
   user?: { email: string; name: string; admin?: boolean };
   usage?: { used: number; quota: number };
 }
@@ -100,7 +143,14 @@ export const files = {
   adminAdd: (a: { email: string; name: string; password: string; admin: boolean; quota_mb?: number }) => postJson("/api/admin/users", a),
   adminUpdate: (a: { email: string; name?: string; password?: string; admin?: boolean; quota_mb?: number }) => postJson("/api/admin/users/update", a),
   adminDelete: (email: string, withFiles: boolean) => postJson("/api/admin/users/delete", { email, files: withFiles }),
-  auxicorrect: () => getJson<{ available: boolean; version: string | null; options: { enabled: boolean; international: boolean; variant: string; style: boolean; regional: boolean } }>("/api/auxicorrect"),
+  auxicorrect: () => getJson<{ available: boolean; version: string | null; options: AcOptions }>("/api/auxicorrect"),
+  setAuxicorrect: (o: AcOptions) => postJson<{ available: boolean; version: string | null; options: AcOptions }>("/api/auxicorrect", o, "PUT"),
+  lookup: (what: string, word: string) => postJson<{ text: string }>("/api/auxicorrect/lookup", { what, word }),
+  check: (text: string, international: boolean) => postJson<Remark[]>("/api/auxicorrect/check", { text, international }),
+  setProfile: (name: string) => postJson("/api/me/profile", { name }),
+  settings: () => getJson<Settings>("/api/admin/settings"),
+  setSettings: (s: Settings) => postJson<Settings>("/api/admin/settings", s, "PUT"),
+  status: () => getJson<Status>("/api/admin/status"),
   log: (message: string) => void fetch("/api/log", { method: "POST", credentials: "same-origin", headers: MUTATE, body: message }).catch(() => undefined),
 };
 

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Icône d'AuxiCorrect (écosystème AuxiNux) : carré arrondi orange, « A » blanc et coche. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="fond" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7831F"/>
+      <stop offset="1" stop-color="#E06200"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="108" ry="108" fill="url(#fond)"/>
+  <!-- Lettre A -->
+  <path d="M 224 92 L 288 92 L 404 392 L 340 392 L 316 324 L 196 324 L 172 392 L 108 392 Z M 214 272 L 298 272 L 256 154 Z"
+        fill="#FFFFFF" fill-rule="evenodd"/>
+  <!-- Coche -->
+  <circle cx="392" cy="392" r="84" fill="#23252A"/>
+  <path d="M 350 394 L 380 424 L 436 364" fill="none" stroke="#F2B713" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
