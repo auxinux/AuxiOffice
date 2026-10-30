@@ -376,6 +376,19 @@ function buildList(list: Entry[], close: () => void): HTMLDivElement {
       const sub = buildList(i.entries(), close);
       sub.classList.add("auxi-submenu");
       r.append(sub);
+      // Placé par rapport à la fenêtre : un menu qui défile couperait un
+      // sous-menu placé à côté de lui. À droite de la ligne, sinon à gauche ;
+      // remonté s'il dépasse le bas de la fenêtre.
+      r.addEventListener("mouseenter", () => {
+        const row = r.getBoundingClientRect();
+        sub.style.left = `${row.right - 2}px`;
+        sub.style.top = `${row.top - 5}px`;
+        requestAnimationFrame(() => {
+          const s = sub.getBoundingClientRect();
+          if (s.right > innerWidth - 4) sub.style.left = `${Math.max(4, row.left - s.width + 2)}px`;
+          if (s.bottom > innerHeight - 4) sub.style.top = `${Math.max(4, innerHeight - s.height - 4)}px`;
+        });
+      });
       box.append(r);
       lastWasSep = false;
       continue;

@@ -93,12 +93,13 @@ body > #root {
   box-shadow: var(--ao-shadow);
   z-index: 9001;
 }
+.auxi-menu {
+  overflow-x: hidden;
+}
 .auxi-submenu {
   display: none;
-  top: -5px;
-  left: 100%;
-  overflow: visible;
-  max-height: none;
+  position: fixed;
+  max-height: calc(100vh - 8px);
 }
 .auxi-menu-item.has-sub:hover > .auxi-submenu {
   display: block;
