@@ -114,6 +114,12 @@ _pr_inno() {
   return 1
 }
 
+# Contrôle intelligent des applications actif (1 ; 0 : désactivé, 2 : évaluation).
+_pr_sac() {
+  MSYS2_ARG_CONV_EXCL='*' reg.exe query 'HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy' \
+    /v VerifiedAndReputablePolicyState 2>/dev/null | tr -d '\r' | grep -q 'REG_DWORD[[:space:]]*0x1$'
+}
+
 _pr_winget() { echo "winget install -e --id $1 --accept-package-agreements --accept-source-agreements${2:+ $2}"; }
 
 # Remplit PR_MISSING, PR_PKGS, PR_STEPS et PR_MANUAL.
@@ -139,6 +145,13 @@ _pr_check() {
       _pr_pkg "$(_pr_linux_name pkgconfig)"
       for lib in webkit2gtk-4.1 gtk+-3.0 libsoup-3.0; do _pr_pkg "$(_pr_linux_name "$lib")"; done
     fi
+  fi
+
+  # Contrôle intelligent des applications (Windows 11) : il bloque les programmes
+  # non signés que Rust compile puis lance (build.rs : « os error 4551 »).
+  if [ "$PR_OS" = windows ] && _pr_sac; then
+    _pr_need "Contrôle intelligent des applications (Smart App Control) désactivé"
+    _pr_manual "Sécurité Windows → Contrôle des applications et du navigateur → Paramètres du contrôle intelligent des applications → Désactivé, puis relancez ce script (il bloque les programmes compilés : « os error 4551 »)"
   fi
 
   # Outils MSVC (Windows) : l'éditeur de liens de Rust.

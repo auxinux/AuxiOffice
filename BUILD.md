@@ -147,6 +147,14 @@ Les scripts de compilation (`build.sh`, `build.ps1`, `build-win.sh`, `build-mac.
 - macOS : Homebrew (Node.js, Python), rustup ; les outils Xcode s'installent par
   `xcode-select --install`, puis on relance le script.
 
+Windows 11 : le **contrôle intelligent des applications** (Smart App Control) bloque les
+programmes non signés que Rust compile puis lance pendant la compilation (`could not execute
+process … build-script-build`, « Une stratégie de contrôle d'application a bloqué ce fichier »,
+`os error 4551`). Le script le détecte et demande de le désactiver : Sécurité Windows →
+Contrôle des applications et du navigateur → Paramètres du contrôle intelligent des
+applications → Désactivé. Sur un poste géré (stratégie WDAC de l'entreprise), il faut une
+exception pour le dossier du dépôt.
+
 `AUXI_INSTALL=oui` installe sans demander, `AUXI_INSTALL=non` s'arrête sans rien installer. Hors
 d'un terminal (CI), les commandes à lancer sont affichées et le script s'arrête. Une version
 trop ancienne de Node.js (moins de 20.19) ou de Rust (moins de 1.85) est signalée ; Rust est mis
