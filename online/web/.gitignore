@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Module WebAssembly d'AuxiText (généré par online/build.sh)
+wasm/

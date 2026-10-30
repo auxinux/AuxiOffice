@@ -24,6 +24,10 @@ enregistrement atomique, thème clair ou sombre qui suit le bureau. « Ouvrir da
 apparaît quand la suite est installée. Avec AuxiCorrect (activé pour AuxiText dans son onglet
 Intégration), le français des textes et du Markdown est corrigé pendant la frappe.
 
+**AuxiOffice Online** (`online/`, pour web.office.auxinux.ca) offre ces applications dans
+le navigateur, plus **AuxiSheet Lite**, un tableur qui calcule entièrement chez le client
+(IronCalc en WebAssembly) : voir [online/README.md](online/README.md).
+
 AuxiOffice est un **produit propriétaire du Projet AuxiNux**. Son interface et sa coque sont
 écrites par AuxiNux ; le rendu et l'édition des documents sont confiés à
 **LibreOffice**, utilisé sans modification comme moteur, dans un processus séparé

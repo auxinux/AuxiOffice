@@ -1,0 +1,24 @@
+[package]
+name = "auxisheet-lite-wasm"
+description = "AuxiSheet Lite (AuxiOffice Online) : lecture et écriture des classeurs .xlsx dans le navigateur, par IronCalc compilé en WebAssembly"
+version = "0.2.0-beta.2"
+edition = "2021"
+license = "LicenseRef-AuxiOffice-Proprietary"
+publish = false
+
+# Projet séparé du dépôt (voir `exclude` du Cargo.toml racine).
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Même version que @ironcalc/wasm et @ironcalc/workbook (online/web/package.json) :
+# le format interne des classeurs (bitcode) doit être identique des deux côtés.
+ironcalc = "=0.9.1"
+wasm-bindgen = "=0.2.129"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1

@@ -1,0 +1,19 @@
+[package]
+name = "auxitext-textio-wasm"
+description = "Encodages d'AuxiText (détection, décodage, encodage) compilés en WebAssembly pour AuxiOffice Online"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+encoding_rs = "0.8"
+chardetng = "0.1"
+# Même version que l'outil wasm-bindgen qui génère le module JavaScript.
+wasm-bindgen = "=0.2.129"

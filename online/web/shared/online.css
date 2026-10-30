@@ -1,0 +1,387 @@
+/* AuxiOffice Online : barre de menus HTML, boîtes de dialogue et sélecteur
+   de fichiers, ajoutés aux applications du bureau. */
+
+:root {
+  --ao-orange: #f26f00;
+  --ao-graphite: #23252a;
+  --ao-bg: #ffffff;
+  --ao-bg2: #f4f4f2;
+  --ao-line: #dcdcd8;
+  --ao-text: #23252a;
+  --ao-muted: #6b6e73;
+  --ao-sel: #fde6d2;
+  --ao-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+html.dark,
+html.dark body {
+  --ao-bg: #2a2c31;
+  --ao-bg2: #222428;
+  --ao-line: #3d4046;
+  --ao-text: #e8e8e6;
+  --ao-muted: #a2a5aa;
+  --ao-sel: #5a3a1c;
+}
+
+/* La page : barre de menus en haut, application dessous. */
+body {
+  display: flex;
+  flex-direction: column;
+}
+body > #root {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto !important;
+}
+
+#auxi-menubar {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  height: 28px;
+  padding: 0 4px;
+  background: var(--ao-bg);
+  color: var(--ao-text);
+  border-bottom: 1px solid var(--ao-line);
+  font: 13px "Carlito", "Segoe UI", "Noto Sans", system-ui, sans-serif;
+  user-select: none;
+  position: relative;
+  z-index: 9000;
+}
+#auxi-menubar .spacer {
+  flex: 1;
+}
+.auxi-menubar-top {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  border-radius: 4px;
+  margin: 2px 0;
+  cursor: default;
+}
+.auxi-menubar-top:hover,
+.auxi-menubar-top.open {
+  background: var(--ao-bg2);
+}
+.auxi-menubar-home {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  margin: 3px 0;
+  border-radius: 4px;
+  color: var(--ao-orange);
+  text-decoration: none;
+  font-weight: 600;
+}
+.auxi-menubar-home:hover {
+  background: var(--ao-bg2);
+}
+
+.auxi-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 230px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--ao-bg);
+  color: var(--ao-text);
+  border: 1px solid var(--ao-line);
+  border-radius: 6px;
+  box-shadow: var(--ao-shadow);
+  z-index: 9001;
+}
+.auxi-submenu {
+  display: none;
+  top: -5px;
+  left: 100%;
+  overflow: visible;
+  max-height: none;
+}
+.auxi-menu-item.has-sub:hover > .auxi-submenu {
+  display: block;
+}
+.auxi-menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 4px;
+  border-radius: 4px;
+  white-space: nowrap;
+  cursor: default;
+}
+.auxi-menu-item:hover:not(.disabled) {
+  background: var(--ao-orange);
+  color: #fff;
+}
+.auxi-menu-item.disabled {
+  color: var(--ao-muted);
+  opacity: 0.6;
+}
+.auxi-menu-item .check {
+  width: 16px;
+  text-align: center;
+  flex: none;
+}
+.auxi-menu-item .label {
+  flex: 1;
+}
+.auxi-menu-item .accel {
+  color: var(--ao-muted);
+  font-size: 12px;
+  margin-left: 24px;
+}
+.auxi-menu-item:hover:not(.disabled) .accel {
+  color: #fff;
+}
+.auxi-menu-item.has-sub::after {
+  content: "›";
+  margin-left: 16px;
+}
+.auxi-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--ao-line);
+}
+
+/* Boîtes de dialogue. */
+.auxi-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 21, 24, 0.35);
+  font: 14px "Carlito", "Segoe UI", "Noto Sans", system-ui, sans-serif;
+}
+.auxi-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  background: var(--ao-bg);
+  color: var(--ao-text);
+  border-radius: 10px;
+  box-shadow: var(--ao-shadow);
+  overflow: hidden;
+}
+.auxi-modal.wide {
+  width: min(760px, calc(100vw - 32px));
+  height: min(560px, calc(100vh - 48px));
+}
+.auxi-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 8px 18px;
+  font-weight: 600;
+  font-size: 15px;
+}
+.auxi-modal.kind-warning .auxi-modal-head {
+  border-top: 3px solid #f2b713;
+}
+.auxi-modal.kind-error .auxi-modal-head {
+  border-top: 3px solid #d33;
+}
+.auxi-modal-x {
+  border: 0;
+  background: none;
+  color: var(--ao-muted);
+  font-size: 20px;
+  cursor: pointer;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+}
+.auxi-modal-x:hover {
+  background: var(--ao-bg2);
+}
+.auxi-modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 18px 10px;
+}
+.auxi-modal-text {
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+.auxi-modal-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 18px 16px;
+}
+.auxi-modal-actions .spacer {
+  flex: 1;
+}
+.auxi-modal button.primary,
+.auxi-modal button.secondary {
+  font: inherit;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--ao-line);
+}
+.auxi-modal button.primary {
+  background: var(--ao-orange);
+  border-color: var(--ao-orange);
+  color: #fff;
+  font-weight: 600;
+}
+.auxi-modal button.primary:hover {
+  filter: brightness(0.95);
+}
+.auxi-modal button.secondary {
+  background: var(--ao-bg);
+  color: var(--ao-text);
+}
+.auxi-modal button.secondary:hover {
+  background: var(--ao-bg2);
+}
+.auxi-input {
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--ao-line);
+  border-radius: 6px;
+  background: var(--ao-bg);
+  color: var(--ao-text);
+  min-width: 0;
+}
+.auxi-input:focus {
+  outline: 2px solid var(--ao-orange);
+  outline-offset: -1px;
+}
+.auxi-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ao-muted);
+}
+.auxi-field .auxi-input {
+  flex: 1;
+  color: var(--ao-text);
+}
+
+/* Sélecteur de fichiers. */
+.auxi-picker-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.auxi-crumbs {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+}
+.auxi-crumbs .crumb {
+  font: inherit;
+  border: 0;
+  background: none;
+  color: var(--ao-text);
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.auxi-crumbs .crumb:hover {
+  background: var(--ao-bg2);
+}
+.auxi-crumbs .crumb:last-child {
+  font-weight: 600;
+}
+.auxi-crumbs .sep {
+  color: var(--ao-muted);
+}
+.auxi-picker-tools {
+  display: flex;
+  gap: 6px;
+}
+.auxi-picker-tools button {
+  padding: 4px 10px !important;
+  font-size: 13px !important;
+}
+.auxi-files {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  border: 1px solid var(--ao-line);
+  border-radius: 8px;
+  padding: 4px;
+  outline: none;
+}
+.auxi-files.drop {
+  border-color: var(--ao-orange);
+  background: var(--ao-sel);
+}
+.auxi-files-empty {
+  color: var(--ao-muted);
+  padding: 24px;
+  text-align: center;
+}
+.auxi-file {
+  display: grid;
+  grid-template-columns: 24px 1fr 80px 130px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: default;
+  user-select: none;
+}
+.auxi-file:hover {
+  background: var(--ao-bg2);
+}
+.auxi-file.sel {
+  background: var(--ao-sel);
+}
+.ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.auxi-file .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auxi-file .size,
+.auxi-file .date {
+  color: var(--ao-muted);
+  font-size: 12px;
+  text-align: right;
+}
+.auxi-picker-status {
+  min-height: 1em;
+  color: #c33;
+  font-size: 13px;
+}
+.auxi-picker-bottom {
+  display: flex;
+  gap: 12px;
+}
+.auxi-picker-bottom .auxi-field {
+  flex: 1;
+}
+
+.auxi-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 10001;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--ao-graphite);
+  color: #fff;
+  font: 14px "Carlito", "Segoe UI", "Noto Sans", system-ui, sans-serif;
+  box-shadow: var(--ao-shadow);
+}

@@ -37,21 +37,37 @@ AuxiOffice :
 | Composants tiers inclus dans LibreOffice (bibliothèques, dictionnaires, polices) | ils sont couverts par les licences listées dans `LICENSE.html` de LibreOffice ; ils sont redistribués sans modification, avec ces mentions |
 | Dépendances Rust et npm de la coque et de l'interface | licences permissives (MIT, Apache 2.0, BSD, ISC, Zlib, Unicode) ; une liste des licences tierces doit être générée et livrée avec l'application — **à faire** (par exemple `cargo about` et `license-checker`) |
 
-## 4. Marques
+## 4. AuxiOffice Online (`online/`)
+
+- Le serveur (`online/server`), le portail et les adaptations web (`online/web`) sont
+  propriétaires, comme le reste d'AuxiOffice. Le moteur de documents y est le même
+  LibreOffice non modifié, dans un processus séparé par document.
+- **Offrir un service en ligne n'est pas une « distribution »** au sens de la MPL 2.0 : les
+  obligations de la section 3 s'appliquent aux paquets d'installation du serveur, s'ils sont
+  remis à des tiers. Les mentions de LibreOffice restent à afficher (page `/licences` du site,
+  « À propos »).
+- **IronCalc** (AuxiSheet Lite : crate `ironcalc`, paquets npm `@ironcalc/wasm` et
+  `@ironcalc/workbook`) est sous **MIT ou Apache 2.0** : mention de copyright et texte de la
+  licence à livrer avec l'interface web (liste des licences tierces, **à faire** comme pour
+  le bureau).
+- Autres dépendances (axum, tokio, tower-http, argon2, flate2, wasm-bindgen ; React, i18next,
+  lucide-react, CodeMirror, PDF.js) : licences permissives (MIT, Apache 2.0, BSD, ISC).
+
+## 5. Marques
 
 - « LibreOffice » est une marque déposée de The Document Foundation. AuxiOffice ne l'emploie
   que pour indiquer l'origine du moteur (« Moteur de documents : LibreOffice »), jamais comme
   nom de produit, et n'affiche pas le logo LibreOffice.
 - Les noms et logos AuxiNux et AuxiOffice (`branding/`) appartiennent au Projet AuxiNux.
 
-## 5. Ce qu'il faut éviter dans le cœur du produit
+## 6. Ce qu'il faut éviter dans le cœur du produit
 
 - Code sous **GPL ou AGPL** (il imposerait la publication de l'ensemble) : par exemple
   HyperFormula (GPL v3 sans licence commerciale), ou le code d'ONLYOFFICE.
 - Bibliothèques « freemium » dont les fonctions utiles sont réservées à une édition payante.
 - Toute modification de fichiers de LibreOffice sans la publier.
 
-## 6. AuxiNux Office (produit précédent)
+## 7. AuxiNux Office (produit précédent)
 
 AuxiNux Office 0.1.0 était un fork AGPL d'ONLYOFFICE. Ses versions déjà distribuées restent
 sous AGPL : leur code source correspondant doit rester accessible aux personnes qui ont reçu

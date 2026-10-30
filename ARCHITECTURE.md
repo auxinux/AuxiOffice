@@ -254,3 +254,12 @@ second fil (`run_windows`). Sans cette boucle, tout ce qui passe par la boucle d
 restait bloqué (chargement des classeurs, présentations et dessins, enregistrement, boîtes de
 dialogue). Le mode « unipoll » n'existe pas sous Windows (le module Windows n'appelle pas ses
 rappels).
+
+## AuxiOffice Online (`online/`)
+
+Les mêmes applications dans le navigateur (web.office.auxinux.ca) : `app/ui` et `text/ui`
+sont reconstruites pour le web avec les modules de Tauri remplacés (`online/web/shims/`) ;
+le serveur Rust `auxi-online` (`online/server`) relaie le protocole d'`auxi-engine` par
+WebSocket, un moteur isolé (bubblewrap) par document. AuxiText, AuxiPDF et AuxiSheet Lite
+(IronCalc) fonctionnent entièrement dans le navigateur, en WebAssembly pour la partie Rust.
+Détails : [online/README.md](online/README.md).

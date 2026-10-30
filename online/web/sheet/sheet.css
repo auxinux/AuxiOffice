@@ -1,0 +1,102 @@
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+body > #root {
+  height: 100% !important;
+}
+body {
+  display: block;
+  font: 14px "Carlito", "Segoe UI", "Noto Sans", system-ui, sans-serif;
+  color: var(--ao-text);
+}
+.lite {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.lite-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 10px;
+  background: var(--ao-graphite);
+  color: #eee;
+}
+.lite-bar img {
+  width: 22px;
+  height: 22px;
+}
+.lite-app {
+  font-size: 14px;
+  color: #d7d7d4;
+}
+.lite-app b {
+  color: #1e9e5a;
+  color: #4cc786;
+}
+.lite-name {
+  font-weight: 600;
+  margin-left: 6px;
+  max-width: 34vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lite-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #33363c;
+  color: #b7b9ba;
+}
+.lite-bar .spacer {
+  flex: 1;
+}
+.lite-bar button {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #44474e;
+  background: #2e3036;
+  color: #eee;
+  cursor: pointer;
+}
+.lite-bar button:hover:not(:disabled) {
+  background: #3a3d44;
+}
+.lite-bar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.lite-home {
+  color: #f26f00;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0 6px;
+}
+.lite-main {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.lite-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ao-muted);
+  white-space: pre-wrap;
+  padding: 24px;
+  text-align: center;
+}
+.lite-state.error {
+  color: #c33;
+}
