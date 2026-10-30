@@ -25,6 +25,9 @@ struct AppState {
     /// Dernière fenêtre active : elle reçoit les lancements suivants.
     focused: Mutex<String>,
     next_window: AtomicU64,
+    /// L'interface de la fenêtre principale a démarré (elle a demandé ses
+    /// lancements). Avant, un lancement lui est réservé.
+    ui_started: std::sync::atomic::AtomicBool,
 }
 
 /// AuxiCorrect : réglage commun (lu au démarrage), options d'AuxiOffice et
@@ -712,6 +715,7 @@ fn app_info(state: State<'_, AppState>) -> Value {
 /// demande au démarrage et à chaque événement `launch`.
 #[tauri::command]
 fn take_launches(window: WebviewWindow, state: State<'_, AppState>) -> Vec<Launch> {
+    state.ui_started.store(true, Ordering::SeqCst);
     state.pending.lock().unwrap().remove(window.label()).unwrap_or_default()
 }
 
@@ -811,7 +815,16 @@ fn queue_launch(app: &AppHandle, l: Launch) {
     let state = app.state::<AppState>();
     let windows = app.webview_windows();
     let focused = state.focused.lock().unwrap().clone();
-    let target = if windows.contains_key(&focused) { Some(focused) } else { windows.keys().next().cloned() };
+    // macOS : le document du Finder (`open -a AuxiWriter.app fichier`) arrive
+    // avant que la fenêtre principale existe ; il lui revient, sans quoi elle
+    // démarrait en plus sur un document vierge.
+    let target = if windows.contains_key(&focused) {
+        Some(focused)
+    } else if !state.ui_started.load(Ordering::SeqCst) {
+        Some("main".to_string())
+    } else {
+        windows.keys().next().cloned()
+    };
     let Some(label) = target else {
         let app2 = app.clone();
         let _ = app.run_on_main_thread(move || {
@@ -901,7 +914,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Engines::default())
         .manage(Mutex::new(Corrector::start(&data_dir, kind)))
-        .manage(AppState { kind, data_dir: data_dir.clone(), pending: Mutex::new(initial), focused: Mutex::new("main".into()), next_window: AtomicU64::new(0) })
+        .manage(AppState { kind, data_dir: data_dir.clone(), pending: Mutex::new(initial), focused: Mutex::new("main".into()), next_window: AtomicU64::new(0), ui_started: Default::default() })
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::Focused(true) => {
                 *window.app_handle().state::<AppState>().focused.lock().unwrap() = window.label().to_string();

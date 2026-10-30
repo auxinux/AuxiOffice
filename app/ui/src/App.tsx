@@ -169,10 +169,16 @@ export function App() {
     [],
   );
 
+  /** Document vierge du démarrage en cours de création. */
+  const startupBlank = useRef<Promise<void> | null>(null);
+
   /** Ouvre des fichiers ici, ou dans leur application s'ils sont d'un autre type. */
   const openFiles = useCallback(
     async (files: string[]) => {
       if (!files.length) return;
+      // Un fichier arrivé pendant la création du document vierge de démarrage
+      // l'attend, puis le remplace.
+      if (startupBlank.current) await startupBlank.current;
       try {
         const mine = await routeFiles(files);
         if (mine.length < files.length) notify(appRef.current === "office" ? "Ouverture dans son application…" : "Document ouvert dans son application.");
@@ -265,9 +271,21 @@ export function App() {
       off = await onLaunch(() => void handle());
       const first = await takeLaunches();
       for (const l of first) await runLaunch(l);
-      // Comme Word : l'application démarre sur un document vierge.
+      // Comme Word : l'application démarre sur un document vierge, sauf si un
+      // fichier arrive juste après le lancement (macOS : document du Finder
+      // ou d'AuxiOffice, livré par le système après le démarrage).
       const own = APP_DOC[info.kind];
-      if (!first.length && own && own !== "pdf") await createNew(own);
+      if (!first.length && own && own !== "pdf") {
+        await new Promise((r) => window.setTimeout(r, 400));
+        const late = await takeLaunches();
+        for (const l of late) await runLaunch(l);
+        if (!late.length && tabsRef.current.length === 0) {
+          const blank = createNew(own);
+          startupBlank.current = blank;
+          await blank;
+          startupBlank.current = null;
+        }
+      }
       // Moteur de réserve, une fois l'interface affichée (pas dans AuxiPDF).
       if (info.kind !== "pdf") window.setTimeout(() => void warmEngine(), first.length ? 4000 : 800);
     })();
