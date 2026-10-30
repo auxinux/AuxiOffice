@@ -51,11 +51,8 @@ if [ -n "$INSTALLER" ]; then
   if [ -n "$TEXT_ONLY" ]; then exec scripts/build-deb.sh --auxitext; else exec scripts/build-deb.sh; fi
 fi
 
-missing=""
-for tool in cargo npm; do
-  command -v "$tool" >/dev/null || missing="$missing $tool"
-done
-[ -z "$missing" ] || die "outils manquants :$missing — voir BUILD.md (Rust via rustup, Node.js 22+)"
+. "$ROOT/scripts/lib/prereqs.sh"
+prereqs ${TEXT_ONLY:+auxitext}
 
 if [ -z "$TEXT_ONLY" ]; then
   printf '\n== Moteur LibreOffice\n'

@@ -65,11 +65,8 @@ win_exts() {
   esac
 }
 
-missing=""
-for tool in cargo npm; do
-  command -v "$tool" >/dev/null || missing="$missing $tool"
-done
-[ -z "$missing" ] || die "outils manquants :$missing — voir BUILD.md (Rust via rustup, Node.js 22+)"
+. "$ROOT/scripts/lib/prereqs.sh"
+prereqs ${TEXT_ONLY:+auxitext} ${INSTALLER:+installer}
 
 # Inno Setup : cherché avant la compilation, pour ne pas échouer à la fin.
 ISCC=""

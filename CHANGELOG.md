@@ -9,6 +9,12 @@
   d'administrateur (`scripts/build-win.sh`). macOS : applications autonomes (moteur dans
   AuxiOffice.app) et images disque `.dmg` (`scripts/build-mac.sh`). Linux : paquets `.deb`
   (`scripts/build-deb.sh`).
+- **Prérequis proposés à l'installation** : au lieu de s'arrêter sur « cargo et npm absents »,
+  les scripts de compilation listent ce qui manque (Rust, Node.js, npm, Python, outils MSVC,
+  bibliothèques WebKitGTK, dpkg-deb et fakeroot, Inno Setup, Git sous Windows) et proposent de
+  l'installer : `apt`, `auxi install --deb` (AuxiNuxOS), `dnf`, `pacman`, `winget`, Homebrew,
+  rustup (`scripts/lib/prereqs.sh`, `scripts/lib/git-bash.ps1`). `AUXI_INSTALL=oui` : sans
+  demander.
 - `.gitattributes` : les scripts `.sh` gardent leurs fins de ligne LF dans un clone Windows.
 
 ## 0.2.0-beta.2

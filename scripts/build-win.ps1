@@ -37,8 +37,9 @@ Usage : scripts\build-win.ps1 [-AuxiText] [-Installer] [-Help]
   scripts\build-win.ps1 -AuxiText -Installer  AuxiText et son installateur
   scripts\build-win.ps1 -Help                 cette aide (aussi -h, --help)
 
-Prérequis : Git pour Windows, Rust (outils MSVC), Node.js 22+, Python 3 ;
-pour -Installer : Inno Setup 6 (winget install JRSoftware.InnoSetup).
+Prérequis : Git pour Windows, Rust (outils MSVC), Node.js 20.19+, Python 3 ;
+pour -Installer : Inno Setup 6. Ce qui manque est proposé à l'installation
+(winget) ; AUXI_INSTALL=oui installe sans demander.
 
 Si Windows refuse d'exécuter le script :
   powershell -ExecutionPolicy Bypass -File scripts\build-win.ps1 [-AuxiText] [-Installer]
@@ -55,16 +56,9 @@ foreach ($a in $Reste) {
 }
 if ($Help) { Write-Host $usage; exit 0 }
 
-# Le Bash de Git pour Windows (pas celui de WSL, C:\Windows\System32\bash.exe).
-$candidats = @()
-$git = Get-Command git.exe -ErrorAction SilentlyContinue
-if ($git) { $candidats += Join-Path (Split-Path (Split-Path $git.Source)) 'bin\bash.exe' }
-$candidats += "$env:ProgramFiles\Git\bin\bash.exe", "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe"
-$bash = $candidats | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $bash) {
-  Write-Host 'Erreur : Git pour Windows introuvable (il fournit Git Bash) : https://git-scm.com/download/win' -ForegroundColor Red
-  exit 1
-}
+# Le Bash de Git pour Windows (Git est proposé à l'installation s'il manque).
+. (Join-Path $PSScriptRoot 'lib\git-bash.ps1')
+$bash = Get-GitBash
 
 $options = @()
 if ($AuxiText) { $options += '--auxitext' }

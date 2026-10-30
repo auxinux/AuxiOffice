@@ -48,11 +48,8 @@ VERSION=$(tr -d '\r\n' < VERSION)
 OUT="$ROOT/target/macos"
 APPS="office writer sheet present draw pdf"
 
-missing=""
-for tool in cargo npm; do
-  command -v "$tool" >/dev/null || missing="$missing $tool"
-done
-[ -z "$missing" ] || die "outils manquants :$missing — voir BUILD.md (Rust via rustup, Node.js 22+)"
+. "$ROOT/scripts/lib/prereqs.sh"
+prereqs ${TEXT_ONLY:+auxitext}
 
 if [ -z "$TEXT_ONLY" ]; then
   say "Moteur LibreOffice"

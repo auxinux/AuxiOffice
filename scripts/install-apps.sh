@@ -152,6 +152,9 @@ if [ "${1:-}" = "--remove" ]; then
   exit 0
 fi
 
+. "$ROOT/scripts/lib/prereqs.sh"
+prereqs
+
 say "Moteur LibreOffice"
 if ! ls .engine/*/program-dir >/dev/null 2>&1; then
   if [ "$OS" = macos ]; then scripts/build-engine-macos.sh; else scripts/fetch-engine.sh; fi

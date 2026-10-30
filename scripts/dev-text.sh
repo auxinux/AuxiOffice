@@ -7,14 +7,8 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
-missing=""
-for tool in cargo npm; do
-  command -v "$tool" >/dev/null || missing="$missing $tool"
-done
-if [ -n "$missing" ]; then
-  echo "Outils manquants :$missing — voir BUILD.md (Rust via rustup, Node.js 22+)." >&2
-  exit 1
-fi
+. "$ROOT/scripts/lib/prereqs.sh"
+prereqs auxitext
 
 echo "== Interface d'AuxiText"
 (cd text && { [ -d node_modules ] || npm install --no-audit --no-fund; } && npm run --silent build)

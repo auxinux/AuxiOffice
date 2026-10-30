@@ -30,6 +30,8 @@ OUT="$ROOT/target/deb"
 WORK="$ROOT/target/deb-work"
 MAINTAINER="AuxiNux <repo@auxinux.ca>"
 HOMEPAGE="https://office.auxinux.ca"
+. "$ROOT/scripts/lib/prereqs.sh"
+prereqs deb ${TEXT_ONLY:+auxitext}
 if [ -z "$TEXT_ONLY" ]; then
   ENGINE=$(cat ".engine/$PLATFORM/program-dir" 2>/dev/null || true)
   [ -n "$ENGINE" ] && [ -d "$ENGINE" ] || { echo "Moteur absent ($PLATFORM) : lancer d'abord scripts/fetch-engine.sh" >&2; exit 1; }

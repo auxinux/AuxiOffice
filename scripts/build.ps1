@@ -45,6 +45,9 @@ Installateurs produits :
   Linux    target/deb/auxioffice_<version>_<arch>.deb (dépend d'auxitext)
            et auxitext_<version>_<arch>.deb
 
+Prérequis manquants (Git, Rust et outils MSVC, Node.js, Python, Inno Setup) :
+  proposés à l'installation avec winget ; AUXI_INSTALL=oui installe sans demander.
+
 Si Windows refuse d'exécuter le script :
   powershell -ExecutionPolicy Bypass -File scripts\build.ps1 [-AuxiText] [-Installer]
 '@
@@ -71,16 +74,9 @@ if ($env:OS -ne 'Windows_NT') {
   exit $LASTEXITCODE
 }
 
-# Windows : le Bash de Git pour Windows (pas celui de WSL, C:\Windows\System32\bash.exe).
-$candidats = @()
-$git = Get-Command git.exe -ErrorAction SilentlyContinue
-if ($git) { $candidats += Join-Path (Split-Path (Split-Path $git.Source)) 'bin\bash.exe' }
-$candidats += "$env:ProgramFiles\Git\bin\bash.exe", "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe"
-$bash = $candidats | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $bash) {
-  Write-Host 'Erreur : Git pour Windows introuvable (il fournit Git Bash) : https://git-scm.com/download/win' -ForegroundColor Red
-  exit 1
-}
+# Windows : le Bash de Git pour Windows (Git est proposé à l'installation s'il manque).
+. (Join-Path $PSScriptRoot 'lib\git-bash.ps1')
+$bash = Get-GitBash
 
 & $bash $script @options
 exit $LASTEXITCODE

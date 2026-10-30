@@ -136,6 +136,22 @@ lancements suivants sont rapides. Sous Windows, lancer les scripts dans Git Bash
 
 Windows : WebView2 (fourni avec Windows 10/11). macOS : Xcode (outils en ligne de commande).
 
+Les scripts de compilation (`build.sh`, `build.ps1`, `build-win.sh`, `build-mac.sh`,
+`build-deb.sh`, `install-apps.sh`, `dev.sh`, `dev-text.sh`) vérifient ces prérequis
+(`scripts/lib/prereqs.sh`) et proposent d'installer ce qui manque :
+
+- Linux : `apt` (Debian, Ubuntu), `sudo auxi install --deb` (AuxiNuxOS), `dnf` ou `pacman`,
+  puis Rust par rustup ;
+- Windows : `winget` (Git, outils MSVC de Visual Studio, Node.js LTS, Python 3, Rust, et
+  Inno Setup pour `--installer`) ;
+- macOS : Homebrew (Node.js, Python), rustup ; les outils Xcode s'installent par
+  `xcode-select --install`, puis on relance le script.
+
+`AUXI_INSTALL=oui` installe sans demander, `AUXI_INSTALL=non` s'arrête sans rien installer. Hors
+d'un terminal (CI), les commandes à lancer sont affichées et le script s'arrête. Une version
+trop ancienne de Node.js (moins de 20.19) ou de Rust (moins de 1.85) est signalée ; Rust est mis
+à jour par rustup.
+
 ## Moteur LibreOffice
 
 ```sh

@@ -16,17 +16,12 @@ case "$(uname -s)-$(uname -m)" in
   *) echo "Plateforme non prise en charge : $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
 
+. "$ROOT/scripts/lib/prereqs.sh"
+prereqs
+
 # Python : « python3 », ou « python » sous Windows.
 PY=python3
 command -v python3 >/dev/null && python3 -c "" 2>/dev/null || PY=python
-missing=""
-for tool in cargo npm "$PY" curl; do
-  command -v "$tool" >/dev/null || missing="$missing $tool"
-done
-if [ -n "$missing" ]; then
-  echo "Outils manquants :$missing — voir BUILD.md (Rust via rustup, Node.js 22+, outils Xcode sur Mac)." >&2
-  exit 1
-fi
 
 # Moteur absent ou d'une autre version que celle épinglée : (re)télécharger.
 wanted=$("$PY" -c "import json;print(json.load(open('engine/libreoffice.lock.json'))['version'])")
