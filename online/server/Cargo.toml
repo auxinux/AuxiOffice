@@ -16,6 +16,7 @@ axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "fs"] }
 tower-http = { version = "0.6", features = ["fs", "set-header"] }
 argon2 = "0.5"
+sha2 = "0.10"
 rand = "0.8"
 flate2 = "1"
 url = "2"

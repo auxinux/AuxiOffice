@@ -135,6 +135,63 @@ export function prompt(title: string, label: string, value = ""): Promise<string
   });
 }
 
+export interface Field {
+  name: string;
+  label: string;
+  type?: "text" | "email" | "password" | "number" | "checkbox";
+  value?: string | boolean;
+  placeholder?: string;
+}
+
+/**
+ * Formulaire de quelques champs ; `check` refuse les valeurs invalides
+ * (message affiché, la boîte reste ouverte). null : annulé.
+ */
+export function form(title: string, fields: Field[], okLabel = "OK", check?: (v: Record<string, string | boolean>) => Promise<string | null> | string | null): Promise<Record<string, string | boolean> | null> {
+  return new Promise((resolve) => {
+    const s = shell(title, () => {
+      s.close();
+      resolve(null);
+    });
+    const inputs = new Map<string, HTMLInputElement>();
+    for (const f of fields) {
+      const input = el("input", { type: f.type ?? "text", className: f.type === "checkbox" ? "" : "auxi-input", placeholder: f.placeholder ?? "" });
+      if (f.type === "checkbox") input.checked = !!f.value;
+      else input.value = typeof f.value === "string" ? f.value : "";
+      if (f.type === "password") input.autocomplete = "new-password";
+      inputs.set(f.name, input);
+      s.body.append(f.type === "checkbox" ? el("label", { className: "auxi-check" }, input, f.label) : el("label", { className: "auxi-field column" }, f.label, input));
+    }
+    const msg = el("div", { className: "auxi-picker-status" });
+    s.body.append(msg);
+    const ok = button(okLabel, true, async () => {
+      const v: Record<string, string | boolean> = {};
+      for (const [k, i] of inputs) v[k] = i.type === "checkbox" ? i.checked : i.value;
+      ok.disabled = true;
+      const err = check ? await check(v) : null;
+      ok.disabled = false;
+      if (err) {
+        msg.textContent = err;
+        return;
+      }
+      s.close();
+      resolve(v);
+    });
+    s.actions.append(
+      el("span", { className: "spacer" }),
+      button("Annuler", false, () => {
+        s.close();
+        resolve(null);
+      }),
+      ok,
+    );
+    s.root.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") void ok.click();
+    });
+    [...inputs.values()].find((i) => i.type !== "checkbox")?.focus();
+  });
+}
+
 /** Petit message passager en bas de la fenêtre. */
 export function toast(text: string, ms = 4000) {
   const t = el("div", { className: "auxi-toast", textContent: text });

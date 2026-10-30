@@ -5,7 +5,7 @@ export type OfficeKind = "office" | "writer" | "sheet" | "present" | "draw" | "p
 export type AppId = OfficeKind | "text" | "sheetlite";
 
 export const APPS: { id: AppId; name: string; icon: string; blurb: string }[] = [
-  { id: "office", name: "AuxiOffice", icon: "/icons/auxioffice.svg", blurb: "Tous vos documents, en onglets" },
+  { id: "office", name: "AuxiOffice", icon: "/icons/auxioffice.svg", blurb: "Le lanceur de la suite" },
   { id: "writer", name: "AuxiWriter", icon: "/icons/auxiwriter.svg", blurb: "Traitement de texte" },
   { id: "sheet", name: "AuxiSheet", icon: "/icons/auxisheet.svg", blurb: "Tableur" },
   { id: "present", name: "AuxiPresent", icon: "/icons/auxipresent.svg", blurb: "Présentations" },

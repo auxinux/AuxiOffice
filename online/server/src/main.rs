@@ -80,7 +80,8 @@ const USAGE: &str = "AuxiOffice Online — serveur de web.office.auxinux.ca
 
 Utilisation :
   auxi-online [serve] [options]        démarre le serveur
-  auxi-online user add <courriel> [--name <nom>] [--quota-mb <n>]
+  auxi-online user add <courriel> [--name <nom>] [--quota-mb <n>] [--admin]
+  auxi-online user admin <courriel>    (donne le rôle d'administrateur)
   auxi-online user passwd <courriel>
   auxi-online user remove <courriel>
   auxi-online user list
@@ -114,7 +115,7 @@ struct Args {
     positional: Vec<String>,
 }
 
-const BOOL_FLAGS: &[&str] = &["no-auth", "secure-cookies", "help"];
+const BOOL_FLAGS: &[&str] = &["no-auth", "secure-cookies", "help", "admin"];
 
 fn parse_args() -> Args {
     let mut flags = HashMap::new();
@@ -238,34 +239,36 @@ fn user_command(args: &Args, data: &Path) -> Result<(), String> {
     match pos.get(1).map(String::as_str) {
         Some("list") => {
             for u in &users {
-                println!("{}\t{}\t{}", u.email, u.name, u.id);
+                println!("{}\t{}\t{}{}", u.email, u.name, u.id, if u.admin { "\tadministrateur" } else { "" });
             }
             Ok(())
         }
         Some("add") => {
-            let email = email.filter(|e| e.contains('@')).ok_or("courriel manquant ou invalide")?;
+            let email = email.ok_or("courriel manquant")?;
             if users.iter().any(|u| u.email.eq_ignore_ascii_case(&email)) {
                 return Err(format!("{email} existe déjà"));
             }
-            let password = read_password();
-            if password.chars().count() < 8 {
-                return Err("mot de passe trop court (8 caractères au moins)".into());
-            }
-            let name = args.get("name").unwrap_or_else(|| email.split('@').next().unwrap_or("").to_string());
-            let id = format!("u{}", &auth::random_token()[..16]);
-            users.push(auth::User { id, email: email.clone(), name, hash: auth::hash_password(&password)?, quota_mb: args.get("quota-mb").and_then(|q| q.parse().ok()) });
+            // Le premier compte est administrateur.
+            let admin = args.on("admin") || users.is_empty();
+            let u = auth::new_user(&email, &args.get("name").unwrap_or_default(), &read_password(), args.get("quota-mb").and_then(|q| q.parse().ok()), admin)?;
+            users.push(u);
             auth::save_users(&file, &users)?;
-            println!("compte créé : {email}");
+            println!("compte créé : {email}{}", if admin { " (administrateur)" } else { "" });
+            Ok(())
+        }
+        Some("admin") => {
+            let email = email.ok_or("courriel manquant")?;
+            let u = users.iter_mut().find(|u| u.email.eq_ignore_ascii_case(&email)).ok_or(format!("{email} : compte inconnu"))?;
+            u.admin = true;
+            auth::save_users(&file, &users)?;
+            println!("{email} est administrateur");
             Ok(())
         }
         Some("passwd") => {
             let email = email.ok_or("courriel manquant")?;
-            let password = read_password();
-            if password.chars().count() < 8 {
-                return Err("mot de passe trop court (8 caractères au moins)".into());
-            }
+            let hash = auth::hash_password(&read_password())?;
             let u = users.iter_mut().find(|u| u.email.eq_ignore_ascii_case(&email)).ok_or(format!("{email} : compte inconnu"))?;
-            u.hash = auth::hash_password(&password)?;
+            u.hash = hash;
             auth::save_users(&file, &users)?;
             println!("mot de passe changé : {email}");
             Ok(())
@@ -388,6 +391,10 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         .route("/api/me", get(api::me))
         .route("/api/login", post(api::login))
         .route("/api/logout", post(api::logout))
+        .route("/api/me/password", post(api::change_password))
+        .route("/api/admin/users", get(api::admin_list).post(api::admin_add))
+        .route("/api/admin/users/update", post(api::admin_update))
+        .route("/api/admin/users/delete", post(api::admin_delete))
         .route("/api/files", get(api::list))
         .route("/api/file", get(api::read).put(api::write))
         .route("/api/stat", post(api::stat))

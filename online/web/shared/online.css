@@ -385,3 +385,16 @@ body > #root {
   font: 14px "Carlito", "Segoe UI", "Noto Sans", system-ui, sans-serif;
   box-shadow: var(--ao-shadow);
 }
+
+.auxi-field.column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  font-size: 13px;
+}
+.auxi-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
