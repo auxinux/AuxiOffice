@@ -4,8 +4,7 @@
 // (impression, liens, encodages d'AuxiText en WebAssembly).
 
 import { appFor, appName, extension, launch, officeKindFor, type OfficeKind } from "../shared/apps";
-import { toast } from "../shared/dialogs";
-import { files, HttpError } from "../shared/http";
+import { files, HttpError, postJson } from "../shared/http";
 import * as ws from "../shared/ws";
 import { dispatch } from "./event";
 import "../shared/online.css";
@@ -82,17 +81,27 @@ async function recentOffice(add: string | null): Promise<string[]> {
   return list.filter((_, i) => stats[i]?.exists);
 }
 
-const AUXICORRECT_OFF = {
-  installed: false,
-  enabledForAuxiOffice: false,
-  version: null,
-  hasApp: false,
-  settingsFile: "",
-  running: false,
-  active: false,
-  writerOnly: kind !== "writer" && kind !== "office",
-  options: { enabled: false, international: false, variant: "toutes", style: false, regional: false },
-};
+interface AcState {
+  available: boolean;
+  version: string | null;
+  options: { enabled: boolean; international: boolean; variant: string; style: boolean; regional: boolean };
+}
+
+/** AuxiCorrect tourne sur le serveur (s'il y est installé), avec les options du compte. */
+function acStatus(st: AcState) {
+  const writerOnly = kind !== "writer" && kind !== "office";
+  return {
+    installed: st.available,
+    enabledForAuxiOffice: st.available,
+    version: st.version,
+    hasApp: false,
+    settingsFile: "",
+    running: st.available,
+    active: st.available && st.options.enabled && !writerOnly,
+    writerOnly,
+    options: st.options,
+  };
+}
 
 async function office(cmd: string, a: Record<string, unknown>, raw: Args, opts?: Opts): Promise<unknown> {
   switch (cmd) {
@@ -184,11 +193,13 @@ async function office(cmd: string, a: Record<string, unknown>, raw: Args, opts?:
     case "prefs_set":
       return void (await files.kvPut("prefs-office", a.prefs));
     case "auxicorrect_status":
+      return acStatus(await files.auxicorrect());
     case "auxicorrect_set_options":
-      return AUXICORRECT_OFF;
-    case "auxicorrect_open_app":
+      return acStatus(await postJson<AcState>("/api/auxicorrect", a.options, "PUT"));
     case "auxicorrect_lookup":
-      throw "AuxiCorrect n'est pas encore offert dans AuxiOffice Online.";
+      return (await postJson<{ text: string }>("/api/auxicorrect/lookup", { what: a.what, word: a.word })).text;
+    case "auxicorrect_open_app":
+      throw "Les réglages avancés d'AuxiCorrect (dictionnaire personnel, mots ignorés) se font dans l'application AuxiCorrect sur un ordinateur.";
   }
   throw `commande non disponible en ligne : ${cmd}`;
 }
@@ -285,12 +296,14 @@ async function text(cmd: string, a: Record<string, unknown>): Promise<unknown> {
       return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     case "print_page":
       return window.print();
-    case "auxicorrect_status":
-      return { installed: false, enabled: false, version: null, hasApp: false };
+    case "auxicorrect_status": {
+      const st = await files.auxicorrect().catch(() => null);
+      return { installed: !!st?.available, enabled: !!st?.available, version: st?.version ?? null, hasApp: false };
+    }
     case "auxicorrect_check":
-      return [];
+      return postJson("/api/auxicorrect/check", { text: a.text, international: !!a.international });
     case "auxicorrect_open":
-      throw "AuxiCorrect n'est pas encore offert dans AuxiOffice Online.";
+      throw "Les réglages avancés d'AuxiCorrect se font dans l'application AuxiCorrect sur un ordinateur.";
   }
   throw `commande non disponible en ligne : ${cmd}`;
 }
@@ -308,10 +321,3 @@ export async function invoke<T>(cmd: string, args?: Args, opts?: Opts): Promise<
 
 export const isTauri = () => false;
 export const convertFileSrc = (p: string) => files.url(p);
-
-// Le serveur redémarré ou la connexion perdue : prévenir une fois.
-let warned = false;
-window.addEventListener("offline", () => {
-  if (!warned) toast("Connexion Internet perdue : les documents ouverts ne peuvent plus être enregistrés.", 8000);
-  warned = true;
-});

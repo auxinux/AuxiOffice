@@ -47,6 +47,10 @@ pub struct Setup {
     pub max_per_user: usize,
     pub spares: usize,
     pub max_open_mb: u64,
+    /// `auxicorrect-cli` d'AuxiCorrect (correction du français), si installé.
+    pub auxicorrect: Option<PathBuf>,
+    /// Espaces des utilisateurs (`données/files`) : options d'AuxiCorrect.
+    pub files_root: PathBuf,
 }
 
 /// Où envoyer les événements d'un moteur : fixé quand il reçoit son document
@@ -71,16 +75,30 @@ struct DocState {
 pub struct OpenDoc {
     pub id: u64,
     pub user: String,
-    pub conn: u64,
+    /// Session WebSocket du document : elle survit à une coupure le temps
+    /// d'une reconnexion (voir `detach` et `attach`).
+    pub session: String,
     engine: Engine,
+    route: Arc<Route>,
     slot: usize,
     work: PathBuf,
     state: Mutex<DocState>,
     last: Mutex<Instant>,
 }
 
+/// Session WebSocket : son utilisateur et, si sa connexion est coupée, depuis quand.
+struct Session {
+    user: String,
+    detached: Option<Instant>,
+}
+
 pub struct Pool {
     pub setup: Setup,
+    sessions: Mutex<HashMap<String, Session>>,
+    /// Utilisateur du document de chaque emplacement (AuxiCorrect).
+    slot_users: Arc<Mutex<HashMap<usize, String>>>,
+    /// Emplacements dont la prise AuxiCorrect écoute déjà.
+    grammar_slots: Mutex<std::collections::HashSet<usize>>,
     slots: Mutex<Vec<bool>>,
     spares: Mutex<Vec<Spare>>,
     warming: AtomicUsize,
@@ -132,7 +150,7 @@ impl Pool {
                 let _ = std::fs::remove_dir_all(e.path().join("work"));
             }
         }
-        Pool { setup, slots: Mutex::new(vec![]), spares: Mutex::new(vec![]), warming: AtomicUsize::new(0), docs: Mutex::new(HashMap::new()), next: AtomicU64::new(0) }
+        Pool { setup, sessions: Mutex::new(HashMap::new()), slot_users: Default::default(), grammar_slots: Default::default(), slots: Mutex::new(vec![]), spares: Mutex::new(vec![]), warming: AtomicUsize::new(0), docs: Mutex::new(HashMap::new()), next: AtomicU64::new(0) }
     }
 
     fn alloc_slot(&self) -> Option<usize> {
@@ -153,6 +171,7 @@ impl Pool {
     }
 
     fn free_slot(&self, i: usize) {
+        self.slot_users.lock().unwrap().remove(&i);
         let _ = std::fs::remove_dir_all(self.slot_dir(i).join("work"));
         if let Some(u) = self.slots.lock().unwrap().get_mut(i) {
             *u = false;
@@ -180,7 +199,9 @@ impl Pool {
         // (fils temporaires de tokio), pas au serveur. Si le serveur
         // s'arrête, le moteur voit son entrée se fermer et quitte seul.
         push(&["--new-session", "--unshare-all", "--cap-drop", "ALL"]);
-        for d in ["/usr", "/lib", "/lib64", "/lib32", "/bin", "/sbin", "/etc/fonts", "/etc/ld.so.cache", "/etc/localtime", "/etc/alternatives", "/var/cache/fontconfig"] {
+        // /etc/ssl : sans certificats, LibreOffice renonce à son client HTTP et
+        // donc au correcteur AuxiCorrect (même joint en HTTP local).
+        for d in ["/usr", "/lib", "/lib64", "/lib32", "/bin", "/sbin", "/etc/fonts", "/etc/ld.so.cache", "/etc/localtime", "/etc/alternatives", "/etc/ssl", "/var/cache/fontconfig"] {
             push(&["--ro-bind-try", d, d]);
         }
         push(&["--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"]);
@@ -202,6 +223,22 @@ impl Pool {
         a
     }
 
+    /// Prise AuxiCorrect de l'emplacement (créée une fois), si AuxiCorrect est installé.
+    fn grammar_socket(&self, slot: usize, dir: &Path) -> Option<PathBuf> {
+        let cli = self.setup.auxicorrect.clone()?;
+        let socket = dir.join("grammar.sock");
+        let mut started = self.grammar_slots.lock().unwrap();
+        if !started.contains(&slot) {
+            let users = self.slot_users.clone();
+            if let Err(e) = crate::grammar::listen(socket.clone(), cli, self.setup.files_root.clone(), move || users.lock().unwrap().get(&slot).cloned()) {
+                eprintln!("auxi-online : AuxiCorrect indisponible pour l'emplacement {slot} : {e}");
+                return None;
+            }
+            started.insert(slot);
+        }
+        Some(socket)
+    }
+
     fn spawn(&self, slot: usize, route: Arc<Route>) -> Result<Engine, String> {
         let dir = self.slot_dir(slot);
         let _ = std::fs::remove_dir_all(dir.join("work"));
@@ -218,6 +255,7 @@ impl Pool {
             profile_root: Some(dir.clone()),
             grammar_url: None,
             launcher: self.launcher(&dir),
+            grammar_socket: self.grammar_socket(slot, &dir),
         };
         Engine::spawn(
             &cfg,
@@ -294,7 +332,7 @@ impl Pool {
 
     /// Ouvre un document de l'utilisateur dans un moteur.
     #[allow(clippy::too_many_arguments)]
-    pub fn open(self: &Arc<Self>, store: &Storage, user: &str, conn: u64, tx: Outbox, vpath: &str, password: Option<String>) -> Result<Value, String> {
+    pub fn open(self: &Arc<Self>, store: &Storage, user: &str, session: &str, tx: Outbox, vpath: &str, password: Option<String>) -> Result<Value, String> {
         let vpath = storage::normalize(vpath)?;
         let real = store.real(user, &vpath)?;
         let meta = std::fs::metadata(&real).map_err(|_| format!("« {} » est introuvable", storage::file_name(&vpath)))?;
@@ -315,6 +353,7 @@ impl Pool {
             }
         }
         let (engine, route, slot) = self.take_engine()?;
+        self.slot_users.lock().unwrap().insert(slot, user.to_string());
         self.refill();
         let work = self.slot_dir(slot).join("work");
         let work_file = work.join(safe_name(storage::file_name(&vpath)));
@@ -345,8 +384,9 @@ impl Pool {
         let doc = OpenDoc {
             id,
             user: user.to_string(),
-            conn,
+            session: session.to_string(),
             engine,
+            route,
             slot,
             work,
             state: Mutex::new(DocState { vpath, work_file }),
@@ -505,21 +545,68 @@ impl Pool {
         }
     }
 
-    /// Connexion WebSocket fermée : ses documents sont fermés.
-    pub fn close_conn(&self, conn: u64) {
-        let gone: Vec<_> = {
-            let mut docs = self.docs.lock().unwrap();
-            let ids: Vec<u64> = docs.values().filter(|d| d.conn == conn).map(|d| d.id).collect();
-            ids.into_iter().filter_map(|i| docs.remove(&i)).collect()
+    /// Nouvelle session WebSocket, ou reprise d'une session coupée de ce même
+    /// utilisateur : ses documents envoient de nouveau leurs événements à la
+    /// nouvelle connexion. Retourne la session et ses documents encore ouverts.
+    pub fn attach(&self, user: &str, resume: Option<&str>, tx: Outbox) -> (String, Vec<u64>) {
+        let mut sessions = self.sessions.lock().unwrap();
+        let resumed = resume.filter(|r| sessions.get(*r).is_some_and(|s| s.user == user)).map(str::to_owned);
+        let Some(token) = resumed else {
+            let token = crate::auth::random_token();
+            sessions.insert(token.clone(), Session { user: user.to_string(), detached: None });
+            return (token, vec![]);
         };
-        for d in gone {
-            self.release(d);
+        sessions.get_mut(&token).unwrap().detached = None;
+        drop(sessions);
+        let mut ids = vec![];
+        for d in self.docs.lock().unwrap().values().filter(|d| d.session == token) {
+            *d.route.tx.lock().unwrap() = Some(tx.clone());
+            ids.push(d.id);
+        }
+        (token, ids)
+    }
+
+    /// Connexion WebSocket coupée : ses documents restent ouverts le temps
+    /// d'une reconnexion (voir `reap`), leurs événements ne partent plus.
+    pub fn detach(&self, session: &str) {
+        let mut any = false;
+        for d in self.docs.lock().unwrap().values().filter(|d| d.session == session) {
+            *d.route.tx.lock().unwrap() = None;
+            any = true;
+        }
+        let mut sessions = self.sessions.lock().unwrap();
+        if any {
+            if let Some(s) = sessions.get_mut(session) {
+                s.detached = Some(Instant::now());
+            }
+        } else {
+            sessions.remove(session);
         }
     }
 
-    /// Ferme les documents inactifs depuis `idle` et les moteurs arrêtés
+    /// Ferme les documents inactifs depuis `idle`, ceux d'une session coupée
+    /// depuis plus de `grace` (pas de reconnexion), et les moteurs arrêtés
     /// (documents et réserve).
-    pub fn reap(&self, idle: Duration) {
+    pub fn reap(&self, idle: Duration, grace: Duration) {
+        let expired: Vec<String> = {
+            let mut sessions = self.sessions.lock().unwrap();
+            let gone: Vec<String> = sessions.iter().filter(|(_, s)| s.detached.is_some_and(|t| t.elapsed() > grace)).map(|(k, _)| k.clone()).collect();
+            for k in &gone {
+                sessions.remove(k);
+            }
+            gone
+        };
+        if !expired.is_empty() {
+            let gone: Vec<_> = {
+                let mut docs = self.docs.lock().unwrap();
+                let ids: Vec<u64> = docs.values().filter(|d| expired.contains(&d.session)).map(|d| d.id).collect();
+                ids.into_iter().filter_map(|i| docs.remove(&i)).collect()
+            };
+            for d in gone {
+                eprintln!("auxi-online : document {} fermé (connexion perdue sans reprise)", d.id);
+                self.release(d);
+            }
+        }
         let dead: Vec<Spare> = {
             let mut spares = self.spares.lock().unwrap();
             let (alive, dead) = spares.drain(..).partition(|s| s.engine.is_alive());

@@ -134,7 +134,8 @@ export function Home({ app, recents, onNew, onOpen, onOpenPdf, onOpenPath, onAux
         </label>
       )}
       <footer>
-        {APP_NAMES[app]} · <a href="https://office.auxinux.ca" target="_blank" rel="noreferrer">office.auxinux.ca</a> ·{" "}
+        {APP_NAMES[app]} · <a href="https://office.auxinux.ca" target="_blank" rel="noreferrer">office.auxinux.ca</a>
+        {app !== "pdf" && " · "}
         {app !== "pdf" && (
           <button className="link" onClick={onAuxiCorrect}>
             Correction : {ac?.enabledForAuxiOffice ? `AuxiCorrect ${ac.version ?? ""}${ac.options.enabled ? "" : " (désactivé)"}` : "correcteur intégré"}

@@ -5,7 +5,10 @@ AuxiWriter, AuxiSheet, AuxiPresent, AuxiDraw, AuxiPDF, AuxiText, et **AuxiSheet 
 
 Les applications sont **celles du bureau**, sans copie de leur code : la même interface
 React (`app/ui`, `text/ui`) est construite une seconde fois pour le web, avec les modules de
-Tauri remplacés par des équivalents web (`web/shims/`).
+Tauri remplacés par des équivalents web (`web/shims/`). Elles se comportent donc comme sur le
+bureau : AuxiOffice est le lanceur, chaque application démarre sur un document, une
+« fenêtre » par document (un onglet du navigateur) ou des onglets dans l'application (réglage
+du menu Fichier), mêmes menus, ruban, boîtes de dialogue, AuxiCorrect.
 
 ## Qui fait le travail : le navigateur d'abord
 
@@ -46,6 +49,21 @@ auxi-online (Rust, axum) ── un auxi-engine par document, dans bubblewrap
   raccourcis, glisser-déposer de fichiers (envoyés dans Documents), impression par le
   navigateur.
 - `textio-wasm/`, `sheet-wasm/` : modules WebAssembly (Rust).
+
+### AuxiCorrect
+
+Si AuxiCorrect est installé sur le serveur (détecté comme sur le bureau par
+`~/.config/auxinux/auxicorrect.json`, ou `--auxicorrect-cli <outil>`), le français est corrigé
+comme dans AuxiWriter : soulignements et suggestions, options par compte (appliquées
+aussitôt), dictionnaire (définitions, synonymes, conjugaison) et correction dans AuxiText.
+`auxicorrect-cli` tourne sur le serveur ; le moteur, sans réseau, le joint par une prise Unix
+de son emplacement (`slot-N/grammar.sock`), relayée en HTTP local dans le bac à sable.
+
+### Coupures de connexion
+
+Une coupure (Wi-Fi, mise en veille, mandataire redémarré) ne perd rien : les documents de
+l'onglet restent ouverts sur le serveur (`--resume-seconds`, 180 s par défaut), le navigateur
+se reconnecte seul à la même session et tout est redessiné.
 
 ### Sécurité
 
@@ -97,25 +115,32 @@ auxi-online user remove ana@exemple.ca --data …     # ses fichiers restent sur
 auxi-online user list --data …
 ```
 
-Le mot de passe est lu dans `AUXI_PASSWORD`, sinon sur l'entrée standard. Les comptes
-ajoutés pendant que le serveur tourne sont pris en compte à la connexion suivante. Prévu
-ensuite : connexion unique (OIDC) commune avec AuxiMail.
+Le mot de passe est lu dans `AUXI_PASSWORD`, sinon sur l'entrée standard. **Le premier compte
+créé est administrateur** (`--admin` pour les suivants, ou `auxi-online user admin <courriel>`).
+
+Dans le portail, chacun peut **changer son mot de passe** ; les administrateurs ont une section
+**Administration** : créer un compte, changer son nom, son mot de passe, son espace ou son rôle,
+le supprimer (en gardant ou non ses fichiers). Un nouveau mot de passe ferme les sessions du
+compte. Les sessions sont gardées dans `sessions.json` (empreinte SHA-256 des jetons
+seulement) : un redémarrage du serveur ne déconnecte personne. Prévu ensuite : connexion
+unique (OIDC) commune avec AuxiMail.
 
 ## Mettre en ligne (web.office.auxinux.ca)
 
 1. Paquets du serveur (Debian 13) : `bubblewrap`, polices `fonts-crosextra-carlito`,
    `fonts-crosextra-caladea`, `fonts-liberation`, `fonts-dejavu`.
-2. Dossier d'installation, par exemple `/opt/auxioffice-online/` :
+2. Facultatif : AuxiCorrect sur le serveur (`--auxicorrect-cli /chemin/auxicorrect-cli`).
+3. Dossier d'installation, par exemple `/opt/auxioffice-online/` :
    `auxi-online`, `auxi-engine`, `templates/` (copie de `app/src-tauri/templates`),
    `web/` (copie de `online/web/dist`), et `engine/program/` (le moteur de documents :
    copie du dossier d'installation obtenu par `scripts/fetch-engine.sh`, ou
    `--lo-program <dossier program>`).
-3. Utilisateur système et données : `useradd -r -d /var/lib/auxioffice-online auxioffice`.
-4. Service : `deploy/auxioffice-online.service` (copie dans `/etc/systemd/system/`), puis
+4. Utilisateur système et données : `useradd -r -d /var/lib/auxioffice-online auxioffice`.
+5. Service : `deploy/auxioffice-online.service` (copie dans `/etc/systemd/system/`), puis
    `systemctl enable --now auxioffice-online`.
-5. Mandataire HTTPS : `deploy/nginx.conf` (WebSocket compris), certificat Let's Encrypt.
+6. Mandataire HTTPS : `deploy/nginx.conf` (WebSocket compris), certificat Let's Encrypt.
    Le serveur écoute sur 127.0.0.1 : ne jamais l'exposer directement.
-6. Premier compte : `sudo -u auxioffice /opt/auxioffice-online/auxi-online user add … --data /var/lib/auxioffice-online`.
+7. Premier compte (administrateur) : `sudo -u auxioffice /opt/auxioffice-online/auxi-online user add … --data /var/lib/auxioffice-online`.
 
 ### Capacité
 
@@ -128,7 +153,10 @@ AuxiText, AuxiPDF et AuxiSheet Lite ne consomment rien côté serveur.
 - Pas encore de coédition (deux personnes sur le même document) : un document n'est ouvert
   que par un onglet à la fois. LibreOfficeKit permet plusieurs vues par document, c'est la
   prochaine étape.
-- AuxiCorrect n'est pas encore offert en ligne.
+- Les réglages avancés d'AuxiCorrect (dictionnaire personnel, mots ignorés) restent dans
+  l'application AuxiCorrect d'un ordinateur.
+- Le copier-coller passe par le presse-papiers du navigateur : il exige HTTPS (ou
+  `localhost`), ce qui est le cas derrière nginx.
 - Le navigateur réserve certains raccourcis (Ctrl+N, Ctrl+T, Ctrl+W) ; le collage depuis le
   menu Édition est impossible (Ctrl+V fonctionne).
 - AuxiSheet Lite ne conserve pas les graphiques, images, tableaux croisés ni macros d'un

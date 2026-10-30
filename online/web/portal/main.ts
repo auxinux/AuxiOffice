@@ -3,9 +3,9 @@
 // Page légère, sans cadriciel : elle s'affiche avant tout le reste.
 
 import { APPS, appFor, appUrl, isLiteSheet, launch, type AppId } from "../shared/apps";
-import { messageBox, prompt, toast } from "../shared/dialogs";
+import { form, messageBox, prompt, toast } from "../shared/dialogs";
 import { fileIcon } from "../shared/icons";
-import { baseName, dirName, files, formatSize, joinPath, upload, type Entry, type Me } from "../shared/http";
+import { baseName, dirName, files, formatSize, joinPath, upload, type Account, type Entry, type Me } from "../shared/http";
 import "../shared/online.css";
 import "./portal.css";
 
@@ -102,6 +102,7 @@ async function showDashboard() {
     h("span", { className: "spacer" }),
     usage && h("span", { className: "usage", title: `${formatSize(usage.used)} sur ${formatSize(usage.quota)}` }, h("span", { className: "bar" }, h("span", { style: `width:${pct}%` })), `${formatSize(usage.used)} / ${formatSize(usage.quota)}`),
     h("span", { className: "user" }, user.name || user.email),
+    me.auth && h("button", { className: "secondary", onclick: () => void changePassword() }, "Mon mot de passe"),
     me.auth &&
       h(
         "button",
@@ -135,8 +136,140 @@ async function showDashboard() {
   );
 
   const browser = h("section", { className: "browser" });
-  root.replaceChildren(h("div", { className: "page" }, header, h("main", {}, create, apps, browser), footer()));
+  const adminBox = user.admin ? h("section", { className: "browser admin" }) : null;
+  root.replaceChildren(h("div", { className: "page" }, header, h("main", {}, create, apps, browser, adminBox), footer()));
   await renderFiles(browser);
+  if (adminBox) await renderAdmin(adminBox);
+}
+
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+async function changePassword() {
+  const done = await form(
+    "Changer mon mot de passe",
+    [
+      { name: "old", label: "Mot de passe actuel", type: "password" },
+      { name: "new", label: "Nouveau mot de passe (8 caractères au moins)", type: "password" },
+      { name: "again", label: "Nouveau mot de passe, encore", type: "password" },
+    ],
+    "Changer",
+    async (v) => {
+      if (v.new !== v.again) return "Les deux nouveaux mots de passe diffèrent.";
+      try {
+        await files.changePassword(String(v.old), String(v.new));
+        return null;
+      } catch (e) {
+        return errText(e);
+      }
+    },
+  );
+  if (done) toast("Mot de passe changé. Vos autres sessions ont été fermées.");
+}
+
+// --- Administration des comptes ---------------------------------------------------
+
+async function renderAdmin(box: HTMLElement) {
+  let list: Account[] = [];
+  let defaultQuota = 0;
+  try {
+    const r = await files.adminUsers();
+    list = r.users;
+    defaultQuota = r.default_quota_mb;
+  } catch (e) {
+    box.replaceChildren(h("h2", {}, "Administration"), h("p", { className: "hint" }, errText(e)));
+    return;
+  }
+  const refresh = () => void renderAdmin(box);
+  const quotaLabel = (a: Account) => `${formatSize(a.used)} / ${formatSize(a.quota_mb * 1024 * 1024)}${a.custom_quota ? "" : " (défaut)"}`;
+
+  const add = async () => {
+    const v = await form(
+      "Nouveau compte",
+      [
+        { name: "email", label: "Courriel", type: "email" },
+        { name: "name", label: "Nom affiché" },
+        { name: "password", label: "Mot de passe initial (8 caractères au moins)", type: "password" },
+        { name: "quota", label: `Espace en Mo (vide : ${defaultQuota} Mo par défaut)`, type: "number" },
+        { name: "admin", label: "Administrateur (gère les comptes)", type: "checkbox" },
+      ],
+      "Créer le compte",
+      async (v) => {
+        try {
+          const q = Number(v.quota);
+          await files.adminAdd({ email: String(v.email), name: String(v.name), password: String(v.password), admin: !!v.admin, quota_mb: q > 0 ? q : undefined });
+          return null;
+        } catch (e) {
+          return errText(e);
+        }
+      },
+    );
+    if (v) {
+      toast(`Compte ${v.email} créé.`);
+      refresh();
+    }
+  };
+
+  const edit = async (a: Account) => {
+    const v = await form(
+      `Modifier ${a.email}`,
+      [
+        { name: "name", label: "Nom affiché", value: a.name },
+        { name: "password", label: "Nouveau mot de passe (vide : inchangé ; ses sessions seront fermées)", type: "password" },
+        { name: "quota", label: `Espace en Mo (vide ou 0 : ${defaultQuota} Mo par défaut)`, type: "number", value: a.custom_quota ? String(a.quota_mb) : "" },
+        { name: "admin", label: "Administrateur", type: "checkbox", value: a.admin },
+      ],
+      "Enregistrer",
+      async (v) => {
+        try {
+          await files.adminUpdate({ email: a.email, name: String(v.name), password: String(v.password) || undefined, admin: !!v.admin, quota_mb: Number(v.quota) || 0 });
+          return null;
+        } catch (e) {
+          return errText(e);
+        }
+      },
+    );
+    if (v) refresh();
+  };
+
+  const remove = async (a: Account) => {
+    const choice = await messageBox(`Supprimer le compte ${a.email} ?\n\nSes fichiers (${formatSize(a.used)}) peuvent être gardés sur le serveur ou supprimés aussi.`, {
+      title: "Supprimer un compte",
+      kind: "warning",
+      buttons: ["Supprimer le compte", "Supprimer aussi ses fichiers", "Annuler"],
+    });
+    if (choice !== "Supprimer le compte" && choice !== "Supprimer aussi ses fichiers") return;
+    try {
+      await files.adminDelete(a.email, choice === "Supprimer aussi ses fichiers");
+      toast(`Compte ${a.email} supprimé.`);
+    } catch (e) {
+      await messageBox(errText(e), { title: "Supprimer un compte", kind: "error" });
+    }
+    refresh();
+  };
+
+  box.replaceChildren(
+    h("div", { className: "browser-head" }, h("h2", {}, "Administration : comptes"), h("span", { className: "spacer" }), h("button", { className: "primary", onclick: () => void add() }, "Nouveau compte…")),
+    h(
+      "div",
+      { className: "file-list accounts" },
+      ...list.map((a) =>
+        h(
+          "div",
+          { className: "frow account" },
+          h("span", { className: "name" }, a.name, h("span", { className: "mail" }, ` ${a.email}`)),
+          h("span", { className: "role" }, a.admin ? "administrateur" : ""),
+          h("span", { className: "size" }, quotaLabel(a)),
+          h(
+            "span",
+            { className: "row-actions" },
+            h("button", { className: "act", title: "Modifier (nom, mot de passe, espace, rôle)", onclick: () => void edit(a) }, "✎"),
+            a.email !== me.user?.email && h("button", { className: "act danger", title: "Supprimer le compte", onclick: () => void remove(a) }, "🗑"),
+          ),
+        ),
+      ),
+    ),
+    h("p", { className: "hint" }, "Chaque compte a son espace « Mes fichiers ». Un nouveau mot de passe ferme les sessions ouvertes du compte."),
+  );
 }
 
 async function renderFiles(box: HTMLElement) {

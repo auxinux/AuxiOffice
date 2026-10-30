@@ -81,11 +81,13 @@ function App() {
     ref.current?.setLanguage("fr-FR");
   }, [model]);
 
-  // Modifications : la file des changements du modèle n'est pas vide.
+  // Modifications : la file des changements du modèle n'est pas vide et il
+  // y a quelque chose à annuler (au chargement, le tableur émet des
+  // changements internes qui ne sont pas des modifications).
   useEffect(() => {
     if (!model) return;
     const t = window.setInterval(() => {
-      if (model.flushSendQueue().length) setModified(true);
+      if (model.flushSendQueue().length && model.canUndo()) setModified(true);
     }, 400);
     return () => clearInterval(t);
   }, [model]);

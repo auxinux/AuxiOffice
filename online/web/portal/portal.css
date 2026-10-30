@@ -310,3 +310,17 @@ h2 {
     display: none;
   }
 }
+
+.frow.account {
+  grid-template-columns: 1fr 120px 200px 80px;
+  cursor: default;
+}
+.frow.account .mail {
+  color: var(--ao-muted);
+  font-size: 13px;
+}
+.frow.account .role {
+  color: var(--ao-orange);
+  font-size: 13px;
+  font-weight: 600;
+}

@@ -51,7 +51,7 @@ pub async fn me(State(app): State<Arc<AppState>>, method: Method, headers: Heade
     match user(&app, &headers, &method) {
         Ok(u) => {
             let mut v = base;
-            v["user"] = json!({"email": u.email, "name": u.name});
+            v["user"] = json!({"email": u.email, "name": u.name, "admin": u.admin});
             let (store, id) = (app.store.clone(), u.id.clone());
             let used = tokio::task::spawn_blocking(move || store.usage(&id)).await.unwrap_or(0);
             v["usage"] = json!({"used": used, "quota": u.quota_mb.unwrap_or(app.quota_mb) * 1024 * 1024});
@@ -267,6 +267,188 @@ pub async fn log(State(app): State<Arc<AppState>>, method: Method, headers: Head
     let line: String = body.chars().take(4000).collect();
     eprintln!("interface [{}] : {}", u.id, line.replace('\n', " ⏎ "));
     Ok(Json(json!({})))
+}
+
+// --- Comptes ---------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct ChangePassword {
+    old: String,
+    new: String,
+}
+
+/// Changer son mot de passe (les autres sessions du compte sont fermées).
+pub async fn change_password(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<ChangePassword>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    let token = cookie_token(&headers).unwrap_or_default();
+    let a = app.clone();
+    blocking(move || a.auth.change_own(&u.id, &token, &b.old, &b.new)).await?;
+    Ok(Json(json!({})))
+}
+
+/// Administrateur seulement (comptes activés).
+fn admin(app: &AppState, headers: &HeaderMap, method: &Method) -> ApiResult<User> {
+    let u = user(app, headers, method)?;
+    if !app.auth.enabled() || !u.admin {
+        return Err(ApiError(StatusCode::FORBIDDEN, "Réservé aux administrateurs.".into()));
+    }
+    Ok(u)
+}
+
+pub async fn admin_list(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap) -> ApiResult<Json<Value>> {
+    admin(&app, &headers, &method)?;
+    let a = app.clone();
+    let list = blocking(move || {
+        Ok(a.auth
+            .list()
+            .iter()
+            .map(|u| json!({"email": u.email, "name": u.name, "admin": u.admin, "quota_mb": u.quota_mb.unwrap_or(a.quota_mb), "custom_quota": u.quota_mb.is_some(), "used": a.store.usage(&u.id)}))
+            .collect::<Vec<_>>())
+    })
+    .await?;
+    Ok(Json(json!({"users": list, "default_quota_mb": app.quota_mb})))
+}
+
+#[derive(Deserialize)]
+pub struct NewAccount {
+    email: String,
+    #[serde(default)]
+    name: String,
+    password: String,
+    #[serde(default)]
+    admin: bool,
+    #[serde(default)]
+    quota_mb: Option<u64>,
+}
+
+pub async fn admin_add(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<NewAccount>) -> ApiResult<Json<Value>> {
+    admin(&app, &headers, &method)?;
+    let a = app.clone();
+    blocking(move || {
+        let u = crate::auth::new_user(&b.email, &b.name, &b.password, b.quota_mb, b.admin)?;
+        a.auth.add(u)
+    })
+    .await?;
+    Ok(Json(json!({})))
+}
+
+#[derive(Deserialize)]
+pub struct UpdateAccount {
+    email: String,
+    #[serde(default)]
+    name: Option<String>,
+    /// Nouveau mot de passe (fermera les sessions du compte).
+    #[serde(default)]
+    password: Option<String>,
+    #[serde(default)]
+    admin: Option<bool>,
+    /// Quota en Mo ; 0 : quota par défaut du serveur.
+    #[serde(default)]
+    quota_mb: Option<u64>,
+}
+
+pub async fn admin_update(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<UpdateAccount>) -> ApiResult<Json<Value>> {
+    let me = admin(&app, &headers, &method)?;
+    if b.admin == Some(false) && me.email.eq_ignore_ascii_case(&b.email) {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "Vous ne pouvez pas retirer votre propre rôle d'administrateur.".into()));
+    }
+    let a = app.clone();
+    blocking(move || {
+        if let Some(p) = b.password.as_deref().filter(|p| !p.is_empty()) {
+            a.auth.set_password(&b.email, p)?;
+        }
+        a.auth.set_profile(&b.email, b.name, b.quota_mb.map(|q| (q > 0).then_some(q)), b.admin)
+    })
+    .await?;
+    Ok(Json(json!({})))
+}
+
+#[derive(Deserialize)]
+pub struct DeleteAccount {
+    email: String,
+    /// Supprimer aussi ses fichiers.
+    #[serde(default)]
+    files: bool,
+}
+
+pub async fn admin_delete(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<DeleteAccount>) -> ApiResult<Json<Value>> {
+    let me = admin(&app, &headers, &method)?;
+    if me.email.eq_ignore_ascii_case(&b.email) {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "Vous ne pouvez pas supprimer votre propre compte.".into()));
+    }
+    let a = app.clone();
+    blocking(move || {
+        let u = a.auth.remove(&b.email)?;
+        if b.files {
+            let _ = std::fs::remove_dir_all(a.store.user_root(&u.id));
+        }
+        Ok(())
+    })
+    .await?;
+    Ok(Json(json!({})))
+}
+
+// --- AuxiCorrect -----------------------------------------------------------------
+
+fn auxicorrect_state(app: &AppState, user: &str) -> Value {
+    let opts = crate::grammar::user_options(&app.pool.setup.files_root, user);
+    json!({
+        "available": app.auxicorrect.is_some(),
+        "version": app.auxicorrect.as_ref().and_then(|(_, v)| v.clone()),
+        "options": opts,
+    })
+}
+
+pub async fn auxicorrect_get(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    Ok(Json(auxicorrect_state(&app, &u.id)))
+}
+
+/// Options d'AuxiCorrect de l'utilisateur : elles valent aussitôt pour les
+/// paragraphes vérifiés ensuite, y compris dans les documents déjà ouverts.
+pub async fn auxicorrect_put(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(o): Json<crate::auxicorrect::Options>) -> ApiResult<Json<Value>> {
+    let u = user(&app, &headers, &method)?;
+    crate::grammar::save_user_options(&app.pool.setup.files_root, &u.id, &o)?;
+    Ok(Json(auxicorrect_state(&app, &u.id)))
+}
+
+fn cli(app: &AppState) -> ApiResult<std::path::PathBuf> {
+    app.auxicorrect.as_ref().map(|(c, _)| c.clone()).ok_or_else(|| ApiError(StatusCode::NOT_FOUND, "AuxiCorrect n'est pas installé sur ce serveur.".into()))
+}
+
+#[derive(Deserialize)]
+pub struct Lookup {
+    what: String,
+    word: String,
+}
+
+/// Dictionnaire : définition, synonymes, antonymes, conjugaison.
+pub async fn auxicorrect_lookup(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<Lookup>) -> ApiResult<Json<Value>> {
+    user(&app, &headers, &method)?;
+    let cli = cli(&app)?;
+    if b.word.chars().count() > 80 {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "mot trop long".into()));
+    }
+    let text = blocking(move || crate::auxicorrect::lookup(&cli, &b.what, &b.word)).await?;
+    Ok(Json(json!({"text": text})))
+}
+
+#[derive(Deserialize)]
+pub struct Check {
+    text: String,
+    #[serde(default)]
+    international: bool,
+}
+
+/// Vérification d'un texte d'AuxiText (remarques, positions UTF-16).
+pub async fn auxicorrect_check(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<Check>) -> ApiResult<Json<Value>> {
+    user(&app, &headers, &method)?;
+    let cli = cli(&app)?;
+    if b.text.len() > 2 << 20 {
+        return Err(ApiError(StatusCode::PAYLOAD_TOO_LARGE, "texte trop long pour la vérification".into()));
+    }
+    let remarks = blocking(move || crate::text_auxicorrect::check(&cli, &b.text, b.international)).await?;
+    Ok(Json(json!(remarks)))
 }
 
 #[cfg(test)]

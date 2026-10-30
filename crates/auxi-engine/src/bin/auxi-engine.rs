@@ -5,7 +5,8 @@
 //! LibreOffice, obligatoire), `AUXI_ENGINE_PROFILE`, `AUXI_ENGINE_LANG`,
 //! `AUXI_ENGINE_AUTHOR`, `AUXI_ENGINE_PROFILE_ROOT`, `AUXI_ENGINE_DOC_LANG`
 //! (langue par défaut des documents, fr-CA), `AUXI_ENGINE_GRAMMAR_URL`
-//! (serveur AuxiCorrect) ; aucun argument (voir `parse_args`).
+//! (serveur AuxiCorrect) ou `AUXI_ENGINE_GRAMMAR_SOCKET` (AuxiCorrect par une
+//! prise Unix, pour un moteur sans réseau) ; aucun argument (voir `parse_args`).
 
 use auxi_engine::lok::{Document, Office};
 use auxi_engine::protocol::{callback_name, read_frame, write_frame, Frame};
@@ -50,13 +51,55 @@ fn parse_args() -> Result<Args, String> {
         author: var("AUXI_ENGINE_AUTHOR").unwrap_or_default(),
         profile_root: var("AUXI_ENGINE_PROFILE_ROOT").map(PathBuf::from),
         doc_lang: var("AUXI_ENGINE_DOC_LANG").unwrap_or_else(|| "fr-CA".into()),
-        grammar_url: var("AUXI_ENGINE_GRAMMAR_URL"),
+        grammar_url: var("AUXI_ENGINE_GRAMMAR_URL").or_else(|| var("AUXI_ENGINE_GRAMMAR_SOCKET").and_then(|s| grammar_relay(Path::new(&s)))),
     };
     // Ne pas transmettre ces variables aux composants de LibreOffice.
-    for k in ["AUXI_ENGINE_PROGRAM_DIR", "AUXI_ENGINE_PROFILE", "AUXI_ENGINE_LANG", "AUXI_ENGINE_AUTHOR", "AUXI_ENGINE_PROFILE_ROOT", "AUXI_ENGINE_DOC_LANG", "AUXI_ENGINE_GRAMMAR_URL"] {
+    for k in ["AUXI_ENGINE_PROGRAM_DIR", "AUXI_ENGINE_PROFILE", "AUXI_ENGINE_LANG", "AUXI_ENGINE_AUTHOR", "AUXI_ENGINE_PROFILE_ROOT", "AUXI_ENGINE_DOC_LANG", "AUXI_ENGINE_GRAMMAR_URL", "AUXI_ENGINE_GRAMMAR_SOCKET"] {
         std::env::remove_var(k);
     }
     Ok(a)
+}
+
+/// AuxiOffice Online : le moteur tourne sans réseau (bac à sable) ; LibreOffice
+/// ne sait parler à un correcteur qu'en HTTP. Un relais écoute donc sur la
+/// boucle locale du moteur et transmet chaque connexion à la prise Unix du
+/// serveur (dans l'emplacement du moteur). Retourne l'adresse pour LibreOffice.
+#[cfg(unix)]
+fn grammar_relay(socket: &Path) -> Option<String> {
+    use std::os::unix::net::UnixStream;
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).map_err(|e| eprintln!("auxi-engine : relais AuxiCorrect impossible : {e}")).ok()?;
+    let port = listener.local_addr().ok()?.port();
+    let socket = socket.to_path_buf();
+    std::thread::Builder::new()
+        .name("auxi-grammar-relay".into())
+        .spawn(move || {
+            for conn in listener.incoming().flatten() {
+                let upstream = match UnixStream::connect(&socket) {
+                    Ok(u) => u,
+                    Err(e) => {
+                        eprintln!("auxi-engine : relais AuxiCorrect : {} : {e}", socket.display());
+                        continue;
+                    }
+                };
+                let (Ok(mut a_in), Ok(mut b_in)) = (conn.try_clone(), upstream.try_clone()) else { continue };
+                let (mut a_out, mut b_out) = (conn, upstream);
+                std::thread::spawn(move || {
+                    let _ = std::io::copy(&mut a_in, &mut b_out);
+                    let _ = b_out.shutdown(std::net::Shutdown::Write);
+                });
+                std::thread::spawn(move || {
+                    let _ = std::io::copy(&mut b_in, &mut a_out);
+                    let _ = a_out.shutdown(std::net::Shutdown::Both);
+                });
+            }
+        })
+        .ok()?;
+    Some(format!("http://127.0.0.1:{port}/auxicorrect/v2"))
+}
+
+#[cfg(not(unix))]
+fn grammar_relay(_socket: &Path) -> Option<String> {
+    None
 }
 
 /// Réserve la sortie standard au protocole : LibreOffice écrit parfois sur
