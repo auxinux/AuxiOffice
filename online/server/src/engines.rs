@@ -176,7 +176,10 @@ impl Pool {
         let Sandbox::Bwrap(bwrap) = &self.setup.sandbox else { return vec![] };
         let mut a: Vec<OsString> = vec![bwrap.into()];
         let mut push = |v: &[&str]| a.extend(v.iter().map(OsString::from));
-        push(&["--die-with-parent", "--new-session", "--unshare-all", "--cap-drop", "ALL"]);
+        // Pas de --die-with-parent : il est lié au fil qui lance le moteur
+        // (fils temporaires de tokio), pas au serveur. Si le serveur
+        // s'arrête, le moteur voit son entrée se fermer et quitte seul.
+        push(&["--new-session", "--unshare-all", "--cap-drop", "ALL"]);
         for d in ["/usr", "/lib", "/lib64", "/lib32", "/bin", "/sbin", "/etc/fonts", "/etc/ld.so.cache", "/etc/localtime", "/etc/alternatives", "/var/cache/fontconfig"] {
             push(&["--ro-bind-try", d, d]);
         }
@@ -514,8 +517,19 @@ impl Pool {
         }
     }
 
-    /// Ferme les documents inactifs depuis `idle` et les moteurs arrêtés.
+    /// Ferme les documents inactifs depuis `idle` et les moteurs arrêtés
+    /// (documents et réserve).
     pub fn reap(&self, idle: Duration) {
+        let dead: Vec<Spare> = {
+            let mut spares = self.spares.lock().unwrap();
+            let (alive, dead) = spares.drain(..).partition(|s| s.engine.is_alive());
+            *spares = alive;
+            dead
+        };
+        for s in dead {
+            eprintln!("auxi-online : moteur de réserve arrêté, remplacé");
+            self.free_slot(s.slot);
+        }
         let gone: Vec<_> = {
             let mut docs = self.docs.lock().unwrap();
             let ids: Vec<u64> = docs.values().filter(|d| d.last.lock().unwrap().elapsed() > idle || !d.engine.is_alive()).map(|d| d.id).collect();
