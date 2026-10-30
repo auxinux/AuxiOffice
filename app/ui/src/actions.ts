@@ -28,7 +28,8 @@ export type AppAction =
   | "slideShowHere"
   | "about"
   | "auxicorrectOptions"
-  | "auxicorrectDictionary";
+  | "auxicorrectDictionary"
+  | "toggleTabs";
 
 export interface Action {
   label: string;
@@ -53,6 +54,10 @@ export interface MenuDef {
 
 const u = (label: string, uno: string, extra: Partial<Action> = {}): Action => ({ label, uno, ...extra });
 const a = (label: string, app: AppAction, extra: Partial<Action> = {}): Action => ({ label, app, ...extra });
+
+/** Réglage « une fenêtre par document » / onglets (état « app:tabs »). */
+export const TABS_CHECK = "app:tabs";
+const tabsItem = (): Action => a("Ouvrir les documents dans des onglets", "toggleTabs", { check: TABS_CHECK });
 
 // --- Commandes communes --------------------------------------------------
 export const A = {
@@ -366,6 +371,8 @@ const fileMenu_ = (app: AppKind, type: DocType): MenuDef => ({
     "-",
     A.docProps,
     "-",
+    tabsItem(),
+    "-",
     a("Fermer le document", "close", { accel: "CmdOrCtrl+W" }),
   ],
 });
@@ -373,7 +380,7 @@ const fileMenu_ = (app: AppKind, type: DocType): MenuDef => ({
 /** Menu Fichier sans document ouvert (accueil). */
 const homeFileMenu = (app: AppKind): MenuDef => ({
   label: "Fichier",
-  items: app === "pdf" ? [a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" })] : [newMenu(app), a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" })],
+  items: [...(app === "pdf" ? [] : [newMenu(app)]), a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" }), ...(app === "office" ? [] : ["-" as const, tabsItem()])],
 });
 
 /** Commande du lecteur PDF (traitée par PdfView). */
@@ -420,7 +427,7 @@ export const PDF = {
 
 function pdfMenus(): MenuDef[] {
   return [
-    { label: "Fichier", items: [a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" }), "-", PDF.save, PDF.saveAs, "-", PDF.print, "-", PDF.props, PDF.editDraw, "-", PDF.close] },
+    { label: "Fichier", items: [a("Ouvrir…", "open", { accel: "CmdOrCtrl+O" }), "-", PDF.save, PDF.saveAs, "-", PDF.print, "-", PDF.props, PDF.editDraw, "-", tabsItem(), "-", PDF.close] },
     { label: "Édition", items: [PDF.copy, PDF.selectAll, "-", PDF.find, PDF.findNext, PDF.findPrev] },
     {
       label: "Affichage",

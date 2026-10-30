@@ -123,6 +123,21 @@ export const launchApp = (kind: AppInfo["kind"], files: string[] = [], newDoc = 
 /** Confie à leur application les fichiers d'un autre type ; retourne ceux à ouvrir ici. */
 export const routeFiles = (files: string[]) => invoke<string[]>("route_files", { files });
 
+/** Ouvre des fichiers (ou un document vierge) dans une nouvelle fenêtre de l'application. */
+export const openWindow = (files: string[], newDoc = false) => invoke<void>("open_window", { files, newDoc });
+/** Nombre des autres fenêtres de l'application. */
+export const otherWindows = () => invoke<number>("other_windows");
+
+export interface Prefs {
+  /** `windows` : une fenêtre par document (défaut) ; `tabs` : onglets dans la même fenêtre. */
+  open_mode: "windows" | "tabs";
+  [k: string]: unknown;
+}
+export const prefsGet = () => invoke<Prefs>("prefs_get");
+export const prefsSet = (prefs: Prefs) => invoke<void>("prefs_set", { prefs });
+/** Préférences changées (dans n'importe quelle fenêtre). */
+export const onPrefs = (fn: (p: Prefs) => void) => listen<Prefs>("prefs", (e) => fn(e.payload));
+
 /** Prévient quand un lancement arrive (second lancement, Finder). */
 export const onLaunch = (fn: () => void) => listen("launch", () => fn());
 

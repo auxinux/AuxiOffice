@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions de la fenêtre principale d'AuxiOffice",
-  "windows": ["main"],
+  "description": "Permissions des fenêtres d'AuxiOffice (principale et fenêtres de documents)",
+  "windows": ["main", "w*"],
   "permissions": [
     "core:default",
     "core:menu:default",

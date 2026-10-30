@@ -13,14 +13,18 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-/// Application lancée (AuxiOffice, AuxiWriter…) et lancements reçus que
-/// l'interface n'a pas encore traités (fichiers à ouvrir, document vierge).
+/// Application lancée (AuxiOffice, AuxiWriter…) et, pour chaque fenêtre,
+/// les lancements reçus qu'elle n'a pas encore traités (fichiers à ouvrir,
+/// document vierge).
 struct AppState {
     kind: AppKind,
     data_dir: PathBuf,
-    pending: Mutex<Vec<Launch>>,
+    pending: Mutex<HashMap<String, Vec<Launch>>>,
+    /// Dernière fenêtre active : elle reçoit les lancements suivants.
+    focused: Mutex<String>,
+    next_window: AtomicU64,
 }
 
 /// AuxiCorrect : réglage commun (lu au démarrage), options d'AuxiOffice et
@@ -82,6 +86,8 @@ struct Engines {
     /// doivent jamais partager un profil). Réutilisés après fermeture.
     slots: Mutex<Vec<bool>>,
     doc_slots: Mutex<HashMap<u64, usize>>,
+    /// Fenêtre de chaque document : ses moteurs s'arrêtent avec elle.
+    doc_windows: Mutex<HashMap<u64, String>>,
 }
 
 impl Engines {
@@ -314,7 +320,7 @@ fn user_name() -> String {
 /// Ouvre un document dans un nouveau moteur. Les rappels du moteur sont
 /// relayés à l'interface sous l'événement `engine` avec l'identifiant du document.
 #[tauri::command]
-async fn doc_open(app: AppHandle, state: State<'_, Engines>, path: String, ignore_lock: Option<bool>, password: Option<String>) -> Result<Value, String> {
+async fn doc_open(app: AppHandle, window: WebviewWindow, state: State<'_, Engines>, path: String, ignore_lock: Option<bool>, password: Option<String>) -> Result<Value, String> {
     let id = state.next.fetch_add(1, Ordering::Relaxed) + 1;
     let a = app.clone();
     let text = AppKind::for_path(&path) == AppKind::Writer;
@@ -345,6 +351,7 @@ async fn doc_open(app: AppHandle, state: State<'_, Engines>, path: String, ignor
     info["path"] = json!(path);
     info["libreoffice"] = json!(engine.libreoffice);
     state.docs.lock().unwrap().insert(id, engine);
+    state.doc_windows.lock().unwrap().insert(id, window.label().to_string());
     Ok(info)
 }
 
@@ -370,6 +377,7 @@ async fn doc_paint(state: State<'_, Engines>, doc: u64, req: Value) -> Result<ta
 
 #[tauri::command]
 async fn doc_close(state: State<'_, Engines>, doc: u64) -> Result<(), String> {
+    state.doc_windows.lock().unwrap().remove(&doc);
     let engine = state.docs.lock().unwrap().remove(&doc);
     if let Some(engine) = engine {
         tauri::async_runtime::spawn_blocking(move || engine.shutdown()).await.map_err(|e| e.to_string())?;
@@ -699,11 +707,69 @@ fn app_info(state: State<'_, AppState>) -> Value {
     json!({"kind": state.kind, "name": state.kind.name()})
 }
 
-/// Lancements en attente (ligne de commande, Finder, second lancement) ;
-/// l'interface les demande au démarrage et à chaque événement `launch`.
+/// Lancements en attente pour cette fenêtre (ligne de commande, Finder,
+/// second lancement, « Ouvrir » dans une nouvelle fenêtre) ; l'interface les
+/// demande au démarrage et à chaque événement `launch`.
 #[tauri::command]
-fn take_launches(state: State<'_, AppState>) -> Vec<Launch> {
-    std::mem::take(&mut *state.pending.lock().unwrap())
+fn take_launches(window: WebviewWindow, state: State<'_, AppState>) -> Vec<Launch> {
+    state.pending.lock().unwrap().remove(window.label()).unwrap_or_default()
+}
+
+/// Nouvelle fenêtre de l'application, avec des fichiers à ouvrir ou un
+/// document vierge (mode « une fenêtre par document »).
+#[tauri::command]
+async fn open_window(app: AppHandle, files: Vec<String>, new_doc: bool) -> Result<(), String> {
+    create_window(&app, Launch { files, new_doc }).map(|_| ())
+}
+
+/// Nombre des autres fenêtres de l'application (fermer la fenêtre de son
+/// dernier document, ou garder l'écran de démarrage).
+#[tauri::command]
+fn other_windows(app: AppHandle, window: WebviewWindow) -> usize {
+    app.webview_windows().keys().filter(|l| l.as_str() != window.label()).count()
+}
+
+/// Préférences communes aux applications (`preferences.json`) : `open_mode`
+/// = `windows` (une fenêtre par document, par défaut) ou `tabs`.
+#[tauri::command]
+fn prefs_get(state: State<'_, AppState>) -> Value {
+    let mut p: Value = std::fs::read(state.data_dir.join("preferences.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(json!({}));
+    if !p.is_object() {
+        p = json!({});
+    }
+    if p.get("open_mode").and_then(Value::as_str).is_none_or(|m| m != "tabs") {
+        p["open_mode"] = json!("windows");
+    }
+    p
+}
+
+#[tauri::command]
+fn prefs_set(app: AppHandle, state: State<'_, AppState>, prefs: Value) -> Result<(), String> {
+    std::fs::create_dir_all(&state.data_dir).map_err(|e| e.to_string())?;
+    write_atomic(&state.data_dir.join("preferences.json"), &serde_json::to_vec_pretty(&prefs).map_err(|e| e.to_string())?)?;
+    // Les autres fenêtres suivent le changement.
+    let _ = app.emit("prefs", &prefs);
+    Ok(())
+}
+
+/// Crée une fenêtre de l'application ; ses lancements l'attendent.
+fn create_window(app: &AppHandle, l: Launch) -> Result<String, String> {
+    let state = app.state::<AppState>();
+    let n = state.next_window.fetch_add(1, Ordering::Relaxed) + 1;
+    let label = format!("w{n}");
+    if l != Launch::default() {
+        state.pending.lock().unwrap().insert(label.clone(), vec![l]);
+    }
+    let mut b = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
+        .title(state.kind.name())
+        .inner_size(1280.0, 820.0)
+        .min_inner_size(800.0, 520.0);
+    if let Ok(icon) = tauri::image::Image::from_bytes(state.kind.icon_png()) {
+        b = b.icon(icon).map_err(|e| e.to_string())?;
+    }
+    b.build().map_err(|e| e.to_string())?;
+    *state.focused.lock().unwrap() = label.clone();
+    Ok(label)
 }
 
 /// Ouvre une autre application (AuxiSheet pour un classeur…) : lui transmet
@@ -722,9 +788,9 @@ fn route_files(state: State<'_, AppState>, files: Vec<String>) -> Result<Vec<Str
     let mut others: Vec<(AppKind, Vec<String>)> = Vec::new();
     for f in files {
         let k = AppKind::for_path(&f);
-        // AuxiOffice ouvre tous les types dans ses onglets ; AuxiDraw modifie
-        // aussi les PDF (« Modifier dans AuxiDraw »).
-        if state.kind == AppKind::Office || k == state.kind || (state.kind == AppKind::Draw && k == AppKind::Pdf) {
+        // AuxiOffice n'ouvre rien lui-même : chaque fichier part dans son
+        // application. AuxiDraw modifie aussi les PDF (« Modifier dans AuxiDraw »).
+        if state.kind != AppKind::Office && (k == state.kind || (state.kind == AppKind::Draw && k == AppKind::Pdf)) {
             mine.push(f);
         } else if let Some(o) = others.iter_mut().find(|(o, _)| *o == k) {
             o.1.push(f);
@@ -738,13 +804,46 @@ fn route_files(state: State<'_, AppState>, files: Vec<String>) -> Result<Vec<Str
     Ok(mine)
 }
 
+/// Lancement reçu (second lancement, Finder) : confié à la dernière fenêtre
+/// active, qui l'ouvre chez elle ou dans une nouvelle fenêtre selon le
+/// réglage « une fenêtre par document ».
 fn queue_launch(app: &AppHandle, l: Launch) {
-    app.state::<AppState>().pending.lock().unwrap().push(l);
-    let _ = app.emit("launch", ());
-    if let Some(w) = app.get_webview_window("main") {
+    let state = app.state::<AppState>();
+    let windows = app.webview_windows();
+    let focused = state.focused.lock().unwrap().clone();
+    let target = if windows.contains_key(&focused) { Some(focused) } else { windows.keys().next().cloned() };
+    let Some(label) = target else {
+        let app2 = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Err(e) = create_window(&app2, l) {
+                eprintln!("nouvelle fenêtre impossible ({e})");
+            }
+        });
+        return;
+    };
+    state.pending.lock().unwrap().entry(label.clone()).or_default().push(l);
+    let _ = app.emit_to(label.as_str(), "launch", ());
+    if let Some(w) = app.get_webview_window(&label) {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
+    }
+}
+
+/// Fenêtre fermée : ses documents et leurs moteurs aussi.
+fn window_closed(app: &AppHandle, label: &str) {
+    app.state::<AppState>().pending.lock().unwrap().remove(label);
+    let engines = app.state::<Engines>();
+    let docs: Vec<u64> = engines.doc_windows.lock().unwrap().iter().filter(|(_, w)| w.as_str() == label).map(|(d, _)| *d).collect();
+    for doc in docs {
+        engines.doc_windows.lock().unwrap().remove(&doc);
+        let engine = engines.docs.lock().unwrap().remove(&doc);
+        if let Some(p) = engines.doc_slots.lock().unwrap().remove(&doc) {
+            engines.free_slot(p);
+        }
+        if let Some(e) = engine {
+            std::thread::spawn(move || e.shutdown());
+        }
     }
 }
 
@@ -794,12 +893,22 @@ pub fn run() {
         return;
     }
     remove_old_profiles(&data_dir);
-    let initial = if launch == Launch::default() { vec![] } else { vec![launch] };
+    let mut initial = HashMap::new();
+    if launch != Launch::default() {
+        initial.insert("main".to_string(), vec![launch]);
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Engines::default())
         .manage(Mutex::new(Corrector::start(&data_dir, kind)))
-        .manage(AppState { kind, data_dir: data_dir.clone(), pending: Mutex::new(initial) })
+        .manage(AppState { kind, data_dir: data_dir.clone(), pending: Mutex::new(initial), focused: Mutex::new("main".into()), next_window: AtomicU64::new(0) })
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::Focused(true) => {
+                *window.app_handle().state::<AppState>().focused.lock().unwrap() = window.label().to_string();
+            }
+            tauri::WindowEvent::Destroyed => window_closed(window.app_handle(), window.label()),
+            _ => {}
+        })
         .setup(move |app| {
             let handle = app.handle().clone();
             if let Err(e) = apps::listen(&data_dir, kind, move |l| queue_launch(&handle, l)) {
@@ -827,6 +936,10 @@ pub fn run() {
             auxicorrect_open_app,
             auxicorrect_lookup,
             take_launches,
+            open_window,
+            other_windows,
+            prefs_get,
+            prefs_set,
             launch_app,
             route_files,
             warm_engine,

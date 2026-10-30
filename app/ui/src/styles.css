@@ -71,6 +71,7 @@ button, select, input { font: inherit; color: inherit; }
 .recents .name { font-weight: 600; }
 .recents .path { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home .empty { color: var(--muted); }
+.home .tabs-pref { display: flex; align-items: center; gap: 8px; margin-top: 32px; color: var(--text); font-size: 13px; cursor: pointer; }
 .home footer { margin-top: 48px; color: var(--muted); font-size: 12px; }
 .home footer a { color: var(--orange-dark); }
 

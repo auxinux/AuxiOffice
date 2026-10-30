@@ -1,20 +1,21 @@
-// Fenêtre principale. AuxiOffice : accueil et un onglet par document, de
-// tous les types (texte, classeur, présentation, dessin, PDF). AuxiWriter,
-// AuxiSheet, AuxiPresent, AuxiDraw, AuxiPDF (lancées depuis le menu du système
-// ou par un document du bureau) : onglet Accueil et un onglet par document de
-// leur type ; un document d'un autre type part dans son application.
+// Fenêtre d'une application. AuxiOffice est le lanceur : il crée et ouvre
+// des documents dans leur vraie application (AuxiWriter, AuxiSheet…), sans
+// en ouvrir lui-même. AuxiWriter, AuxiSheet, AuxiPresent, AuxiDraw, AuxiPDF
+// démarrent directement sur leur document ; chaque document a sa fenêtre
+// (réglage par défaut) ou son onglet, et la barre d'onglets n'apparaît qu'à
+// partir de deux documents. Sans document : l'écran de démarrage.
 
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { APP_DOC, APP_NAMES, type Action, type AppAction, type AppKind, type NewKind } from "./actions";
+import { APP_DOC, APP_NAMES, TABS_CHECK, type Action, type AppAction, type AppKind, type NewKind } from "./actions";
 import { DocView, type DocHandle } from "./DocView";
 import { installMenus, updateMenuChecks } from "./menus";
 import { PrintDialog } from "./PrintDialog";
 import { AuxiCorrectDictionary, AuxiCorrectOptionsDialog } from "./AuxiCorrect";
-import { appInfo, call, closeDocument, launchApp, newDocument, onLaunch, openDocument, openPdf, recentFiles, routeFiles, takeLaunches, warmEngine, type DocInfo, type Launch } from "./engine";
+import { appInfo, call, closeDocument, launchApp, newDocument, onLaunch, onPrefs, openDocument, openPdf, openWindow, otherWindows, prefsGet, prefsSet, recentFiles, routeFiles, takeLaunches, warmEngine, type DocInfo, type Launch, type Prefs } from "./engine";
 import { PdfView } from "./PdfView";
 import { Home } from "./Home";
 import { askPassword, passwordError } from "./PasswordDialog";
@@ -85,7 +86,10 @@ export function App() {
   const [app, setApp] = useState<AppKind | null>(null);
   const appRef = useRef<AppKind>("office");
   const [tabs, setTabs] = useState<Tab[]>([]);
-  const [active, setActive] = useState<number>(0); // 0 = Accueil
+  const [active, setActive] = useState<number>(0); // 0 = aucun document (écran de démarrage)
+  const [prefs, setPrefs] = useState<Prefs>({ open_mode: "windows" });
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
   const [recents, setRecents] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; kind: "info" | "error" } | null>(null);
@@ -109,11 +113,11 @@ export function App() {
   }, [tabs, active, app, name]);
 
   const openPath = useCallback(
-    async (path: string) => {
+    async (path: string): Promise<boolean> => {
       const existing = tabsRef.current.find((t) => t.path === path);
       if (existing) {
         setActive(existing.info.doc);
-        return;
+        return true;
       }
       setBusy(`Ouverture de ${fileName(path)}…`);
       try {
@@ -122,7 +126,7 @@ export function App() {
           setTabs((ts) => [...ts, { info, path, modified: false, lost: false }]);
           setActive(info.doc);
           setRecents(await recentFiles(path));
-          return;
+          return true;
         }
         // Document chiffré : demander le mot de passe (de nouveau s'il est faux).
         let password: string | undefined;
@@ -135,7 +139,7 @@ export function App() {
             if (!why) throw e;
             setBusy(null);
             const pw = await askPassword(fileName(path), why === "incorrect");
-            if (pw === null) return;
+            if (pw === null) return false;
             password = pw;
             setBusy(`Ouverture de ${fileName(path)}…`);
           }
@@ -154,8 +158,10 @@ export function App() {
         setTabs((ts) => [...ts, { info, path, modified: false, lost: false }]);
         setActive(info.doc);
         if (!isUntitled(path)) setRecents(await recentFiles(path));
+        return true;
       } catch (e) {
         await message(`Impossible d'ouvrir « ${fileName(path)} ».\n\n${e}`, { title: APP_NAMES[appRef.current], kind: "error" });
+        return false;
       } finally {
         setBusy(null);
       }
@@ -169,8 +175,28 @@ export function App() {
       if (!files.length) return;
       try {
         const mine = await routeFiles(files);
-        if (mine.length < files.length) notify("Document ouvert dans son application.");
-        for (const f of mine) await openPath(f);
+        if (mine.length < files.length) notify(appRef.current === "office" ? "Ouverture dans son application…" : "Document ouvert dans son application.");
+        // Une fenêtre par document : cette fenêtre prend le premier document
+        // si elle n'en a pas encore, chacun des autres a sa propre fenêtre.
+        // Comme Word, un document vierge encore intact est remplacé.
+        const ts = tabsRef.current;
+        const blank = ts.length === 1 && isUntitled(ts[0].path) && !ts[0].modified ? ts[0] : null;
+        let used = ts.length > 0 && !blank;
+        let openedHere = false;
+        const elsewhere: string[] = [];
+        for (const f of mine) {
+          if (prefsRef.current.open_mode === "windows" && used && !tabsRef.current.some((t) => t.path === f)) elsewhere.push(f);
+          else {
+            openedHere = (await openPath(f)) || openedHere;
+            used = true;
+          }
+        }
+        if (blank && openedHere) {
+          await closeDocument(blank.info.doc).catch(() => undefined);
+          handles.current.delete(blank.info.doc);
+          setTabs((x) => x.filter((t) => t.info.doc !== blank.info.doc));
+        }
+        for (const f of elsewhere) await openWindow([f]);
       } catch (e) {
         notify(`${e}`, "error");
       }
@@ -191,10 +217,14 @@ export function App() {
   const createNew = useCallback(
     async (kind: NewKind) => {
       try {
-        if (appRef.current !== "office" && APP_DOC[appRef.current] !== kind) {
-          // Un autre type : son application (AuxiOffice, lui, ouvre tout).
+        if (APP_DOC[appRef.current] !== kind) {
+          // Un autre type (ou AuxiOffice, le lanceur) : son application.
           await launchApp(APP_FOR_DOC[kind], [], true);
           notify(`Ouverture d'${APP_NAMES[APP_FOR_DOC[kind]]}…`);
+          return;
+        }
+        if (prefsRef.current.open_mode === "windows" && tabsRef.current.length > 0) {
+          await openWindow([], true);
           return;
         }
         await openPath(await newDocument(kind));
@@ -217,18 +247,34 @@ export function App() {
       const own = APP_DOC[appRef.current];
       if (l.new_doc && own && own !== "pdf" && !l.files.length) await createNew(own);
     };
+    let offPrefs: (() => void) | undefined;
     void (async () => {
       const info = await appInfo();
       appRef.current = info.kind;
+      const p = await prefsGet().catch(() => null);
+      if (p) {
+        prefsRef.current = p;
+        setPrefs(p);
+      }
+      offPrefs = await onPrefs((np) => {
+        prefsRef.current = np;
+        setPrefs(np);
+      });
       setApp(info.kind);
       setRecents(await recentFiles());
       off = await onLaunch(() => void handle());
       const first = await takeLaunches();
       for (const l of first) await runLaunch(l);
+      // Comme Word : l'application démarre sur un document vierge.
+      const own = APP_DOC[info.kind];
+      if (!first.length && own && own !== "pdf") await createNew(own);
       // Moteur de réserve, une fois l'interface affichée (pas dans AuxiPDF).
       if (info.kind !== "pdf") window.setTimeout(() => void warmEngine(), first.length ? 4000 : 800);
     })();
-    return () => off?.();
+    return () => {
+      off?.();
+      offPrefs?.();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -348,12 +394,27 @@ export function App() {
     }
     await closeDocument(doc).catch(() => undefined);
     handles.current.delete(doc);
+    const rest = tabsRef.current.filter((x) => x.info.doc !== doc);
+    // Dernier document d'une fenêtre alors que d'autres sont ouvertes : la
+    // fenêtre se ferme, comme dans Word. Sinon, l'écran de démarrage.
+    if (!rest.length && (await otherWindows().catch(() => 0)) > 0) {
+      await getCurrentWindow().destroy();
+      return;
+    }
     setTabs((ts) => {
-      const rest = ts.filter((x) => x.info.doc !== doc);
-      setActive((a) => (a === doc ? (rest[rest.length - 1]?.info.doc ?? 0) : a));
-      return rest;
+      const left = ts.filter((x) => x.info.doc !== doc);
+      setActive((a) => (a === doc ? (left[left.length - 1]?.info.doc ?? 0) : a));
+      return left;
     });
   }, [saveDocument]);
+
+  const toggleTabs = useCallback(async () => {
+    const next: Prefs = { ...prefsRef.current, open_mode: prefsRef.current.open_mode === "tabs" ? "windows" : "tabs" };
+    prefsRef.current = next;
+    setPrefs(next);
+    await prefsSet(next).catch((e) => notify(`Réglage non enregistré : ${e}`, "error"));
+    notify(next.open_mode === "tabs" ? "Les documents s'ouvriront dans des onglets." : "Chaque document s'ouvrira dans sa propre fenêtre.");
+  }, [notify]);
 
   const [about, setAbout] = useState(false);
   const [version, setVersion] = useState("");
@@ -421,10 +482,19 @@ export function App() {
           return doc ? setPrinting(doc) : undefined;
         case "close":
           return doc ? void closeTab(doc) : undefined;
+        case "toggleTabs":
+          return void toggleTabs();
       }
     },
-    [createNew, openDialog, saveDocument, exportPdf, exportImage, closeTab, openDictionary],
+    [createNew, openDialog, saveDocument, exportPdf, exportImage, closeTab, openDictionary, toggleTabs],
   );
+
+  // Coches des menus : état du document actif et réglage des onglets.
+  const docStates = useRef<Record<string, string>>({});
+  const showChecks = useCallback((states: Record<string, string>) => {
+    docStates.current = states;
+    updateMenuChecks({ ...states, [TABS_CHECK]: prefsRef.current.open_mode === "tabs" ? "true" : "false" });
+  }, []);
 
   // Barre de menus : reconstruite quand le type du document actif change ;
   // les commandes de document vont au document actif.
@@ -438,8 +508,9 @@ export function App() {
       if (h) h.run(a);
       else if (a.app) appAction(a.app, 0);
     };
-    if (app) void installMenus(activeType, run, app).catch((e) => console.warn("menus", e));
-  }, [activeType, appAction, app]);
+    if (app) void installMenus(activeType, run, app).then(() => showChecks(docStates.current), (e) => console.warn("menus", e));
+  }, [activeType, appAction, app, showChecks]);
+  useEffect(() => showChecks(docStates.current), [prefs, showChecks]);
 
   // Fermeture de la fenêtre : confirmer s'il reste des modifications.
   useEffect(() => {
@@ -480,41 +551,45 @@ export function App() {
 
   return (
     <div className={`app app-${app}`}>
-      <div className="tabbar" role="tablist">
-        <div role="tab" className={`tab tab-home ${active === 0 ? "active" : ""}`} onClick={() => setActive(0)} aria-selected={active === 0}>
-          <img src={`/icons/auxi${app}.svg`} alt="" />
-          <span className="name">Accueil</span>
+      {tabs.length >= 2 && (
+        <div className="tabbar" role="tablist">
+          {tabs.map((t) => (
+            <div key={t.info.doc} role="tab" aria-selected={active === t.info.doc} className={`tab doc kind-${t.info.type} ${active === t.info.doc ? "active" : ""}`} onClick={() => setActive(t.info.doc)}>
+              <span className="dot" />
+              <span className="name">
+                {t.modified ? "• " : ""}
+                {isUntitled(t.path) ? "Sans titre" : fileName(t.path)}
+              </span>
+              <button
+                className="close"
+                title="Fermer (Ctrl+W)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void closeTab(t.info.doc);
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <span className="tabbar-fill" />
         </div>
-        {tabs.map((t) => (
-          <div key={t.info.doc} role="tab" aria-selected={active === t.info.doc} className={`tab doc kind-${t.info.type} ${active === t.info.doc ? "active" : ""}`} onClick={() => setActive(t.info.doc)}>
-            <span className="dot" />
-            <span className="name">
-              {t.modified ? "• " : ""}
-              {isUntitled(t.path) ? "Sans titre" : fileName(t.path)}
-            </span>
-            <button
-              className="close"
-              title="Fermer (Ctrl+W)"
-              onClick={(e) => {
-                e.stopPropagation();
-                void closeTab(t.info.doc);
-              }}
-            >
-              ×
-            </button>
-          </div>
-        ))}
-        <span className="tabbar-fill" />
-        {active !== 0 && (
-          <div className="file-actions">
-            <button onClick={() => void openDialog()} title="Ouvrir (Ctrl+O)">Ouvrir</button>
-            <button onClick={() => void saveDocument(active, true)} title="Enregistrer sous (Ctrl+Maj+S)">Enregistrer sous</button>
-          </div>
-        )}
-      </div>
+      )}
 
       <div className="content">
-        {active === 0 && <Home app={app} recents={recents} onNew={createNew} onOpen={openDialog} onOpenPdf={() => void openPdfDialog()} onOpenPath={(p) => void openFiles([p])} onAuxiCorrect={() => setAcOptions(true)} />}
+        {tabs.length === 0 && (
+          <Home
+            app={app}
+            recents={recents}
+            onNew={createNew}
+            onOpen={openDialog}
+            onOpenPdf={() => void openPdfDialog()}
+            onOpenPath={(p) => void openFiles([p])}
+            onAuxiCorrect={() => setAcOptions(true)}
+            tabs={prefs.open_mode === "tabs"}
+            onToggleTabs={() => void toggleTabs()}
+          />
+        )}
         {tabs.map((t) =>
           t.lost ? (
             active === t.info.doc && (
@@ -553,7 +628,7 @@ export function App() {
               onMessage={notify}
               register={(h) => handles.current.set(t.info.doc, h)}
               onAppAction={(a) => appAction(a, t.info.doc)}
-              onStates={updateMenuChecks}
+              onStates={showChecks}
             />
           ),
         )}

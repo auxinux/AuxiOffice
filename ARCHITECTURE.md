@@ -21,13 +21,20 @@
 
 ## Six applications, un exécutable
 
-- **AuxiOffice** ouvre tous les types de documents dans ses propres onglets (créer, ouvrir,
-  glisser-déposer, récents) ; menus et ruban suivent le type de l'onglet actif.
+- **AuxiOffice** est le lanceur : ses applications, « Ouvrir un fichier… », glisser-déposer
+  et documents récents démarrent la vraie application (AuxiWriter pour un .docx…) ; il
+  n'ouvre aucun document lui-même (`route_files` confie tout).
 - **AuxiWriter**, **AuxiSheet**, **AuxiPresent**, **AuxiDraw**, **AuxiPDF** sont lancées par le
-  menu des applications du système ou par un document ouvert depuis le bureau (types de
-  fichiers associés à chacune, jamais à AuxiOffice) : chacune a sa fenêtre, son icône, son
-  accueil et ses menus ; un fichier d'un autre type ouvert dans l'une part dans la bonne
+  menu des applications du système, par AuxiOffice ou par un document ouvert depuis le
+  bureau : chacune a son icône et ses menus, et démarre directement sur un document vierge
+  (AuxiPDF : écran d'ouverture). Un fichier d'un autre type part dans la bonne application
   (exception : AuxiDraw garde les PDF qu'on lui confie, pour les modifier).
+- **Une fenêtre par document** (réglage par défaut) ou **onglets** : Fichier → « Ouvrir les
+  documents dans des onglets », commun à toutes les applications (`preferences.json`,
+  `open_mode`). La barre d'onglets n'apparaît qu'à partir de deux documents. En mode
+  fenêtres, une fenêtre sans document prend le premier fichier, un document vierge intact
+  est remplacé (comme Word), et fermer le dernier document d'une fenêtre la ferme s'il en
+  reste d'autres. Les moteurs d'une fenêtre s'arrêtent avec elle (`doc_windows`).
 - AuxiCorrect ne s'applique qu'aux moteurs des documents texte : dans AuxiOffice, le moteur
   de réserve sert aux autres types et un document texte reçoit un moteur réglé pour lui.
 - Même exécutable, application choisie au lancement (`app/src-tauri/src/apps.rs`) : `--app`,

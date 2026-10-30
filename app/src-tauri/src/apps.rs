@@ -1,6 +1,6 @@
-//! Les applications : AuxiOffice (le gestionnaire : créer, ouvrir, documents
-//! récents) et AuxiWriter, AuxiSheet, AuxiPresent, AuxiDraw, AuxiPDF (un type
-//! de document chacune). C'est le même exécutable ; l'application est choisie
+//! Les applications : AuxiOffice (le lanceur : il crée et ouvre chaque
+//! document dans sa vraie application) et AuxiWriter, AuxiSheet, AuxiPresent,
+//! AuxiDraw, AuxiPDF (un type de document chacune). C'est le même exécutable ; l'application est choisie
 //! au lancement :
 //!
 //! 1. `--app writer|sheet|present|draw|pdf|office` (raccourcis Linux et Windows) ;
@@ -259,7 +259,13 @@ pub fn launch(dir: &Path, kind: AppKind, l: &Launch) -> Result<(), String> {
 
 fn spawn(mut c: Command) -> Result<(), String> {
     c.stdin(Stdio::null());
-    c.spawn().map(|_| ()).map_err(|e| format!("lancement impossible : {e}"))
+    let mut child = c.spawn().map_err(|e| format!("lancement impossible : {e}"))?;
+    // L'application lancée vit sa vie ; on recueille sa fin pour qu'elle ne
+    // reste pas en processus zombie tant qu'AuxiOffice est ouvert.
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(())
 }
 
 /// Paquet `AuxiWriter.app`… : à côté du nôtre, puis dans ~/Applications et

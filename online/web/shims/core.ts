@@ -160,18 +160,29 @@ async function office(cmd: string, a: Record<string, unknown>, raw: Args, opts?:
     case "launch_app":
       return launch(a.kind as OfficeKind, (a.files as string[]) ?? [], !!a.newDoc);
     case "route_files": {
-      // Comme sur le bureau : AuxiOffice ouvre tout ; chaque application
-      // confie aux autres les fichiers qui ne sont pas de son type.
+      // Comme sur le bureau : AuxiOffice (le lanceur) confie chaque fichier
+      // à son application ; chacune confie aux autres ceux d'un autre type.
       const mine: string[] = [];
       const others = new Map<string, string[]>();
       for (const f of a.files as string[]) {
         const k = officeKindFor(f);
-        if (kind === "office" || k === kind || (kind === "draw" && k === "pdf")) mine.push(f);
+        if (kind !== "office" && (k === kind || (kind === "draw" && k === "pdf"))) mine.push(f);
         else others.set(k, [...(others.get(k) ?? []), f]);
       }
       for (const [k, fl] of others) launch(k as OfficeKind, fl);
       return mine;
     }
+    case "open_window":
+      // Une « fenêtre » par document : un onglet du navigateur.
+      return launch(kind, (a.files as string[]) ?? [], !!a.newDoc);
+    case "other_windows":
+      return 0;
+    case "prefs_get": {
+      const p = ((await files.kvGet<Record<string, unknown>>("prefs-office").catch(() => null)) ?? {}) as Record<string, unknown>;
+      return { ...p, open_mode: p.open_mode === "tabs" ? "tabs" : "windows" };
+    }
+    case "prefs_set":
+      return void (await files.kvPut("prefs-office", a.prefs));
     case "auxicorrect_status":
     case "auxicorrect_set_options":
       return AUXICORRECT_OFF;
