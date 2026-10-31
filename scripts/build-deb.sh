@@ -201,4 +201,6 @@ control "$X" auxinux-office "auxioffice (= $VERSION)" \
 sed -i 's/^Architecture: .*/Architecture: all/; s/^Section: .*/Section: oldlibs/' "$X/DEBIAN/control"
 build "$X" auxinux-office all
 
+echo "== Fiches de la page de téléchargement (office.auxinux.ca)"
+scripts/fiches.sh "$OUT" "$OUT"
 echo "Paquets prêts dans $OUT"

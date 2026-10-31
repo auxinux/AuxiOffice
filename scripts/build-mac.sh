@@ -129,5 +129,9 @@ dmg() {
 dmg AuxiText "$OUT/AuxiText" "$OUT/AuxiText-$VERSION-macos-arm64.dmg"
 [ -n "$TEXT_ONLY" ] || dmg AuxiOffice "$OUT/AuxiOffice" "$OUT/AuxiOffice-$VERSION-macos-arm64.dmg"
 
+say "Fiches de la page de téléchargement (office.auxinux.ca)"
+scripts/fiches.sh "$OUT" "$OUT"
+echo "  À déposer avec les installateurs dans https://dep.auxinux.ca/DOWNLOAD/APPLICATIONS/AUXIOFFICE/ (latest.json en dernier)"
+
 say "Terminé"
 ls -1 "$OUT"/*.dmg | sed 's/^/  /'

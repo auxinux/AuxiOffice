@@ -114,6 +114,12 @@ une diffusion publique demande une signature Developer ID et une notarisation Ap
 **Linux.** `sudo apt install ./auxioffice_*.deb ./auxitext_*.deb` (ou
 `sudo auxi install --deb` sous AuxiNuxOS) ; voir plus haut pour ARM64.
 
+**Page de téléchargement.** Avec `--installer`, chaque script écrit aussi à côté des installateurs
+les fiches lues par office.auxinux.ca (`auxioffice-windows-x64.json`…, `latest.json` ;
+`scripts/fiches.sh`). Déposer installateurs et fiches ensemble dans
+`https://dep.auxinux.ca/DOWNLOAD/APPLICATIONS/AUXIOFFICE/`, `latest.json` en dernier : sans
+fiche, la page affiche « Bientôt disponible » même si le fichier est en ligne.
+
 ## Démarrage rapide (développement)
 
 ```sh

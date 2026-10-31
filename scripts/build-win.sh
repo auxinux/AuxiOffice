@@ -187,5 +187,9 @@ if [ -z "$TEXT_ONLY" ]; then
     "/DAuxiTextSetup=$(cygpath -w "$OUT/AuxiText-$VERSION-windows-x64-setup.exe")"
 fi
 
+say "Fiches de la page de téléchargement (office.auxinux.ca)"
+scripts/fiches.sh "$OUT" "$OUT"
+echo "  À déposer avec les installateurs dans https://dep.auxinux.ca/DOWNLOAD/APPLICATIONS/AUXIOFFICE/ (latest.json en dernier)"
+
 say "Terminé"
 ls -1 "$OUT"/*-setup.exe | sed 's/^/  /'
