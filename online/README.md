@@ -151,8 +151,15 @@ unique (OIDC) commune avec AuxiMail.
 
 ### AuxiMail (AuxiMailWeb, connexion unique)
 
-AuxiMailWeb (le webmail d'AuxiMail, dépôt `auxinux/AuxiMail`, serveur `auximail-web`) est servi
-**sur le même hôte**, sous `/mail/`. Il n'a pas de comptes dans ce mode : à chaque requête, il
+**Le webmail n'existe qu'à travers AuxiOffice Online** (décision du 2026-10-31) : pas de site
+de courriel à part, pas de comptes ni de page de connexion propres à AuxiMailWeb. On y entre
+par le portail (tuile AuxiMail), avec son compte AuxiOffice Online ; comptes, mots de passe et
+administration se gèrent uniquement dans le portail. AuxiMail de bureau n'est pas concerné.
+
+AuxiMailWeb (dépôt `auxinux/AuxiMail`, serveur `auximail-web`) tourne à côté d'auxi-online, sur
+127.0.0.1:8095, jamais exposé directement : il est servi **sur le même hôte**, sous `/mail/`.
+Montage recommandé : le relais intégré (`--auximail-proxy`), pour que le navigateur ne voie
+qu'auxi-online. Il n'a pas de comptes dans ce mode : à chaque requête, il
 lit le témoin `auxi_session` du portail et le fait vérifier par `GET /api/me` d'auxi-online. Un
 utilisateur connecté au portail ouvre donc son courriel sans deuxième connexion ; son espace
 courriel est créé à sa première visite. Contrat complet : `web/INTEGRATION.md` du dépôt AuxiMail.
@@ -163,11 +170,11 @@ courriel est créé à sa première visite. Contrat complet : `web/INTEGRATION.m
    `AUXIMAIL_WEB_OPTS="--base-path /mail --auxioffice-url http://127.0.0.1:8090"`, puis
    `sudo systemctl restart auximail-web` (il écoute sur 127.0.0.1:8095).
 3. Relais de `/mail/`, au choix :
+   - **relais intégré (recommandé)** : `--auximail-proxy http://127.0.0.1:8095` sur auxi-online,
+     rien à ajouter dans nginx ;
    - **nginx** : les deux blocs `location` de `deploy/nginx.conf` (repris de
      `web/deploy/nginx-auxioffice.conf` du dépôt AuxiMail), **avant** `location /` ; ajouter
      `--auximail-health http://127.0.0.1:8095` à auxi-online pour l'état dans l'administration ;
-   - **ou le relais intégré** : `--auximail-proxy http://127.0.0.1:8095` (flux d'événements
-     sans tampon ni délai, corps jusqu'à 60 Mo) ; nginx envoie alors tout à auxi-online.
 4. Administration → Réglages → **Adresse d'AuxiMail** : `/mail/` (ou
    `https://web.office.auxinux.ca/mail/`), ou l'option `--auximail-url /mail/`.
 5. Vérifier : Administration → Serveur → ligne « AuxiMail » (version, espaces ouverts).
