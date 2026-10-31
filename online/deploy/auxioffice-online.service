@@ -7,7 +7,7 @@ After=network.target
 User=auxioffice
 Group=auxioffice
 WorkingDirectory=/var/lib/auxioffice-online
-ExecStart=/opt/auxioffice-online/auxi-online --listen 127.0.0.1:8090 --data /var/lib/auxioffice-online --secure-cookies --max-engines 24 --max-docs 6 --spares 2 --auximail-proxy http://127.0.0.1:8095 --auximail-url /mail/ --auximail-data /var/lib/auximail-web
+ExecStart=/opt/auxioffice-online/auxi-online --listen 127.0.0.1:8090 --data /var/lib/auxioffice-online --secure-cookies --max-engines 24 --max-docs 6 --spares 2 --auximail-proxy http://127.0.0.1:8095 --auximail-url /mail/ --auximail-data /var/lib/auximail-web --auxicorrect-proxy http://127.0.0.1:8096
 Restart=on-failure
 RestartSec=3
 # Les moteurs ont besoin des espaces de noms utilisateur (bubblewrap) :
@@ -17,6 +17,8 @@ ProtectHome=true
 PrivateTmp=true
 LimitNOFILE=65536
 
+# --auxicorrect-proxy : AuxiCorrect Online (paquet auxicorrect-web) sous /correct/ ;
+# retirer l'option s'il n'est pas installé (la page /correct/ intégrée reste alors).
 # --auximail-data : l'utilisateur auxioffice doit pouvoir lire les dossiers
 # d'AuxiMailWeb (par exemple : groupe auximail-web, droits g+rX), pour compter
 # l'espace courriel de chaque client dans son forfait.

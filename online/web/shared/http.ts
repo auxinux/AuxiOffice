@@ -116,6 +116,8 @@ export interface Status {
   auxicorrect: { cli: string; version: string | null } | null;
   max_open_mb: number;
   auximail: { ok: boolean; version?: string; mode?: string; openSpaces?: number; error?: string } | null;
+  /** AuxiCorrect Online (`/correct/api/health`), avec --auxicorrect-proxy. */
+  auxicorrect_online: { ok: boolean; version?: string; mode?: string; dictionary?: boolean; checks?: number; users?: number; uptime?: number; error?: string } | null;
 }
 
 export interface Me {

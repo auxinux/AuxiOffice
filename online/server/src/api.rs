@@ -48,7 +48,7 @@ async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Sen
 
 pub async fn me(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap) -> Response {
     let auximail = app.settings.get().auximail_url;
-    let base = json!({"auth": app.auth.enabled(), "version": env!("CARGO_PKG_VERSION"), "auximail": auximail, "auxicorrect": app.auxicorrect.is_some()});
+    let base = json!({"auth": app.auth.enabled(), "version": env!("CARGO_PKG_VERSION"), "auximail": auximail, "auxicorrect": app.auxicorrect.is_some() || app.correct_proxy.is_some()});
     match user(&app, &headers, &method) {
         Ok(u) => {
             let mut v = base;
@@ -475,6 +475,13 @@ pub async fn admin_status(State(app): State<Arc<AppState>>, method: Method, head
         },
         None => Value::Null,
     };
+    let auxicorrect_online = match &app.correct_proxy {
+        Some(p) => match p.health().await {
+            Ok(v) => v,
+            Err(e) => json!({"ok": false, "error": e}),
+        },
+        None => Value::Null,
+    };
     let setup = &app.pool.setup;
     Ok(Json(json!({
         "version": env!("CARGO_PKG_VERSION"),
@@ -489,6 +496,7 @@ pub async fn admin_status(State(app): State<Arc<AppState>>, method: Method, head
         "auxicorrect": app.auxicorrect.as_ref().map(|(c, v)| json!({"cli": c, "version": v})),
         "max_open_mb": setup.max_open_mb,
         "auximail": auximail,
+        "auxicorrect_online": auxicorrect_online,
     })))
 }
 

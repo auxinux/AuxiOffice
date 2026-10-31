@@ -410,6 +410,14 @@ async function renderStatus(box: HTMLElement) {
             ? `${s.auximail.version ?? "en marche"} — ${s.auximail.openSpaces ?? 0} espace(s) ouvert(s)${s.auximail.mode === "auxioffice" ? ", connexion unique" : ` (mode ${s.auximail.mode})`}`
             : `injoignable : ${s.auximail.error ?? "erreur"}`,
       ),
+      row(
+        "AuxiCorrect Online",
+        !s.auxicorrect_online
+          ? "non relié (option --auxicorrect-proxy) : page /correct/ intégrée"
+          : s.auxicorrect_online.ok
+            ? `${s.auxicorrect_online.version ?? "en marche"} — ${s.auxicorrect_online.users ?? 0} utilisateur(s), ${s.auxicorrect_online.checks ?? 0} vérification(s)${s.auxicorrect_online.dictionary === false ? ", sans base lexicale" : ""}${s.auxicorrect_online.mode === "auxioffice" ? ", connexion unique" : ` (mode ${s.auxicorrect_online.mode})`}`
+            : `injoignable : ${s.auxicorrect_online.error ?? "erreur"}`,
+      ),
     );
   } catch (e) {
     box.replaceChildren(h("p", {}, errText(e)));

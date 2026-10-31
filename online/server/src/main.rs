@@ -57,9 +57,12 @@ pub struct AppState {
     pub secure_cookies: bool,
     pub settings: settings::Store,
     /// Relais intégré vers AuxiMailWeb (`--auximail-proxy`).
-    pub mail_proxy: Option<proxy::MailProxy>,
+    pub mail_proxy: Option<proxy::Proxy>,
     /// AuxiMailWeb pour l'état de l'administration (relais, sinon `--auximail-health`).
-    pub mail_health: Option<proxy::MailProxy>,
+    pub mail_health: Option<proxy::Proxy>,
+    /// Relais intégré vers AuxiCorrect Online (`--auxicorrect-proxy`) : il
+    /// remplace alors la page `/correct/` intégrée.
+    pub correct_proxy: Option<proxy::Proxy>,
     /// Espace AuxiMail de chaque client, compté dans son forfait.
     pub mail_usage: usage::MailUsage,
     pub started: Instant,
@@ -126,6 +129,9 @@ Options (aussi en variables AUXI_ONLINE_<OPTION>, ex. AUXI_ONLINE_LISTEN) :
   --lang <langue>           langue des moteurs (défaut fr-FR)
   --auxicorrect-cli <outil> correcteur AuxiCorrect (défaut : celui déclaré par AuxiCorrect dans
                             ~/.config/auxinux/auxicorrect.json) ; « none » : sans AuxiCorrect
+  --auxicorrect-proxy <url> relaie /correct/… vers AuxiCorrect Online (auxicorrect-web, ex.
+                            http://127.0.0.1:8096), à la place de la page /correct/ intégrée ;
+                            sans cette option, nginx peut faire le relais
   --engine <fichier>        auxi-engine (sinon AUXI_ENGINE_EXE ou détection)
   --lo-program <dossier>    dossier program/ du moteur de documents (sinon AUXI_LO_PROGRAM)
   --templates <dossier>     modèles vierges (sinon AUXI_TEMPLATES)
@@ -354,6 +360,10 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
     if let Some(u) = args.get("auximail-proxy") {
         eprintln!("auxi-online : AuxiMail : /mail/ relayé vers {u}");
     }
+    let correct_proxy = args.get("auxicorrect-proxy").map(|u| proxy::Proxy::correct(&u)).transpose()?;
+    if let Some(u) = args.get("auxicorrect-proxy") {
+        eprintln!("auxi-online : AuxiCorrect Online : /correct/ relayé vers {u}");
+    }
     match &auxicorrect {
         Some((cli, _)) => eprintln!("auxi-online : AuxiCorrect : {}", cli.display()),
         None => eprintln!("auxi-online : sans AuxiCorrect (correcteur intégré seulement)"),
@@ -418,8 +428,9 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
             }
             st
         },
-        mail_proxy: args.get("auximail-proxy").map(|u| proxy::MailProxy::new(&u)).transpose()?,
-        mail_health: args.get("auximail-proxy").or_else(|| args.get("auximail-health")).map(|u| proxy::MailProxy::new(&u)).transpose()?,
+        mail_proxy: args.get("auximail-proxy").map(|u| proxy::Proxy::mail(&u)).transpose()?,
+        mail_health: args.get("auximail-proxy").or_else(|| args.get("auximail-health")).map(|u| proxy::Proxy::mail(&u)).transpose()?,
+        correct_proxy,
         mail_usage: usage::MailUsage::new(args.get("auximail-data").map(PathBuf::from), args.get("auximail-proxy").or_else(|| args.get("auximail-health"))),
         started: Instant::now(),
         sandbox_name: match sandbox {
@@ -454,7 +465,7 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
     // les ressources appelées par un chemin absolu (/icons, /pdfjs) sont
     // cherchées dans chacune.
     let statics = ServeDir::new(&web).fallback(ServeDir::new(web.join("office")).fallback(ServeDir::new(web.join("text"))));
-    let router = Router::new()
+    let mut router = Router::new()
         .route("/api/me", get(api::me))
         .route("/api/login", post(api::login))
         .route("/api/logout", post(api::logout))
@@ -479,9 +490,17 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         .route("/api/auxicorrect/lookup", post(api::auxicorrect_lookup))
         .route("/api/auxicorrect/check", post(api::auxicorrect_check))
         .route("/ws", get(ws::handler))
-        .route("/mail", axum::routing::any(proxy::relay))
-        .route("/mail/", axum::routing::any(proxy::relay))
-        .route("/mail/{*rest}", axum::routing::any(proxy::relay))
+        .route("/mail", axum::routing::any(proxy::relay_mail))
+        .route("/mail/", axum::routing::any(proxy::relay_mail))
+        .route("/mail/{*rest}", axum::routing::any(proxy::relay_mail));
+    // AuxiCorrect Online relayé : prime sur la page intégrée (online/web/correct/).
+    if app.correct_proxy.is_some() {
+        router = router
+            .route("/correct", axum::routing::any(proxy::relay_correct))
+            .route("/correct/", axum::routing::any(proxy::relay_correct))
+            .route("/correct/{*rest}", axum::routing::any(proxy::relay_correct));
+    }
+    let router = router
         .fallback_service(statics)
         // Pages HTML toujours revérifiées : après une mise à jour, le navigateur
         // charge la nouvelle interface (les scripts ont des noms qui changent).

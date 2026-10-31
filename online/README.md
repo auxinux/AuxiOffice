@@ -62,6 +62,10 @@ aussitôt), dictionnaire (définitions, synonymes, conjugaison) et correction da
 `auxicorrect-cli` tourne sur le serveur ; le moteur, sans réseau, le joint par une prise Unix
 de son emplacement (`slot-N/grammar.sock`), relayée en HTTP local dans le bac à sable.
 
+La tuile **AuxiCorrect** du portail ouvre `/correct/` : par défaut la page intégrée
+(`web/correct/`, qui appelle `auxicorrect-cli`), ou **AuxiCorrect Online** relayé
+(`--auxicorrect-proxy`, voir « AuxiCorrect Online » plus bas).
+
 ### Coupures de connexion
 
 Une coupure (Wi-Fi, mise en veille, mandataire redémarré) ne perd rien : les documents de
@@ -125,7 +129,8 @@ Dans le portail, le menu du compte (nom en haut à droite) mène à **Mon profil
 passe, espace utilisé, options d'AuxiCorrect) et, pour les administrateurs, à
 **Administration** : onglet **Réglages** (espace par défaut d'un compte, 1 Go au départ ;
 documents ouverts par compte ; fermeture des documents inactifs ; adresse d'AuxiMail),
-onglet **Serveur** (état : moteurs, documents, espace, bac à sable, AuxiCorrect) et onglet
+onglet **Serveur** (état : moteurs, documents, espace, bac à sable, AuxiCorrect, AuxiMail,
+AuxiCorrect Online) et onglet
 **Comptes** : créer un compte, changer son nom, son mot de passe, son espace ou son rôle,
 le supprimer (en gardant ou non ses fichiers). Un nouveau mot de passe ferme les sessions du
 compte. Les sessions sont gardées dans `sessions.json` (empreinte SHA-256 des jetons
@@ -194,6 +199,49 @@ portail. Le témoin est `SameSite=Strict` : arrivé sur `/mail/` par un lien d'u
 (un courriel, par exemple), le navigateur ne l'envoie pas au premier chargement ; passer par
 le portail (tuile AuxiMail) ou recharger la page.
 
+### AuxiCorrect Online (auxicorrect-web, connexion unique)
+
+AuxiCorrect Online (dépôt `auxinux/AuxiCorrect`, paquet Debian `auxicorrect-web`) est le
+correcteur et dictionnaire d'AuxiCorrect servi **sur le même hôte**, sous `/correct/`, à la
+place de la page intégrée. Comme AuxiMailWeb, il n'a ni comptes ni page de connexion : il lit
+le témoin `auxi_session` et le fait vérifier par `GET /api/me` d'auxi-online (seule route qu'il
+appelle). Le moteur y est chargé une fois pour tous : aucun processus lancé par vérification.
+Contrat complet : `ONLINE.md` du dépôt AuxiCorrect.
+
+```
+navigateur ── web.office.auxinux.ca
+               ├─ /          auxi-online (portail, bureautique)    127.0.0.1:8090
+               ├─ /mail/     AuxiMailWeb                            127.0.0.1:8095
+               └─ /correct/  relayé par auxi-online (--auxicorrect-proxy)
+                             ou par nginx ──▶ auxicorrect-web      127.0.0.1:8096
+                                                └─ GET 127.0.0.1:8090/api/me (témoin auxi_session)
+```
+
+1. Installer le paquet `auxicorrect-web` sur le même serveur
+   (`sudo apt install ./AuxiCorrect-Online-<v>-Linux.deb`) : service sur 127.0.0.1:8096,
+   préfixe `/correct`, sessions vérifiées par http://127.0.0.1:8090 (options dans
+   `/etc/default/auxicorrect-web`). Ne jamais exposer le port 8096 directement.
+2. Relais de `/correct/`, au choix :
+   - **relais intégré (recommandé)** : `--auxicorrect-proxy http://127.0.0.1:8096` sur
+     auxi-online (voir `deploy/auxioffice-online.service`), rien à ajouter dans nginx. Tout
+     ce qui est sous `/correct` est transmis tel quel (chemin, méthode, corps, en-têtes dont
+     `Cookie` et `X-AuxiCorrect`) ; la réponse revient telle quelle ; s'il est injoignable :
+     erreur 502 « AuxiCorrect est momentanément indisponible. » ;
+   - **nginx** : le bloc `location /correct` de `deploy/nginx.conf`, **avant** `location /`
+     (l'état dans l'administration n'est alors pas affiché).
+3. Vérifier : Administration → Serveur → ligne « AuxiCorrect Online » (version,
+   utilisateurs, vérifications).
+
+Avec le relais, `GET /api/me` donne `auxicorrect: true` : la tuile AuxiCorrect et le bouton
+« Corriger » des .txt et .md de « Mes fichiers » (`/correct/?open=<chemin>`) s'affichent. Le
+correcteur lit et réécrit le fichier depuis le navigateur (`GET` et `PUT /api/file`). Sans
+l'option, rien ne change : la page intégrée reste servie sous `/correct/`.
+
+AuxiWriter et AuxiText en ligne continuent d'utiliser `auxicorrect-cli` pour leurs
+soulignements, avec les options AuxiCorrect de **Mon profil**. AuxiCorrect Online garde ses
+propres options et son dictionnaire personnel (dans son dossier de données) : les deux ne
+sont pas encore partagés.
+
 ### Capacité
 
 Chaque document de bureautique ouvert occupe un moteur (≈ 150 à 300 Mo de mémoire selon le
@@ -206,7 +254,8 @@ AuxiText, AuxiPDF et AuxiSheet Lite ne consomment rien côté serveur.
   que par un onglet à la fois. LibreOfficeKit permet plusieurs vues par document, c'est la
   prochaine étape.
 - Les réglages avancés d'AuxiCorrect (dictionnaire personnel, mots ignorés) restent dans
-  l'application AuxiCorrect d'un ordinateur.
+  l'application AuxiCorrect d'un ordinateur, ou dans AuxiCorrect Online (pas encore partagés
+  avec les soulignements d'AuxiWriter et d'AuxiText en ligne).
 - Le copier-coller passe par le presse-papiers du navigateur : il exige HTTPS (ou
   `localhost`), ce qui est le cas derrière nginx.
 - Le navigateur réserve certains raccourcis (Ctrl+N, Ctrl+T, Ctrl+W) ; le collage depuis le
