@@ -24,8 +24,9 @@ for a in "$@"; do
     *) echo "option inconnue : $a" >&2; exit 2 ;;
   esac
 done
-cargo_flags=()
-[ "$profile" = release ] && cargo_flags+=(--release)
+# Pas de tableau : le bash 3.2 de macOS refuse un tableau vide avec « set -u ».
+release_flag=""
+[ "$profile" = release ] && release_flag="--release"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "$1 introuvable : $2" >&2; exit 1; }; }
 
@@ -52,7 +53,7 @@ fi
 
 if [ "$server" = 1 ]; then
   echo "== Serveur et moteur"
-  (cd "$repo" && cargo build "${cargo_flags[@]}" -p auxi-online -p auxi-engine)
+  (cd "$repo" && cargo build $release_flag -p auxi-online -p auxi-engine)
 fi
 
 echo
