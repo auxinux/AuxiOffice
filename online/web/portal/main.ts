@@ -310,7 +310,7 @@ async function renderSettings(box: HTMLElement) {
   const quota = num(st.default_quota_mb);
   const docs = num(st.max_docs_per_user);
   const idle = num(st.idle_minutes);
-  const mail = h("input", { type: "url", className: "auxi-input", value: st.auximail_url, placeholder: "https://mail.auxinux.ca" }) as HTMLInputElement;
+  const mail = h("input", { type: "text", className: "auxi-input", value: st.auximail_url, placeholder: "/mail/" }) as HTMLInputElement;
   const msg = h("div", { className: "form-msg" });
   const field = (label: string, input: HTMLElement, hint: string) => h("label", { className: "form-field" }, h("span", {}, label), input, h("small", { className: "muted" }, hint));
   const save = h("button", { className: "primary", onclick: async () => {
@@ -327,7 +327,7 @@ async function renderSettings(box: HTMLElement) {
     field("Espace par défaut d'un compte (Mo)", quota, `1024 Mo = 1 Go. Les comptes sans espace particulier l'utilisent (${formatSize(Number(st.default_quota_mb) * 1024 * 1024)} maintenant).`),
     field("Documents ouverts en même temps par compte", docs, "Chaque document de bureautique ouvert occupe un moteur sur le serveur (150 à 300 Mo de mémoire)."),
     field("Fermeture des documents inactifs (minutes)", idle, "Un document sans activité depuis ce délai est fermé et son moteur libéré (les modifications non enregistrées sont perdues)."),
-    field("Adresse d'AuxiMail", mail, "Le webmail ouvert par la tuile AuxiMail du portail. Vide : la tuile indique « Bientôt »."),
+    field("Adresse d'AuxiMail", mail, "Le webmail ouvert par la tuile AuxiMail : /mail/ (AuxiMailWeb sur ce serveur, connexion unique) ou une adresse https://. Vide : la tuile indique « Bientôt »."),
     msg,
     h("div", { className: "form-actions" }, save),
   );
@@ -350,6 +350,14 @@ async function renderStatus(box: HTMLElement) {
       row("Bac à sable des moteurs", s.sandbox === "aucun" ? "aucun (à éviter sur un serveur public)" : s.sandbox),
       row("AuxiCorrect", s.auxicorrect ? `${s.auxicorrect.version ?? "installé"} — ${s.auxicorrect.cli}` : "non installé"),
       row("Taille maximale d'un document", `${s.max_open_mb} Mo`),
+      row(
+        "AuxiMail",
+        !s.auximail
+          ? "non relié (options --auximail-proxy ou --auximail-health)"
+          : s.auximail.ok
+            ? `${s.auximail.version ?? "en marche"} — ${s.auximail.openSpaces ?? 0} espace(s) ouvert(s)${s.auximail.mode === "auxioffice" ? ", connexion unique" : ` (mode ${s.auximail.mode})`}`
+            : `injoignable : ${s.auximail.error ?? "erreur"}`,
+      ),
     );
   } catch (e) {
     box.replaceChildren(h("p", {}, errText(e)));

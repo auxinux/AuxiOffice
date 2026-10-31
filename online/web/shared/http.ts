@@ -103,6 +103,7 @@ export interface Status {
   sandbox: string;
   auxicorrect: { cli: string; version: string | null } | null;
   max_open_mb: number;
+  auximail: { ok: boolean; version?: string; mode?: string; openSpaces?: number; error?: string } | null;
 }
 
 export interface Me {

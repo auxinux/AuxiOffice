@@ -38,9 +38,11 @@ impl Settings {
         if !(5..=10_080).contains(&self.idle_minutes) {
             return Err("Fermeture des documents inactifs : entre 5 minutes et 7 jours.".into());
         }
+        // Adresse complète, ou relative au portail (« /mail/ » : même hôte, http comme https).
         let u = self.auximail_url.trim();
-        if !u.is_empty() && !(u.starts_with("https://") || u.starts_with("http://")) {
-            return Err("Adresse d'AuxiMail : elle doit commencer par https://".into());
+        let relative = u.starts_with('/') && !u.starts_with("//");
+        if !u.is_empty() && !(u.starts_with("https://") || u.starts_with("http://") || relative) || u.chars().any(|c| c.is_whitespace() || c == '"' || c == '<') {
+            return Err("Adresse d'AuxiMail : https://… ou une adresse de ce serveur comme /mail/".into());
         }
         Ok(())
     }
@@ -83,6 +85,8 @@ mod tests {
         assert_eq!(st.get().default_quota_mb, 500);
         assert!(st.set(Settings { max_docs_per_user: 0, ..Default::default() }).is_err());
         assert!(st.set(Settings { auximail_url: "ftp://x".into(), ..Default::default() }).is_err());
+        assert!(st.set(Settings { auximail_url: "//pirate.example/".into(), ..Default::default() }).is_err());
+        st.set(Settings { auximail_url: "/mail/".into(), ..Default::default() }).unwrap();
         st.set(Settings { default_quota_mb: 2048, auximail_url: " https://mail.auxinux.ca ".into(), ..Default::default() }).unwrap();
         let again = Store::load(dir.join("settings.json"), Settings::default());
         assert_eq!(again.get().default_quota_mb, 2048);

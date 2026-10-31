@@ -430,6 +430,13 @@ pub async fn admin_status(State(app): State<Arc<AppState>>, method: Method, head
         Ok((users.len(), total))
     })
     .await?;
+    let auximail = match &app.mail_health {
+        Some(p) => match p.health().await {
+            Ok(v) => v,
+            Err(e) => json!({"ok": false, "error": e}),
+        },
+        None => Value::Null,
+    };
     let setup = &app.pool.setup;
     Ok(Json(json!({
         "version": env!("CARGO_PKG_VERSION"),
@@ -443,6 +450,7 @@ pub async fn admin_status(State(app): State<Arc<AppState>>, method: Method, head
         "sandbox": app.sandbox_name,
         "auxicorrect": app.auxicorrect.as_ref().map(|(c, v)| json!({"cli": c, "version": v})),
         "max_open_mb": setup.max_open_mb,
+        "auximail": auximail,
     })))
 }
 

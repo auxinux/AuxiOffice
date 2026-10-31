@@ -9,6 +9,7 @@ mod api;
 mod auth;
 mod engines;
 mod grammar;
+mod proxy;
 mod settings;
 mod storage;
 mod ws;
@@ -54,6 +55,10 @@ pub struct AppState {
     pub pool: Arc<Pool>,
     pub secure_cookies: bool,
     pub settings: settings::Store,
+    /// Relais intégré vers AuxiMailWeb (`--auximail-proxy`).
+    pub mail_proxy: Option<proxy::MailProxy>,
+    /// AuxiMailWeb pour l'état de l'administration (relais, sinon `--auximail-health`).
+    pub mail_health: Option<proxy::MailProxy>,
     pub started: Instant,
     pub sandbox_name: &'static str,
     /// AuxiCorrect : `auxicorrect-cli` et sa version, s'il est installé.
@@ -105,7 +110,13 @@ Options (aussi en variables AUXI_ONLINE_<OPTION>, ex. AUXI_ONLINE_LISTEN) :
                             documents de l'onglet (défaut 180)
   --quota-mb <n>            espace par défaut d'un compte (défaut 1024)
   --max-open-mb <n>         taille maximale d'un document ouvert (défaut 200)
-  --auximail-url <adresse>  adresse d'AuxiMail (webmail) pour le portail
+  --auximail-url <adresse>  adresse de la tuile AuxiMail du portail (/mail/ ou https://…)
+  --auximail-proxy <url>    relaie /mail/… vers AuxiMailWeb (ex. http://127.0.0.1:8095) ;
+                            sans cette option, nginx peut faire le relais
+  --auximail-health <url>   AuxiMailWeb pour l'état de l'administration, si nginx relaie
+                            (ex. http://127.0.0.1:8095)
+  Les réglages donnés ici (--quota-mb, --max-docs, --idle-minutes, --auximail-url)
+  remplacent ceux enregistrés depuis l'administration.
   --lang <langue>           langue des moteurs (défaut fr-FR)
   --auxicorrect-cli <outil> correcteur AuxiCorrect (défaut : celui déclaré par AuxiCorrect dans
                             ~/.config/auxinux/auxicorrect.json) ; « none » : sans AuxiCorrect
@@ -334,6 +345,9 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
             shared.cli.map(|c| (c, shared.version))
         }
     };
+    if let Some(u) = args.get("auximail-proxy") {
+        eprintln!("auxi-online : AuxiMail : /mail/ relayé vers {u}");
+    }
     match &auxicorrect {
         Some((cli, _)) => eprintln!("auxi-online : AuxiCorrect : {}", cli.display()),
         None => eprintln!("auxi-online : sans AuxiCorrect (correcteur intégré seulement)"),
@@ -372,15 +386,30 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         store: storage::Storage::new(data.join("files")),
         pool: pool.clone(),
         secure_cookies: args.on("secure-cookies"),
-        settings: settings::Store::load(
-            data.join("settings.json"),
-            settings::Settings {
-                default_quota_mb: args.num("quota-mb", 1024),
-                max_docs_per_user: args.num("max-docs", 6).clamp(1, 50) as usize,
-                idle_minutes: args.num("idle-minutes", 120).clamp(5, 10_080),
-                auximail_url: args.get("auximail-url").unwrap_or_default(),
-            },
-        ),
+        settings: {
+            let st = settings::Store::load(data.join("settings.json"), settings::Settings::default());
+            // Options de la ligne de commande : elles priment sur les réglages enregistrés.
+            let mut cur = st.get();
+            let before = serde_json::to_string(&cur).unwrap_or_default();
+            if let Some(q) = args.get("quota-mb").and_then(|v| v.parse().ok()) {
+                cur.default_quota_mb = q;
+            }
+            if let Some(d) = args.get("max-docs").and_then(|v| v.parse().ok()) {
+                cur.max_docs_per_user = d;
+            }
+            if let Some(m) = args.get("idle-minutes").and_then(|v| v.parse().ok()) {
+                cur.idle_minutes = m;
+            }
+            if let Some(u) = args.get("auximail-url") {
+                cur.auximail_url = u;
+            }
+            if serde_json::to_string(&cur).unwrap_or_default() != before {
+                st.set(cur).map_err(|e| format!("option invalide : {e}"))?;
+            }
+            st
+        },
+        mail_proxy: args.get("auximail-proxy").map(|u| proxy::MailProxy::new(&u)).transpose()?,
+        mail_health: args.get("auximail-proxy").or_else(|| args.get("auximail-health")).map(|u| proxy::MailProxy::new(&u)).transpose()?,
         started: Instant::now(),
         sandbox_name: match sandbox {
             Sandbox::Bwrap(_) => "bubblewrap",
@@ -439,6 +468,9 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         .route("/api/auxicorrect/lookup", post(api::auxicorrect_lookup))
         .route("/api/auxicorrect/check", post(api::auxicorrect_check))
         .route("/ws", get(ws::handler))
+        .route("/mail", axum::routing::any(proxy::relay))
+        .route("/mail/", axum::routing::any(proxy::relay))
+        .route("/mail/{*rest}", axum::routing::any(proxy::relay))
         .fallback_service(statics)
         // Pages HTML toujours revérifiées : après une mise à jour, le navigateur
         // charge la nouvelle interface (les scripts ont des noms qui changent).

@@ -149,6 +149,34 @@ unique (OIDC) commune avec AuxiMail.
    Le serveur écoute sur 127.0.0.1 : ne jamais l'exposer directement.
 7. Premier compte (administrateur) : `sudo -u auxioffice /opt/auxioffice-online/auxi-online user add … --data /var/lib/auxioffice-online`.
 
+### AuxiMail (AuxiMailWeb, connexion unique)
+
+AuxiMailWeb (le webmail d'AuxiMail, dépôt `auxinux/AuxiMail`, serveur `auximail-web`) est servi
+**sur le même hôte**, sous `/mail/`. Il n'a pas de comptes dans ce mode : à chaque requête, il
+lit le témoin `auxi_session` du portail et le fait vérifier par `GET /api/me` d'auxi-online. Un
+utilisateur connecté au portail ouvre donc son courriel sans deuxième connexion ; son espace
+courriel est créé à sa première visite. Contrat complet : `web/INTEGRATION.md` du dépôt AuxiMail.
+
+1. Installer le paquet Debian `auximail-web` sur le même serveur
+   (`sudo apt install ./auximail-web_<version>_<arch>.deb`, ou `sudo auxi install --deb …`).
+2. `/etc/default/auximail-web` (exemple : `deploy/auximail-web.default`) :
+   `AUXIMAIL_WEB_OPTS="--base-path /mail --auxioffice-url http://127.0.0.1:8090"`, puis
+   `sudo systemctl restart auximail-web` (il écoute sur 127.0.0.1:8095).
+3. Relais de `/mail/`, au choix :
+   - **nginx** : les deux blocs `location` de `deploy/nginx.conf` (repris de
+     `web/deploy/nginx-auxioffice.conf` du dépôt AuxiMail), **avant** `location /` ; ajouter
+     `--auximail-health http://127.0.0.1:8095` à auxi-online pour l'état dans l'administration ;
+   - **ou le relais intégré** : `--auximail-proxy http://127.0.0.1:8095` (flux d'événements
+     sans tampon ni délai, corps jusqu'à 60 Mo) ; nginx envoie alors tout à auxi-online.
+4. Administration → Réglages → **Adresse d'AuxiMail** : `/mail/` (ou
+   `https://web.office.auxinux.ca/mail/`), ou l'option `--auximail-url /mail/`.
+5. Vérifier : Administration → Serveur → ligne « AuxiMail » (version, espaces ouverts).
+
+La déconnexion se fait dans le portail ; le bouton « AuxiOffice Online » d'AuxiMail ramène au
+portail. Le témoin est `SameSite=Strict` : arrivé sur `/mail/` par un lien d'un autre site
+(un courriel, par exemple), le navigateur ne l'envoie pas au premier chargement ; passer par
+le portail (tuile AuxiMail) ou recharger la page.
+
 ### Capacité
 
 Chaque document de bureautique ouvert occupe un moteur (≈ 150 à 300 Mo de mémoire selon le

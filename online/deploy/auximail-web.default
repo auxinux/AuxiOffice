@@ -1,0 +1,4 @@
+# /etc/default/auximail-web — AuxiMailWeb (paquet auximail-web, dépôt AuxiMail) dans
+# AuxiOffice Online : servi sous /mail/ du même hôte, connexion unique par le témoin
+# de session d'AuxiOffice Online (vérifié auprès de GET http://127.0.0.1:8090/api/me).
+AUXIMAIL_WEB_OPTS="--base-path /mail --auxioffice-url http://127.0.0.1:8090"
