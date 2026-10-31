@@ -312,7 +312,7 @@ h2 {
 }
 
 .frow.account {
-  grid-template-columns: 1fr 120px 200px 80px;
+  grid-template-columns: 1fr 110px 140px 170px 80px;
   cursor: default;
 }
 .frow.account .mail {
@@ -543,4 +543,74 @@ h2 {
   .kv {
     grid-template-columns: 1fr;
   }
+}
+
+.plan-name {
+  font-size: 13px;
+}
+.plans {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.plan-row {
+  display: grid;
+  grid-template-columns: 1fr 260px 90px 50px;
+  gap: 10px;
+  align-items: center;
+}
+.plan-row.head {
+  color: var(--ao-muted);
+  font-size: 13px;
+}
+.plan-row .quota {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.plan-row .quota input {
+  width: 130px;
+}
+.plan-row .def {
+  display: flex;
+  justify-content: center;
+}
+.add-plan {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+h2.spaced {
+  margin-top: 18px;
+}
+.big-usage .bar {
+  display: flex;
+}
+.big-usage .bar span.mail {
+  background: #5da3c3;
+}
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--ao-muted);
+}
+.legend {
+  gap: 4px 16px;
+}
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--ao-orange);
+}
+.legend i.mail {
+  background: #5da3c3;
 }

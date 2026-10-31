@@ -5,7 +5,7 @@
 import { APPS, appFor, appUrl, isLiteSheet, launch, PORTAL_APPS, type AppId } from "../shared/apps";
 import { form, messageBox, prompt, toast } from "../shared/dialogs";
 import { fileIcon } from "../shared/icons";
-import { baseName, dirName, files, formatSize, joinPath, upload, type Account, type AcOptions, type Entry, type Me, type Settings } from "../shared/http";
+import { baseName, dirName, files, formatSize, joinPath, upload, type Account, type AcOptions, type Entry, type Me, type Plan, type Settings } from "../shared/http";
 import "../shared/online.css";
 import "./portal.css";
 
@@ -152,7 +152,7 @@ async function showDashboard() {
     { className: "top" },
     h("a", { href: "#", className: "home-link" }, logo()),
     h("span", { className: "spacer" }),
-    usage && h("span", { className: "usage", title: `${formatSize(usage.used)} sur ${formatSize(usage.quota)}` }, h("span", { className: "bar" }, h("span", { style: `width:${pct}%` })), `${formatSize(usage.used)} / ${formatSize(usage.quota)}`),
+    usage && h("span", { className: "usage", title: `Forfait ${usage.plan.name} : ${formatSize(usage.used)} sur ${formatSize(usage.quota)} (documents ${formatSize(usage.files)}, courriel ${formatSize(usage.mail)})` }, h("span", { className: "bar" }, h("span", { style: `width:${pct}%` })), `${formatSize(usage.used)} / ${formatSize(usage.quota)}`),
     me.auth ? userMenu() : h("span", { className: "user" }, me.user.name),
   );
   const main = h("main", {});
@@ -227,7 +227,20 @@ async function renderProfile(main: HTMLElement) {
       "div",
       { className: "cards" },
       card("Identité", field("Nom affiché", name), field("Courriel", h("input", { className: "auxi-input", value: user.email, disabled: true })), h("div", { className: "form-actions" }, saveName)),
-      card("Espace de stockage", usage ? h("div", { className: "big-usage" }, h("span", { className: "bar" }, h("span", { style: `width:${pct}%` })), h("span", {}, `${formatSize(usage.used)} utilisés sur ${formatSize(usage.quota)} (${pct} %)`)) : "", h("p", { className: "muted" }, "Pour plus d'espace, adressez-vous à l'administrateur.")),
+      card(
+        "Espace de stockage",
+        usage
+          ? h(
+              "div",
+              { className: "big-usage" },
+              h("strong", {}, `Forfait ${usage.plan.name} : ${formatSize(usage.quota)}`),
+              h("span", { className: "bar" }, h("span", { className: "files", style: `width:${Math.min(100, (usage.files / Math.max(1, usage.quota)) * 100)}%` }), h("span", { className: "mail", style: `width:${Math.min(100, (usage.mail / Math.max(1, usage.quota)) * 100)}%` })),
+              h("span", {}, `${formatSize(usage.used)} utilisés (${pct} %), ${formatSize(usage.available)} libres`),
+              h("span", { className: "legend" }, h("span", {}, h("i", { className: "files" }), `Documents ${formatSize(usage.files)}`), h("span", {}, h("i", { className: "mail" }), `Courriel et pièces jointes ${formatSize(usage.mail)}`)),
+            )
+          : "",
+        h("p", { className: "muted" }, "Tout ce qui est gardé à votre nom compte dans le forfait. Pour plus d'espace, adressez-vous à l'administrateur."),
+      ),
       card("Mot de passe", field("Mot de passe actuel", pw.old), field("Nouveau mot de passe (8 caractères au moins)", pw.next), field("Nouveau mot de passe, encore", pw.again), pwMsg, h("div", { className: "form-actions" }, changePw)),
       acBox,
     ),
@@ -307,24 +320,63 @@ async function renderSettings(box: HTMLElement) {
     return;
   }
   const num = (v: number) => h("input", { type: "number", className: "auxi-input", value: String(v), min: "1" }) as HTMLInputElement;
-  const quota = num(st.default_quota_mb);
   const docs = num(st.max_docs_per_user);
   const idle = num(st.idle_minutes);
   const mail = h("input", { type: "text", className: "auxi-input", value: st.auximail_url, placeholder: "/mail/" }) as HTMLInputElement;
   const msg = h("div", { className: "form-msg" });
   const field = (label: string, input: HTMLElement, hint: string) => h("label", { className: "form-field" }, h("span", {}, label), input, h("small", { className: "muted" }, hint));
+
+  // Forfaits : nom, espace (Mo), forfait par défaut.
+  let plans: Plan[] = st.plans.map((p) => ({ ...p }));
+  let defaultPlan = st.default_plan;
+  const plansBox = h("div", { className: "plans" });
+  const renderPlans = () => {
+    plansBox.replaceChildren(
+      h("div", { className: "plan-row head" }, h("span", {}, "Nom"), h("span", {}, "Espace (Mo)"), h("span", {}, "Par défaut"), h("span", {})),
+      ...plans.map((p, i) => {
+        const name = h("input", { className: "auxi-input", value: p.name }) as HTMLInputElement;
+        name.oninput = () => (p.name = name.value);
+        const quota = h("input", { type: "number", className: "auxi-input", value: String(p.quota_mb), min: "10" }) as HTMLInputElement;
+        const size = h("small", { className: "muted" }, formatSize(p.quota_mb * 1024 * 1024));
+        quota.oninput = () => {
+          p.quota_mb = Number(quota.value);
+          size.textContent = formatSize(p.quota_mb * 1024 * 1024);
+        };
+        const def = h("input", { type: "radio", name: "default-plan" }) as HTMLInputElement;
+        def.checked = p.id === defaultPlan || (!p.id && false);
+        def.onchange = () => (defaultPlan = p.id || "");
+        const del = h("button", { className: "act danger", title: "Retirer ce forfait (ses comptes passent au forfait par défaut)", onclick: () => {
+          plans = plans.filter((_, k) => k !== i);
+          renderPlans();
+        } }, "🗑");
+        return h("div", { className: "plan-row" }, name, h("span", { className: "quota" }, quota, size), h("label", { className: "def" }, def), plans.length > 1 ? del : h("span", {}));
+      }),
+      h("button", { className: "secondary add-plan", onclick: () => {
+        plans.push({ id: "", name: "Nouveau forfait", quota_mb: 10240 });
+        renderPlans();
+      } }, "Ajouter un forfait"),
+    );
+  };
+  renderPlans();
+
   const save = h("button", { className: "primary", onclick: async () => {
     msg.textContent = "";
     try {
-      await files.setSettings({ default_quota_mb: Number(quota.value), max_docs_per_user: Number(docs.value), idle_minutes: Number(idle.value), auximail_url: mail.value });
+      const saved = await files.setSettings({ ...st, plans, default_plan: defaultPlan, max_docs_per_user: Number(docs.value), idle_minutes: Number(idle.value), auximail_url: mail.value });
+      st = saved;
+      plans = saved.plans.map((p) => ({ ...p }));
+      defaultPlan = saved.default_plan;
+      renderPlans();
       toast("Réglages enregistrés.");
     } catch (e) {
       msg.textContent = errText(e);
     }
   } }, "Enregistrer");
   box.replaceChildren(
-    h("h2", {}, "Réglages du serveur"),
-    field("Espace par défaut d'un compte (Mo)", quota, `1024 Mo = 1 Go. Les comptes sans espace particulier l'utilisent (${formatSize(Number(st.default_quota_mb) * 1024 * 1024)} maintenant).`),
+    h("h2", {}, "Forfaits"),
+    h("p", { className: "muted" }, "L'espace d'un forfait compte tout ce qui est gardé au nom du client : documents de « Mes fichiers », courriels et pièces jointes d'AuxiMail. 1024 Mo = 1 Go. Les comptes sans forfait choisi reçoivent le forfait par défaut."),
+    plansBox,
+    h("h2", { className: "spaced" }, "Serveur"),
     field("Documents ouverts en même temps par compte", docs, "Chaque document de bureautique ouvert occupe un moteur sur le serveur (150 à 300 Mo de mémoire)."),
     field("Fermeture des documents inactifs (minutes)", idle, "Un document sans activité depuis ce délai est fermé et son moteur libéré (les modifications non enregistrées sont perdues)."),
     field("Adresse d'AuxiMail", mail, "Le webmail ouvert par la tuile AuxiMail : /mail/ (AuxiMailWeb sur ce serveur, connexion unique) ou une adresse https://. Vide : la tuile indique « Bientôt »."),
@@ -370,17 +422,23 @@ const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 async function renderAdmin(box: HTMLElement) {
   let list: Account[] = [];
-  let defaultQuota = 0;
+  let plans: Plan[] = [];
+  let defaultPlan = "";
+  let mailCounted = false;
   try {
     const r = await files.adminUsers();
     list = r.users;
-    defaultQuota = r.default_quota_mb;
+    plans = r.plans;
+    defaultPlan = r.default_plan;
+    mailCounted = r.mail_counted;
   } catch (e) {
     box.replaceChildren(h("h2", {}, "Administration"), h("p", { className: "hint" }, errText(e)));
     return;
   }
   const refresh = () => void renderAdmin(box);
-  const quotaLabel = (a: Account) => `${formatSize(a.used)} / ${formatSize(a.quota_mb * 1024 * 1024)}${a.custom_quota ? "" : " (défaut)"}`;
+  const quotaLabel = (a: Account) => `${formatSize(a.used)} / ${formatSize(a.quota_mb * 1024 * 1024)}`;
+  const defName = plans.find((p) => p.id === defaultPlan)?.name ?? "";
+  const planOptions: [string, string][] = [["", `Forfait par défaut (${defName})`], ...plans.map((p): [string, string] => [p.id, `${p.name} — ${formatSize(p.quota_mb * 1024 * 1024)}`])];
 
   const add = async () => {
     const v = await form(
@@ -389,14 +447,15 @@ async function renderAdmin(box: HTMLElement) {
         { name: "email", label: "Courriel", type: "email" },
         { name: "name", label: "Nom affiché" },
         { name: "password", label: "Mot de passe initial (8 caractères au moins)", type: "password" },
-        { name: "quota", label: `Espace en Mo (vide : ${defaultQuota} Mo par défaut)`, type: "number" },
+        { name: "plan", label: "Forfait", type: "select", options: planOptions, value: "" },
+        { name: "quota", label: "Espace particulier en Mo (vide : celui du forfait)", type: "number" },
         { name: "admin", label: "Administrateur (gère les comptes)", type: "checkbox" },
       ],
       "Créer le compte",
       async (v) => {
         try {
           const q = Number(v.quota);
-          await files.adminAdd({ email: String(v.email), name: String(v.name), password: String(v.password), admin: !!v.admin, quota_mb: q > 0 ? q : undefined });
+          await files.adminAdd({ email: String(v.email), name: String(v.name), password: String(v.password), admin: !!v.admin, quota_mb: q > 0 ? q : undefined, plan: String(v.plan) || undefined });
           return null;
         } catch (e) {
           return errText(e);
@@ -415,13 +474,14 @@ async function renderAdmin(box: HTMLElement) {
       [
         { name: "name", label: "Nom affiché", value: a.name },
         { name: "password", label: "Nouveau mot de passe (vide : inchangé ; ses sessions seront fermées)", type: "password" },
-        { name: "quota", label: `Espace en Mo (vide ou 0 : ${defaultQuota} Mo par défaut)`, type: "number", value: a.custom_quota ? String(a.quota_mb) : "" },
+        { name: "plan", label: "Forfait", type: "select", options: planOptions, value: a.plan === defaultPlan ? "" : a.plan },
+        { name: "quota", label: "Espace particulier en Mo (vide ou 0 : celui du forfait)", type: "number", value: a.custom_quota ? String(a.quota_mb) : "" },
         { name: "admin", label: "Administrateur", type: "checkbox", value: a.admin },
       ],
       "Enregistrer",
       async (v) => {
         try {
-          await files.adminUpdate({ email: a.email, name: String(v.name), password: String(v.password) || undefined, admin: !!v.admin, quota_mb: Number(v.quota) || 0 });
+          await files.adminUpdate({ email: a.email, name: String(v.name), password: String(v.password) || undefined, admin: !!v.admin, quota_mb: Number(v.quota) || 0, plan: String(v.plan) });
           return null;
         } catch (e) {
           return errText(e);
@@ -458,7 +518,8 @@ async function renderAdmin(box: HTMLElement) {
           { className: "frow account" },
           h("span", { className: "name" }, a.name, h("span", { className: "mail" }, ` ${a.email}`)),
           h("span", { className: "role" }, a.admin ? "administrateur" : ""),
-          h("span", { className: "size" }, quotaLabel(a)),
+          h("span", { className: "plan-name" }, a.custom_quota ? "Espace particulier" : a.plan_name),
+          h("span", { className: "size", title: `Documents ${formatSize(a.files)}, courriel ${formatSize(a.mail)}` }, quotaLabel(a)),
           h(
             "span",
             { className: "row-actions" },
@@ -468,7 +529,13 @@ async function renderAdmin(box: HTMLElement) {
         ),
       ),
     ),
-    h("p", { className: "hint" }, "Chaque compte a son espace « Mes fichiers ». Un nouveau mot de passe ferme les sessions ouvertes du compte."),
+    h(
+      "p",
+      { className: "hint" },
+      "L'espace utilisé compte les documents et, ",
+      mailCounted ? "le courriel (AuxiMail) de chaque compte. " : "quand AuxiMail est relié, son courriel (il ne l'est pas encore). ",
+      "Un nouveau mot de passe ferme les sessions ouvertes du compte.",
+    ),
   );
 }
 

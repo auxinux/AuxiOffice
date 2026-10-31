@@ -51,6 +51,10 @@ pub async fn relay(State(app): State<Arc<crate::AppState>>, req: Request) -> Res
         return StatusCode::NOT_FOUND.into_response();
     };
     let (parts, body) = req.into_parts();
+    // Routes internes d'AuxiMailWeb (espace d'un client…) : pour ce serveur seulement.
+    if parts.uri.path().starts_with("/mail/api/internal") {
+        return StatusCode::NOT_FOUND.into_response();
+    }
     let path = parts.uri.path_and_query().map(|p| p.as_str()).unwrap_or("/mail");
     let url = format!("{}{}", proxy.base, path);
     let mut out = proxy.client.request(parts.method.clone(), &url);

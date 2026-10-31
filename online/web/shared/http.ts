@@ -74,6 +74,10 @@ export interface Account {
   quota_mb: number;
   custom_quota: boolean;
   used: number;
+  files: number;
+  mail: number;
+  plan: string;
+  plan_name: string;
 }
 
 export interface AcOptions {
@@ -84,7 +88,15 @@ export interface AcOptions {
   regional: boolean;
 }
 
+export interface Plan {
+  id: string;
+  name: string;
+  quota_mb: number;
+}
+
 export interface Settings {
+  plans: Plan[];
+  default_plan: string;
   default_quota_mb: number;
   max_docs_per_user: number;
   idle_minutes: number;
@@ -113,7 +125,7 @@ export interface Me {
   auximail?: string;
   auxicorrect?: boolean;
   user?: { email: string; name: string; admin?: boolean };
-  usage?: { used: number; quota: number };
+  usage?: { used: number; quota: number; files: number; mail: number; available: number; plan: { id: string; name: string } };
 }
 
 const q = (path: string) => `path=${encodeURIComponent(path)}`;
@@ -140,9 +152,9 @@ export const files = {
   kvGet: <T>(name: string) => getJson<T | null>(`/api/kv/${name}`),
   kvPut: (name: string, value: unknown) => postJson(`/api/kv/${name}`, value, "PUT"),
   changePassword: (old: string, next: string) => postJson("/api/me/password", { old, new: next }),
-  adminUsers: () => getJson<{ users: Account[]; default_quota_mb: number }>("/api/admin/users"),
-  adminAdd: (a: { email: string; name: string; password: string; admin: boolean; quota_mb?: number }) => postJson("/api/admin/users", a),
-  adminUpdate: (a: { email: string; name?: string; password?: string; admin?: boolean; quota_mb?: number }) => postJson("/api/admin/users/update", a),
+  adminUsers: () => getJson<{ users: Account[]; default_quota_mb: number; plans: Plan[]; default_plan: string; mail_counted: boolean }>("/api/admin/users"),
+  adminAdd: (a: { email: string; name: string; password: string; admin: boolean; quota_mb?: number; plan?: string }) => postJson("/api/admin/users", a),
+  adminUpdate: (a: { email: string; name?: string; password?: string; admin?: boolean; quota_mb?: number; plan?: string }) => postJson("/api/admin/users/update", a),
   adminDelete: (email: string, withFiles: boolean) => postJson("/api/admin/users/delete", { email, files: withFiles }),
   auxicorrect: () => getJson<{ available: boolean; version: string | null; options: AcOptions }>("/api/auxicorrect"),
   setAuxicorrect: (o: AcOptions) => postJson<{ available: boolean; version: string | null; options: AcOptions }>("/api/auxicorrect", o, "PUT"),

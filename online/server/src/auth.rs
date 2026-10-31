@@ -29,6 +29,9 @@ pub struct User {
     /// Administrateur : gère les comptes depuis le portail.
     #[serde(default)]
     pub admin: bool,
+    /// Forfait (identifiant) ; None : forfait par défaut du serveur.
+    #[serde(default)]
+    pub plan: Option<String>,
 }
 
 /// Session gardée sur le disque : compte et expiration (secondes depuis 1970).
@@ -50,7 +53,7 @@ pub struct Auth {
 }
 
 pub fn local_user() -> User {
-    User { id: "local".into(), email: "local".into(), name: whoami(), hash: String::new(), quota_mb: None, admin: false }
+    User { id: "local".into(), email: "local".into(), name: whoami(), hash: String::new(), quota_mb: None, admin: false, plan: None }
 }
 
 fn whoami() -> String {
@@ -114,7 +117,7 @@ pub fn new_user(email: &str, name: &str, password: &str, quota_mb: Option<u64>, 
         return Err("Adresse courriel invalide.".into());
     }
     let name = if name.trim().is_empty() { email.split('@').next().unwrap_or("").to_string() } else { name.trim().chars().take(100).collect() };
-    Ok(User { id: format!("u{}", &random_token()[..16]), email: email.to_string(), name, hash: hash_password(password)?, quota_mb, admin })
+    Ok(User { id: format!("u{}", &random_token()[..16]), email: email.to_string(), name, hash: hash_password(password)?, quota_mb, admin, plan: None })
 }
 
 impl Auth {
@@ -284,6 +287,15 @@ impl Auth {
         })?;
         self.close_sessions(&id, None);
         Ok(())
+    }
+
+    /// Modifie le forfait d'un compte (None : forfait par défaut).
+    pub fn set_plan(&self, email: &str, plan: Option<String>) -> Result<(), String> {
+        self.update(|users| {
+            let u = users.iter_mut().find(|u| u.email.eq_ignore_ascii_case(email)).ok_or(format!("{email} : compte inconnu"))?;
+            u.plan = plan;
+            Ok(())
+        })
     }
 
     /// Modifie un compte (nom, quota, administrateur).

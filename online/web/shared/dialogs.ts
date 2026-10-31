@@ -138,9 +138,11 @@ export function prompt(title: string, label: string, value = ""): Promise<string
 export interface Field {
   name: string;
   label: string;
-  type?: "text" | "email" | "password" | "number" | "checkbox";
+  type?: "text" | "email" | "password" | "number" | "checkbox" | "select";
   value?: string | boolean;
   placeholder?: string;
+  /** Liste déroulante : [valeur, libellé]. */
+  options?: [string, string][];
 }
 
 /**
@@ -153,8 +155,16 @@ export function form(title: string, fields: Field[], okLabel = "OK", check?: (v:
       s.close();
       resolve(null);
     });
-    const inputs = new Map<string, HTMLInputElement>();
+    const inputs = new Map<string, HTMLInputElement | HTMLSelectElement>();
     for (const f of fields) {
+      if (f.type === "select") {
+        const sel = el("select", { className: "auxi-input" });
+        for (const [v, l] of f.options ?? []) sel.append(el("option", { value: v, textContent: l }));
+        sel.value = typeof f.value === "string" ? f.value : "";
+        inputs.set(f.name, sel);
+        s.body.append(el("label", { className: "auxi-field column" }, f.label, sel));
+        continue;
+      }
       const input = el("input", { type: f.type ?? "text", className: f.type === "checkbox" ? "" : "auxi-input", placeholder: f.placeholder ?? "" });
       if (f.type === "checkbox") input.checked = !!f.value;
       else input.value = typeof f.value === "string" ? f.value : "";
@@ -166,7 +176,7 @@ export function form(title: string, fields: Field[], okLabel = "OK", check?: (v:
     s.body.append(msg);
     const ok = button(okLabel, true, async () => {
       const v: Record<string, string | boolean> = {};
-      for (const [k, i] of inputs) v[k] = i.type === "checkbox" ? i.checked : i.value;
+      for (const [k, i] of inputs) v[k] = i instanceof HTMLInputElement && i.type === "checkbox" ? i.checked : i.value;
       ok.disabled = true;
       const err = check ? await check(v) : null;
       ok.disabled = false;

@@ -12,6 +12,7 @@ mod grammar;
 mod proxy;
 mod settings;
 mod storage;
+mod usage;
 mod ws;
 
 // AuxiCorrect : les mêmes modules que l'application de bureau (AuxiWriter
@@ -59,6 +60,8 @@ pub struct AppState {
     pub mail_proxy: Option<proxy::MailProxy>,
     /// AuxiMailWeb pour l'état de l'administration (relais, sinon `--auximail-health`).
     pub mail_health: Option<proxy::MailProxy>,
+    /// Espace AuxiMail de chaque client, compté dans son forfait.
+    pub mail_usage: usage::MailUsage,
     pub started: Instant,
     pub sandbox_name: &'static str,
     /// AuxiCorrect : `auxicorrect-cli` et sa version, s'il est installé.
@@ -108,13 +111,16 @@ Options (aussi en variables AUXI_ONLINE_<OPTION>, ex. AUXI_ONLINE_LISTEN) :
   --idle-minutes <n>        fermeture d'un document inactif (défaut 120)
   --resume-seconds <n>      après une coupure, délai de reconnexion avant de fermer les
                             documents de l'onglet (défaut 180)
-  --quota-mb <n>            espace par défaut d'un compte (défaut 1024)
+  --quota-mb <n>            espace du forfait par défaut, en Mo (défaut 1024 : Free, 1 Go)
   --max-open-mb <n>         taille maximale d'un document ouvert (défaut 200)
   --auximail-url <adresse>  adresse de la tuile AuxiMail du portail (/mail/ ou https://…)
   --auximail-proxy <url>    relaie /mail/… vers AuxiMailWeb (ex. http://127.0.0.1:8095) ;
                             sans cette option, nginx peut faire le relais
   --auximail-health <url>   AuxiMailWeb pour l'état de l'administration, si nginx relaie
                             (ex. http://127.0.0.1:8095)
+  --auximail-data <dossier> dossier de données d'AuxiMailWeb sur ce serveur : son espace
+                            par client est compté dans le forfait (sinon : demandé à
+                            AuxiMailWeb par sa route interne, s'il la fournit)
   Les réglages donnés ici (--quota-mb, --max-docs, --idle-minutes, --auximail-url)
   remplacent ceux enregistrés depuis l'administration.
   --lang <langue>           langue des moteurs (défaut fr-FR)
@@ -391,7 +397,11 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
             // Options de la ligne de commande : elles priment sur les réglages enregistrés.
             let mut cur = st.get();
             let before = serde_json::to_string(&cur).unwrap_or_default();
-            if let Some(q) = args.get("quota-mb").and_then(|v| v.parse().ok()) {
+            if let Some(q) = args.get("quota-mb").and_then(|v| v.parse::<u64>().ok()) {
+                let id = cur.plan(None).id;
+                if let Some(p) = cur.plans.iter_mut().find(|p| p.id == id) {
+                    p.quota_mb = q;
+                }
                 cur.default_quota_mb = q;
             }
             if let Some(d) = args.get("max-docs").and_then(|v| v.parse().ok()) {
@@ -410,6 +420,7 @@ async fn serve(args: Args, data: PathBuf) -> Result<(), String> {
         },
         mail_proxy: args.get("auximail-proxy").map(|u| proxy::MailProxy::new(&u)).transpose()?,
         mail_health: args.get("auximail-proxy").or_else(|| args.get("auximail-health")).map(|u| proxy::MailProxy::new(&u)).transpose()?,
+        mail_usage: usage::MailUsage::new(args.get("auximail-data").map(PathBuf::from), args.get("auximail-proxy").or_else(|| args.get("auximail-health"))),
         started: Instant::now(),
         sandbox_name: match sandbox {
             Sandbox::Bwrap(_) => "bubblewrap",

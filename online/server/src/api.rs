@@ -53,9 +53,16 @@ pub async fn me(State(app): State<Arc<AppState>>, method: Method, headers: Heade
         Ok(u) => {
             let mut v = base;
             v["user"] = json!({"email": u.email, "name": u.name, "admin": u.admin});
-            let (store, id) = (app.store.clone(), u.id.clone());
-            let used = tokio::task::spawn_blocking(move || store.usage(&id)).await.unwrap_or(0);
-            v["usage"] = json!({"used": used, "quota": u.quota_mb.unwrap_or(app.settings.get().default_quota_mb) * 1024 * 1024});
+            // Espace du client : forfait, total, part des documents et d'AuxiMail.
+            let a = app.clone();
+            let us = tokio::task::spawn_blocking(move || crate::usage::of(&a, &u)).await.ok();
+            if let Some(us) = us {
+                v["usage"] = json!({
+                    "used": us.used, "quota": us.quota, "files": us.files, "mail": us.mail,
+                    "available": us.quota.saturating_sub(us.used),
+                    "plan": {"id": us.plan.id, "name": if us.custom { "Espace particulier".to_string() } else { us.plan.name.clone() }},
+                });
+            }
             Json(v).into_response()
         }
         Err(_) => (StatusCode::UNAUTHORIZED, Json(base)).into_response(),
@@ -153,13 +160,15 @@ pub async fn read(State(app): State<Arc<AppState>>, method: Method, headers: Hea
 
 pub async fn write(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Query(q): Query<PathQ>, body: Bytes) -> ApiResult<Json<Value>> {
     let u = user(&app, &headers, &method)?;
-    let quota = u.quota_mb.unwrap_or(app.settings.get().default_quota_mb) * 1024 * 1024;
     let store = app.store.clone();
     let path = crate::storage::normalize(&q.path)?;
+    let a = app.clone();
     let stat = blocking(move || {
+        // Forfait : documents et courriel ensemble.
+        let us = crate::usage::of(&a, &u);
         let old = store.stat(&u.id, &path).size;
-        if store.usage(&u.id) + body.len() as u64 > quota + old {
-            return Err("Espace de stockage plein : supprimez des fichiers pour continuer.".into());
+        if us.used + body.len() as u64 > us.quota + old {
+            return Err(format!("Espace plein ({} sur votre forfait {}) : supprimez des fichiers ou des courriels pour continuer.", human(us.used), us.plan.name));
         }
         store.write(&u.id, &path, &body)
     })
@@ -270,6 +279,16 @@ pub async fn log(State(app): State<Arc<AppState>>, method: Method, headers: Head
     Ok(Json(json!({})))
 }
 
+/// Taille lisible (« 640 Mo »).
+fn human(n: u64) -> String {
+    let mb = n as f64 / 1024.0 / 1024.0;
+    if mb >= 1024.0 {
+        format!("{:.1} Go", mb / 1024.0).replace('.', ",")
+    } else {
+        format!("{:.0} Mo", mb)
+    }
+}
+
 // --- Comptes ---------------------------------------------------------------------
 
 #[derive(Deserialize)]
@@ -299,16 +318,19 @@ fn admin(app: &AppState, headers: &HeaderMap, method: &Method) -> ApiResult<User
 pub async fn admin_list(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap) -> ApiResult<Json<Value>> {
     admin(&app, &headers, &method)?;
     let a = app.clone();
-    let default = app.settings.get().default_quota_mb;
+    let settings = app.settings.get();
     let list = blocking(move || {
         Ok(a.auth
             .list()
             .iter()
-            .map(|u| json!({"email": u.email, "name": u.name, "admin": u.admin, "quota_mb": u.quota_mb.unwrap_or(default), "custom_quota": u.quota_mb.is_some(), "used": a.store.usage(&u.id)}))
+            .map(|u| {
+                let us = crate::usage::of(&a, u);
+                json!({"email": u.email, "name": u.name, "admin": u.admin, "plan": us.plan.id, "plan_name": us.plan.name, "quota_mb": us.quota / 1024 / 1024, "custom_quota": us.custom, "used": us.used, "files": us.files, "mail": us.mail})
+            })
             .collect::<Vec<_>>())
     })
     .await?;
-    Ok(Json(json!({"users": list, "default_quota_mb": default})))
+    Ok(Json(json!({"users": list, "default_quota_mb": settings.default_quota_mb, "plans": settings.plans, "default_plan": settings.default_plan, "mail_counted": app.mail_usage.enabled()})))
 }
 
 #[derive(Deserialize)]
@@ -321,13 +343,17 @@ pub struct NewAccount {
     admin: bool,
     #[serde(default)]
     quota_mb: Option<u64>,
+    /// Forfait (identifiant) ; absent : forfait par défaut.
+    #[serde(default)]
+    plan: Option<String>,
 }
 
 pub async fn admin_add(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<NewAccount>) -> ApiResult<Json<Value>> {
     admin(&app, &headers, &method)?;
     let a = app.clone();
     blocking(move || {
-        let u = crate::auth::new_user(&b.email, &b.name, &b.password, b.quota_mb, b.admin)?;
+        let mut u = crate::auth::new_user(&b.email, &b.name, &b.password, b.quota_mb, b.admin)?;
+        u.plan = b.plan.filter(|p| a.settings.get().plans.iter().any(|x| &x.id == p));
         a.auth.add(u)
     })
     .await?;
@@ -344,9 +370,12 @@ pub struct UpdateAccount {
     password: Option<String>,
     #[serde(default)]
     admin: Option<bool>,
-    /// Quota en Mo ; 0 : quota par défaut du serveur.
+    /// Espace particulier en Mo ; 0 : celui du forfait.
     #[serde(default)]
     quota_mb: Option<u64>,
+    /// Forfait (identifiant) ; « » : forfait par défaut.
+    #[serde(default)]
+    plan: Option<String>,
 }
 
 pub async fn admin_update(State(app): State<Arc<AppState>>, method: Method, headers: HeaderMap, Json(b): Json<UpdateAccount>) -> ApiResult<Json<Value>> {
@@ -358,6 +387,15 @@ pub async fn admin_update(State(app): State<Arc<AppState>>, method: Method, head
     blocking(move || {
         if let Some(p) = b.password.as_deref().filter(|p| !p.is_empty()) {
             a.auth.set_password(&b.email, p)?;
+        }
+        if let Some(p) = b.plan {
+            let p = Some(p).filter(|p| !p.is_empty());
+            if let Some(id) = &p {
+                if !a.settings.get().plans.iter().any(|x| &x.id == id) {
+                    return Err(format!("Forfait inconnu : {id}"));
+                }
+            }
+            a.auth.set_plan(&b.email, p)?;
         }
         a.auth.set_profile(&b.email, b.name, b.quota_mb.map(|q| (q > 0).then_some(q)), b.admin)
     })

@@ -179,6 +179,16 @@ courriel est créé à sa première visite. Contrat complet : `web/INTEGRATION.m
    `https://web.office.auxinux.ca/mail/`), ou l'option `--auximail-url /mail/`.
 5. Vérifier : Administration → Serveur → ligne « AuxiMail » (version, espaces ouverts).
 
+**Forfaits et espace** : un forfait (Administration → Réglages → Forfaits ; Free = 1 Go au
+départ) vaut pour **tout ce qui est gardé au nom du client** : « Mes fichiers » et son espace
+AuxiMail (courriels, pièces jointes). Pour compter l'espace AuxiMail, auxi-online lit
+`--auximail-data <dossier de données d'AuxiMailWeb>` (`users/ao-<SHA-256 de l'adresse>`,
+règle de web/INTEGRATION.md ; l'utilisateur d'auxi-online doit pouvoir le lire), sinon il le
+demande à AuxiMailWeb (`GET /mail/api/internal/usage?email=…`, route interne jamais relayée
+depuis un navigateur). Les envois de fichiers sont refusés au-delà du forfait ; `GET /api/me`
+donne à AuxiMailWeb `usage` = `{used, quota, files, mail, available, plan}` pour bloquer de
+son côté.
+
 La déconnexion se fait dans le portail ; le bouton « AuxiOffice Online » d'AuxiMail ramène au
 portail. Le témoin est `SameSite=Strict` : arrivé sur `/mail/` par un lien d'un autre site
 (un courriel, par exemple), le navigateur ne l'envoie pas au premier chargement ; passer par
