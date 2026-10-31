@@ -238,7 +238,7 @@ fn open_in_writer(path: String) -> Result<(), String> {
     let exe = office_exe().ok_or("AuxiOffice n'est pas installé.")?;
     c = std::process::Command::new(exe);
     c.args(["--app", "writer"]).arg(&path);
-    c.stdin(std::process::Stdio::null()).spawn().map(|_| ()).map_err(|e| format!("Lancement d'AuxiWriter impossible : {e}"))
+    auxicorrect::no_console(&mut c).stdin(std::process::Stdio::null()).spawn().map(|_| ()).map_err(|e| format!("Lancement d'AuxiWriter impossible : {e}"))
 }
 
 #[tauri::command]

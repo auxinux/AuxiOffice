@@ -106,7 +106,7 @@ pub fn open_with_system(file: &Path) -> Result<(), String> {
     let status = if cfg!(target_os = "macos") {
         Command::new("open").arg(file).status()
     } else if cfg!(windows) {
-        Command::new("cmd").args(["/C", "start", ""]).arg(file).status()
+        auxi_engine::no_console(&mut Command::new("cmd")).args(["/C", "start", ""]).arg(file).status()
     } else {
         Command::new("xdg-open").arg(file).status()
     };

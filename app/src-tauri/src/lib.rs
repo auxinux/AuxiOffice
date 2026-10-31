@@ -695,7 +695,7 @@ fn auxicorrect_open_app(corrector: State<'_, Mutex<Corrector>>) -> Result<(), St
     } else {
         std::process::Command::new(&app)
     };
-    c.stdin(std::process::Stdio::null()).spawn().map(|_| ()).map_err(|e| e.to_string())
+    auxi_engine::no_console(&mut c).stdin(std::process::Stdio::null()).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
 /// Dictionnaire d'AuxiCorrect : définition, synonymes, antonymes, conjugaison.

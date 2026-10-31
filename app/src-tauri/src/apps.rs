@@ -258,7 +258,7 @@ pub fn launch(dir: &Path, kind: AppKind, l: &Launch) -> Result<(), String> {
 }
 
 fn spawn(mut c: Command) -> Result<(), String> {
-    c.stdin(Stdio::null());
+    auxi_engine::no_console(&mut c).stdin(Stdio::null());
     let mut child = c.spawn().map_err(|e| format!("lancement impossible : {e}"))?;
     // L'application lancée vit sa vie ; on recueille sa fin pour qu'elle ne
     // reste pas en processus zombie tant qu'AuxiOffice est ouvert.

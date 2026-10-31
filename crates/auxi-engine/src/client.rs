@@ -94,7 +94,7 @@ impl Engine {
         // Langues pour lesquelles LibreOffice active correcteur et césure.
         cmd.env("LOK_ALLOWLIST_LANGUAGES", "fr-FR fr-CA en-US en-GB es-ES de-DE");
         cmd.env("SAL_USE_VCLPLUGIN", "svp").env_remove("DISPLAY").env_remove("WAYLAND_DISPLAY");
-        let mut child = cmd
+        let mut child = crate::no_console(&mut cmd)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

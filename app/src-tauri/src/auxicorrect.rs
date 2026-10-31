@@ -135,7 +135,7 @@ struct Diag {
 }
 
 pub fn check(cli: &Path, opts: &Options, text: &str) -> Result<Value, String> {
-    let mut child = Command::new(cli)
+    let mut child = auxi_engine::no_console(&mut Command::new(cli))
         .args(opts.args())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -346,7 +346,7 @@ pub fn lookup(cli: &Path, what: &str, word: &str) -> Result<String, String> {
     if word.is_empty() || word.len() > 100 || word.contains('\n') {
         return Err("sélectionnez un mot".into());
     }
-    let out = Command::new(cli).arg(cmd).arg(word).stdin(Stdio::null()).output().map_err(|e| e.to_string())?;
+    let out = auxi_engine::no_console(&mut Command::new(cli)).arg(cmd).arg(word).stdin(Stdio::null()).output().map_err(|e| e.to_string())?;
     let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
     if text.is_empty() {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());

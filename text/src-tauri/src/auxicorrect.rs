@@ -124,12 +124,24 @@ pub fn parse_remarks(text: &str, out: &[u8]) -> Result<Vec<Remark>, String> {
     Ok(remarks)
 }
 
+/// Sous Windows, lance le processus sans fenêtre de console (outil AuxiCorrect,
+/// AuxiOffice compilé en mode débogage…) : sinon une fenêtre noire s'ouvre.
+pub(crate) fn no_console(cmd: &mut std::process::Command) -> &mut std::process::Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
 /// Vérifie `text` avec l'outil d'AuxiCorrect.
 pub fn check(cli: &Path, text: &str, international: bool) -> Result<Vec<Remark>, String> {
     if text.chars().count() > MAX_CHARS {
         return Ok(vec![]);
     }
-    let mut child = Command::new(cli)
+    let mut child = no_console(&mut Command::new(cli))
         .args(cli_args(international))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -183,7 +195,7 @@ pub fn open_app(app: &Path) -> Result<(), String> {
     } else {
         Command::new(app)
     };
-    c.stdin(Stdio::null()).spawn().map(|_| ()).map_err(|e| e.to_string())
+    no_console(&mut c).stdin(Stdio::null()).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
