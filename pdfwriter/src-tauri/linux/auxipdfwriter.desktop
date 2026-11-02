@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=AuxiPDFWriter
+GenericName=Éditeur de PDF
+Comment=Créer, modifier et fusionner des documents PDF
+Exec=auxipdfwriter %F
+Icon=auxipdfwriter
+Terminal=false
+Categories=Office;Viewer;
+MimeType=application/pdf;
+StartupWMClass=auxipdfwriter

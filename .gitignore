@@ -5,6 +5,11 @@ node_modules/
 /app/src-tauri/gen/
 /text/ui/dist/
 /text/src-tauri/gen/
+/pdfwriter/ui/dist/
+/pdfwriter/src-tauri/gen/
+/pdfwriter/src-tauri/target/
+/pdfwriter/target/
+/pdfwriter/ui/public/pdfjs/
 __pycache__/
 *.pyc
 .~lock.*#

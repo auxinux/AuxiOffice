@@ -1,0 +1,36 @@
+[package]
+name = "auxipdfwriter"
+description = "AuxiPDFWriter — créer, modifier et fusionner des documents PDF"
+version = "0.1.0"
+edition = "2021"
+authors = ["Projet AuxiNux"]
+homepage = "https://office.auxinux.ca"
+license = "LicenseRef-AuxiOffice-Proprietary"
+publish = false
+
+# Autonome : ses propres dépendances, sans lien avec le workspace de la suite.
+[workspace]
+
+[lib]
+name = "auxipdfwriter_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["image-png"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Chiffrement des PDF (MIT).
+lopdf = { version = "0.46", default-features = false, features = ["chrono-clock"] }
+getrandom = "0.3"
+
+[features]
+# Interface intégrée à l'exécutable (au lieu du serveur Vite de développement).
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
