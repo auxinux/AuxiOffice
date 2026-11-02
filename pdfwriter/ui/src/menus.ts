@@ -79,6 +79,29 @@ export const MENUS: [string, Entry[]][] = [
   ["Aide", [["about", "À propos d'AuxiPDFWriter"]]],
 ];
 
+// Windows : WebView2 garde le clavier pour lui et a ses propres raccourcis
+// (F5 recharge la page et perdrait le document ; Ctrl+P, Ctrl+F…). La page les
+// bloque et lance elle-même les commandes du menu.
+export const IS_WINDOWS = navigator.platform.toLowerCase().startsWith("win");
+
+/** Nom d'une touche : « ctrl+shift+s », « f4 ». */
+export function keyName(e: { key: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; altKey: boolean }): string {
+  const key = e.key === "+" ? "=" : e.key.toLowerCase();
+  return `${e.ctrlKey || e.metaKey ? "ctrl+" : ""}${e.shiftKey ? "shift+" : ""}${e.altKey ? "alt+" : ""}${key}`;
+}
+
+export function shortcuts(menus = MENUS): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [, items] of menus) {
+    for (const e of items) {
+      if (Array.isArray(e) && e[2]) out.set(e[2].toLowerCase().replace("cmdorctrl", "ctrl"), e[0]);
+    }
+  }
+  return out;
+}
+
+export const BROWSER_KEYS = new Set(["f3", "f5", "f7", "f12", "ctrl+r", "ctrl+f5", "ctrl+shift+r", "ctrl+p", "ctrl+f", "ctrl+g", "ctrl+shift+g", "ctrl+u", "ctrl+j", "ctrl+h", "ctrl+d", "ctrl+shift+i", "ctrl+shift+j", "alt+arrowleft", "alt+arrowright"]);
+
 let menu: Menu | null = null;
 
 export async function installMenu(run: (id: string) => void) {

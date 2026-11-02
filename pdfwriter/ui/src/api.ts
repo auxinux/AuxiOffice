@@ -35,5 +35,6 @@ export const api = {
 
 export const fileName = (p: string) => p.split(/[\\/]/).pop() ?? p;
 export const dirName = (p: string) => p.slice(0, Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\")));
+export const joinPath = (dir: string, name: string) => `${dir}${dir.includes("\\") && !dir.includes("/") ? "\\" : "/"}${name}`;
 export const isPdf = (p: string) => /\.pdf$/i.test(p);
 export const isImage = (p: string) => /\.(png|jpe?g|webp|bmp|gif)$/i.test(p);

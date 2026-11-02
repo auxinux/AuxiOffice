@@ -326,11 +326,11 @@ export function PrintDialog({ onCancel, onOk, onSystem }: { onCancel: () => void
   }, []);
   return (
     <Modal title="Imprimer" onClose={onCancel} actions={<>
-      <button onClick={onSystem}>Ouvrir dans l'aperçu du système</button>
+      <button className={printers?.length === 0 ? "primary" : ""} onClick={onSystem}>Ouvrir dans l'application PDF du système</button>
       <button onClick={onCancel}>Annuler</button>
-      <button className="primary" disabled={!printer} onClick={() => onOk({ printer, copies, pages })}>Imprimer</button>
+      {printers?.length !== 0 && <button className="primary" disabled={!printer} onClick={() => onOk({ printer, copies, pages })}>Imprimer</button>}
     </>}>
-      {printers === null ? <p>Recherche des imprimantes…</p> : printers.length === 0 ? <p>Aucune imprimante n'est configurée.</p> : (
+      {printers === null ? <p>Recherche des imprimantes…</p> : printers.length === 0 ? <p>Le document va s'ouvrir dans l'application PDF de votre système : lancez l'impression depuis celle-ci.</p> : (
         <>
           <Field label="Imprimante"><select value={printer} onChange={(e) => setPrinter(e.target.value)}>{printers.map((p) => <option key={p.name} value={p.name}>{p.name}{p.default ? " (par défaut)" : ""}</option>)}</select></Field>
           <Field label="Copies"><input type="number" min={1} max={999} value={copies} onChange={(e) => setCopies(Math.max(1, Number(e.target.value) || 1))} /></Field>

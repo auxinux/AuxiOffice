@@ -220,12 +220,13 @@ fn create_window(app: &AppHandle, files: Vec<String>) -> Result<(), String> {
     let n = state.next_window.fetch_add(1, Ordering::Relaxed);
     let label = if n == 0 { "main".to_string() } else { format!("w{n}") };
     state.pending.lock().unwrap().insert(label.clone(), files);
-    let dark = theme::system_is_dark().unwrap_or(false);
+    // Thème inconnu (Windows, macOS) : la fenêtre suit celui du système.
+    let window_theme = theme::system_is_dark().map(|dark| if dark { tauri::Theme::Dark } else { tauri::Theme::Light });
     let mut b = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title("AuxiPDFWriter")
         .inner_size(1280.0, 860.0)
         .min_inner_size(760.0, 480.0)
-        .theme(Some(if dark { tauri::Theme::Dark } else { tauri::Theme::Light }));
+        .theme(window_theme);
     if let Ok(icon) = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.png")) {
         b = b.icon(icon).map_err(|e| e.to_string())?;
     }

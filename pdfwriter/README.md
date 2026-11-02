@@ -32,6 +32,7 @@ LibreOffice.
 - « Modifier le texte » travaille ligne par ligne, sans refaire la mise en page du paragraphe, et
   seulement sur le texte placé directement dans la page : pas dans les objets réutilisables (XObject),
   ni dans une image numérisée (pas de reconnaissance de caractères).
+- Windows : l'impression passe par l'application PDF du système (pas de CUPS).
 - Le masque blanc cache l'affichage, sans effacer le contenu. Il n'y a pas encore de caviardage.
 - Le recadrage masque le contenu hors cadre sans l'effacer.
 - La fusion ne reprend pas les signets ni les champs de formulaire des fichiers d'origine. Pas de
@@ -63,6 +64,13 @@ macOS (Apple Silicon ou Intel), produit `pdfwriter/target/macos/AuxiPDFWriter.ap
 
 ```sh
 pdfwriter/build-mac.sh
+```
+
+Windows 11 x64, produit `pdfwriter\target\windows\AuxiPDFWriter\AuxiPDFWriter.exe` (Rust avec les
+outils MSVC, Node.js 22+) :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File pdfwriter\build-win.ps1
 ```
 
 À la main (Linux, ou pour lancer les tests) :

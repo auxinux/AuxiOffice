@@ -5,6 +5,17 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
 
+/// Pas de fenêtre de console noire sous Windows pour les commandes lancées.
+pub fn no_console(cmd: &mut Command) -> &mut Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
 #[derive(Serialize)]
 pub struct Printer {
     pub name: String,
@@ -47,13 +58,17 @@ pub fn lp_args(file: &Path, o: &PrintOptions) -> Result<Vec<String>, String> {
 }
 
 pub fn list_printers() -> Vec<Printer> {
+    // Windows n'a pas CUPS : l'impression passe par l'application PDF du système.
+    if cfg!(windows) {
+        return vec![];
+    }
     let run = |args: &[&str]| -> String { Command::new("lpstat").args(args).env("LC_ALL", "C").output().ok().map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default() };
     let default = run(&["-d"]).split(':').nth(1).map(|s| s.trim().to_string()).unwrap_or_default();
     run(&["-e"]).lines().map(str::trim).filter(|l| !l.is_empty()).map(|name| Printer { default: name == default, name: name.to_string() }).collect()
 }
 
 pub fn print_pdf(file: &Path, o: &PrintOptions) -> Result<String, String> {
-    let out = Command::new("lp").args(lp_args(file, o)?).output().map_err(|e| format!("service d'impression indisponible ({e})"))?;
+    let out = no_console(&mut Command::new("lp")).args(lp_args(file, o)?).output().map_err(|e| format!("service d'impression indisponible ({e})"))?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
     } else {
@@ -73,7 +88,7 @@ pub fn open_with_system(target: &str) -> Result<(), String> {
         c = Command::new("xdg-open");
         c.arg(target);
     }
-    c.spawn().map(|_| ()).map_err(|e| format!("ouverture impossible ({e})"))
+    no_console(&mut c).spawn().map(|_| ()).map_err(|e| format!("ouverture impossible ({e})"))
 }
 
 #[cfg(test)]

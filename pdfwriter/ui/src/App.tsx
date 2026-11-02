@@ -6,7 +6,7 @@ import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialo
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import { api, dirName, fileName, isImage, isPdf, type Prefs } from "./api";
+import { api, dirName, fileName, isImage, isPdf, joinPath, type Prefs } from "./api";
 import { core, CoreCallError } from "./core/client";
 import type { Align, FontFamily, ImageObj, PageObject, TextObj } from "./core/objects";
 import { everyN, type Metadata, type PageSpec, parseRanges, type Rgb } from "./core/pages";
@@ -14,7 +14,7 @@ import type { RunEdit, TextRun } from "./core/textedit";
 import * as D from "./Dialogs";
 import { Icon } from "./icons";
 import { imageUrl, normalizeImage } from "./images";
-import { activateMenu, installMenu } from "./menus";
+import { activateMenu, BROWSER_KEYS, installMenu, IS_WINDOWS, keyName, shortcuts } from "./menus";
 import { applyOrder, type DocState, History, initialState, insertPagesAt, isIdentity, moveOrder, newId, objectsByIndex, touchPages } from "./model";
 import { documentOptions, loadPdfjs, type PdfLib } from "./pdfjs";
 import { Thumbs } from "./Thumbs";
@@ -382,7 +382,7 @@ export default function App() {
 
   /** Nouveau fichier produit par une commande : enregistré puis ouvert. */
   const deliver = async (bytes: Uint8Array, suggested: string) => {
-    const t = await saveDialog({ defaultPath: dirName(path ?? "") ? `${dirName(path!)}/${suggested}` : suggested, filters: PDF_FILTER });
+    const t = await saveDialog({ defaultPath: dirName(path ?? "") ? joinPath(dirName(path!), suggested) : suggested, filters: PDF_FILTER });
     if (!t) return;
     const target = /\.pdf$/i.test(t) ? t : `${t}.pdf`;
     await api.writePdf(target, bytes);
@@ -541,7 +541,11 @@ export default function App() {
       else await api.newWindow(files);
     },
     open: pickOpen,
-    save,
+    save: () => {
+      // Une zone de texte en cours de saisie est validée d'abord.
+      if (document.activeElement instanceof HTMLTextAreaElement) document.activeElement.blur();
+      return save();
+    },
     saveAs,
     merge: () => setDialog({ kind: "merge" }),
     split: () => doc && setDialog({ kind: "split" }),
@@ -601,9 +605,31 @@ export default function App() {
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
 
-  useEffect(() => {
-    void installMenu((id) => void actionsRef.current[id]?.());
+  // Le menu et le clavier peuvent signaler le même appui (Windows) : une seule exécution.
+  const lastCommand = useRef({ id: "", at: 0 });
+  const runCommand = useCallback((id: string) => {
+    const now = Date.now();
+    if (lastCommand.current.id === id && now - lastCommand.current.at < 250) return;
+    lastCommand.current = { id, at: now };
+    void actionsRef.current[id]?.();
   }, []);
+
+  useEffect(() => {
+    void installMenu(runCommand);
+    if (!IS_WINDOWS) return;
+    const table = shortcuts();
+    const onKey = (e: KeyboardEvent) => {
+      const name = keyName(e);
+      const id = table.get(name);
+      const blocked = BROWSER_KEYS.has(name);
+      if (!id && !blocked) return;
+      const modal = !!document.querySelector(".modal");
+      if (blocked || !modal) e.preventDefault();
+      if (id && !modal && !e.repeat) runCommand(id);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [runCommand]);
 
   // Clavier (hors des champs) ; fermeture de la fenêtre ; fichiers déposés.
   useEffect(() => {
@@ -729,7 +755,7 @@ export default function App() {
       const dir = await openDialog({ directory: true, defaultPath: dirName(path ?? "") || undefined, title: "Dossier des fichiers découpés" });
       if (!dir || Array.isArray(dir)) return;
       const parts = await core("split", (await finalBytes()).flat, groups);
-      const names = parts.map((_, i) => `${dir}/${baseName()}_${String(i + 1).padStart(3, "0")}.pdf`);
+      const names = parts.map((_, i) => joinPath(dir, `${baseName()}_${String(i + 1).padStart(3, "0")}.pdf`));
       const infos = await Promise.all(names.map((n) => api.fileInfo(n)));
       const clash = infos.filter((i) => i.exists).length;
       if (clash) {
