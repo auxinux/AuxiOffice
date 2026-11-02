@@ -17,5 +17,7 @@ __pycache__/
 # Vidages mémoire de LibreOffice
 core
 core.[0-9]*
+# … mais pas le code source du cœur d'AuxiPDFWriter.
+!/pdfwriter/ui/src/core/
 /app/ui/public/pdfjs/
 .claude/
